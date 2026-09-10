@@ -1,0 +1,14 @@
+name: Deploy
+
+# Заготовка: развёртывание будет добавлено после настройки стенда и образов.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Развёртывание стенда пока не настроено.'

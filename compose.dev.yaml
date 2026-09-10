@@ -1,0 +1,3 @@
+# Дополнения для локальной разработки: сборка, порты и подключение исходников.
+# Подключается явно: docker compose -f compose.yaml -f compose.dev.yaml up --build
+services: {}

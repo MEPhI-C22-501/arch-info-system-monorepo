@@ -1,0 +1,14 @@
+name: CI
+
+# Заготовка: проверки и сборка будут добавлены после появления приложений и Dockerfile.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Проверки и сборка образов пока не настроены.'
