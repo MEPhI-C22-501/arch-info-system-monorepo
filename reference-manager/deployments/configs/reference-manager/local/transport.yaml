@@ -1,0 +1,9 @@
+transport:
+  http:
+    listen_host: 0.0.0.0
+    listen_port: 8080
+
+    read_header_timeout: 5s
+    read_timeout: 5s
+    write_timeout: 5s
+    idle_timeout: 10s

@@ -1,0 +1,39 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the reference manager application binary
+    env:
+      CGO_ENABLED: 0
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -ldflags="-s -w" -o ./bin/reference-manager ./cmd/reference-manager
+
+  lint:
+    desc: Run linter checks (pass extra flags after '--', e.g., 'task lint -- --fix')
+    cmds:
+      - golangci-lint run ./... {{.CLI_ARGS}}
+
+  migration:
+    desc: Create new migration file
+    cmds:
+      - migrate create -ext sql -dir deployments/migrations -seq {{.CLI_ARGS}}
+
+  images:
+    desc: Build Docker images for the reference manager application
+    deps: [build]
+    cmds:
+      - docker build -f deployments/docker/reference-manager.dockerfile -t erp/reference-manager:latest .
+      - docker build -f deployments/docker/reference-manager-debug.dockerfile -t erp/reference-manager-debug:latest .
+
+  up:
+    desc: Start the local development environment using Docker Compose
+    deps: [images]
+    cmds:
+      - docker compose up -d
+  
+  down:
+    desc: Stop the local environment and remove associated volumes
+    cmds:
+      - docker compose down -v

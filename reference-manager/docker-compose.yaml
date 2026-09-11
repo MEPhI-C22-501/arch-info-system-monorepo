@@ -1,0 +1,67 @@
+services:
+  reference-manager:
+    container_name: reference_manager
+    image: erp/reference-manager-debug:latest
+
+    command: [ "--configs", "/app/configs/reference-manager" ]
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./deployments/configs/reference-manager/local/:/app/configs/reference-manager:ro
+
+    depends_on:
+      reference-manager-migrations:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "/busybox/wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  reference-manager-migrations:
+    container_name: reference_manager_migrations
+    image: migrate/migrate:latest
+
+    volumes:
+      - ./deployments/migrations:/migrations:ro
+
+    command: [ "-path=/migrations", "-database=postgres://reference_manager:reference_manager@reference-manager-database:5432/reference_manager?sslmode=disable", "up" ]
+
+    depends_on:
+      reference-manager-database:
+        condition: service_healthy
+
+    restart: "no"
+
+  reference-manager-database:
+    container_name: reference_manager_database
+    image: postgres:18-alpine
+
+    environment:
+      POSTGRES_DB: reference_manager
+      POSTGRES_USER: reference_manager
+      POSTGRES_PASSWORD: reference_manager
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - reference_manager_database_data:/var/lib/postgresql
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U reference_manager -d reference_manager" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  reference_manager_database_data:
