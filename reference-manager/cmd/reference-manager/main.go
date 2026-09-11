@@ -21,7 +21,7 @@ func main() {
 	app := errors.Must(app.NewApp(cfg))
 
 	startupCtx, startupCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	if err := app.Shutdown(startupCtx); err != nil {
+	if err := app.Startup(startupCtx); err != nil {
 		startupCancel()
 		panic(err)
 	}

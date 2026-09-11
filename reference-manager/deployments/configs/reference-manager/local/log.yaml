@@ -1,0 +1,26 @@
+log:
+  meta:
+    service: reference-manager
+    environment: local
+
+  handlers:
+    - name: reference-manager-info
+      type: file
+      level: debug
+      format: json
+
+      file:
+        location: ./log/reference-manager/
+
+        rotation:
+          enabled: true
+          filename_pattern: reference-manager-info-YY-MM-DD-HH-mm-SS.log
+          max_size: 1000000
+          max_age: 30s
+          max_backups: 5
+          compress: true
+    
+    - name: reference-manager-info-console
+      type: console
+      level: debug
+      format: text
