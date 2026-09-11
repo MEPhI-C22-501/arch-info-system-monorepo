@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Golang
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+*.test
+go.work
+go.work.sum

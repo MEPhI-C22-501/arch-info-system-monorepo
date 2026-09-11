@@ -1,0 +1,16 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build runtime manager application binary
+    env:
+      CGO_ENABLED: 0
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -ldflags="-s -w" -o ./bin/reference-manager ./cmd/reference-manager
+
+  lint:
+    desc: Run linter checks. Pass flags after '--' (e.g. task lint -- --fix)s
+    cmds:
+      - golangci-lint run ./... {{.CLI_ARGS}}
