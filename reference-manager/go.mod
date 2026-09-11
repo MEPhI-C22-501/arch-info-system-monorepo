@@ -3,6 +3,7 @@ module github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager
 go 1.27.0
 
 require (
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	golang.org/x/sync v0.23.0
 )
