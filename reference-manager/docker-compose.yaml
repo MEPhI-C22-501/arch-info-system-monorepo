@@ -1,0 +1,14 @@
+services:
+  reference-manager:
+    container_name: reference_manager
+    image: erp/reference-manager-debug:latest
+
+    command: [ "--configs", "/app/configs/reference-manager" ]
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./deployments/configs/reference-manager/local/:/app/configs/reference-manager:ro
+
+    restart: unless-stopped
