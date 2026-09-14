@@ -1,8 +1,14 @@
 version: '3'
 
 tasks:
+  generate:
+    desc: Generate all artifacts
+    cmds:
+      - echo "not implemented"
+
   build:
     desc: Build the reference manager application binary
+    deps: [generate]
     env:
       CGO_ENABLED: 0
       GOOS: linux
@@ -14,6 +20,12 @@ tasks:
     desc: Run linter checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
       - golangci-lint run ./... {{.CLI_ARGS}}
+
+  tests:
+    desc: Run all tests
+    deps: [lint]
+    cmds:
+      - echo "not implemented"
 
   migration:
     desc: Create new migration file
