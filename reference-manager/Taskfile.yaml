@@ -1,8 +1,14 @@
 version: '3'
 
 tasks:
+  generate:
+    desc: Generate all artifacts
+    cmds:
+      - echo "not implemented"
+
   build:
     desc: Build the reference manager application binary
+    deps: [generate]
     env:
       CGO_ENABLED: 0
       GOOS: linux
@@ -14,6 +20,12 @@ tasks:
     desc: Run linter checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
       - golangci-lint run ./... {{.CLI_ARGS}}
+
+  tests:
+    desc: Run all tests
+    deps: [lint]
+    cmds:
+      - echo "not implemented"
 
   migration:
     desc: Create new migration file
@@ -31,9 +43,9 @@ tasks:
     desc: Start the local development environment using Docker Compose
     deps: [images]
     cmds:
-      - docker compose up -d
+      - docker compose -f deployments/docker-compose.yaml up -d
   
   down:
     desc: Stop the local environment and remove associated volumes
     cmds:
-      - docker compose down -v
+      - docker compose -f deployments/docker-compose.yaml down -v
