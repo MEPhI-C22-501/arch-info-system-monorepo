@@ -1,0 +1,19 @@
+name: Reference Manager Release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - 'reference-manager/**'
+
+jobs:
+  dummy:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dummy step
+        run: echo "Dummy job for release changes in reference-manager"
