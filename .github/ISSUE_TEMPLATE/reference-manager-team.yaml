@@ -1,0 +1,53 @@
+name: Reference Manager Team Task
+description: Create a task for the Reference Manager team
+title: "[Reference Manager]: "
+labels:
+  - reference-manager
+  - triage
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for tasks related to the Reference Manager team.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Select the affected component.
+      options:
+        - reference-manager/api
+        - reference-manager/database
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what needs to be done.
+      placeholder: |
+        What needs to be changed?
+        Why is this change needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: Technical Details
+      description: Add implementation details, links, dependencies, etc.
+    validations:
+      required: false

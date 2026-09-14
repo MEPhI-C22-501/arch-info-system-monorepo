@@ -1,0 +1,15 @@
+name: Reference Manager PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'reference-manager/**'
+
+jobs:
+  dummy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dummy step
+        run: echo "Dummy job for checks changes in reference-manager"

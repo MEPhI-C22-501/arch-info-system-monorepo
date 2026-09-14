@@ -1,8 +1,9 @@
 package httptr
 
 import (
-	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/health"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/health"
 )
 
 func NewRouter() *chi.Mux {
