@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  participant TT as Task Tracker
+  participant IW as Integration Worker
+  participant PS as Planning Core
+  participant CE as Scenario Engine
+  actor PM as Руководитель проекта
+  actor AP as Согласующий
+
+  TT-->>IW: TaskProgressChanged / TimeLogged
+  IW->>IW: Проверить idempotency key
+  IW->>PS: Обновить снимок факта
+  PS->>CE: Пересчитать прогноз и влияние
+  CE-->>PS: Новые даты, EAC, дефициты и зависимости
+  PS-->>PM: Предупреждение об отклонении
+  PM->>PS: Создать сценарий перепланирования
+  PS->>CE: Рассчитать варианты
+  CE-->>PM: Сравнение сроков, ресурсов и бюджета
+  PM->>PS: Отправить выбранный вариант на согласование
+  PS-->>AP: Запрос решения
+  AP->>PS: Утвердить
+  PS->>PS: Создать новую активную версию и сохранить старую
+  PS-->>IW: PlanActivated
+  IW-->>TT: Обновить плановые рамки задач

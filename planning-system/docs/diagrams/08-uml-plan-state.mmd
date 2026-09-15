@@ -1,0 +1,16 @@
+stateDiagram-v2
+  [*] --> DRAFT
+  DRAFT --> ON_REVIEW: отправить на согласование
+  ON_REVIEW --> DRAFT: вернуть на доработку
+  ON_REVIEW --> APPROVED: все обязательные решения получены
+  APPROVED --> ACTIVE: ввести в действие
+  ACTIVE --> SUPERSEDED: активирована новая версия
+  DRAFT --> ARCHIVED: отменить черновик
+  APPROVED --> ARCHIVED: отменить до активации
+  SUPERSEDED --> ARCHIVED: завершить срок хранения online
+  ARCHIVED --> [*]
+
+  note right of APPROVED
+    Содержимое версии неизменяемо.
+    Исправление создается новой версией.
+  end note
