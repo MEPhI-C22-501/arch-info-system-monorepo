@@ -1,0 +1,29 @@
+flowchart LR
+  users["Пользователи и руководители"]
+  planning["Planning System<br/>портфель, ресурсы, сроки, деньги"]
+  tracker["Task Tracker<br/>задачи, история, итерации, тестирование"]
+  reference["Reference Manager<br/>общие классификаторы"]
+  reporting["Reporting<br/>межсистемный план-факт и Excel"]
+  infra["Infrastructure<br/>runtime, data, delivery, observability"]
+  hr["HR-система"]
+  finance["Финансовая система"]
+  keycloak["Keycloak"]
+  tfs["TFS"]
+
+  users --> planning
+  users --> tracker
+  users --> reporting
+  planning <-->|"плановые рамки / статус и факт"| tracker
+  planning -->|"справочные коды"| reference
+  tracker -->|"справочные коды"| reference
+  planning -->|"проекции и события"| reporting
+  tracker -->|"проекции и события"| reporting
+  hr -->|"люди, грейды, календари"| planning
+  finance -->|"лимиты, обязательства, факт"| planning
+  planning -->|"OIDC"| keycloak
+  tracker -->|"OIDC"| keycloak
+  tracker <-->|"дефекты и комментарии"| tfs
+  infra -.->|"размещает и наблюдает"| planning
+  infra -.->|"размещает и наблюдает"| tracker
+  infra -.->|"размещает и наблюдает"| reference
+  infra -.->|"размещает и наблюдает"| reporting

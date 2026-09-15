@@ -1,0 +1,37 @@
+flowchart TB
+  browser["Браузер пользователя"]
+  idp["Keycloak"]
+  ext["Смежные системы"]
+
+  subgraph edge["Периметр"]
+    ingress["Ingress / TLS / WAF"]
+  end
+
+  subgraph cluster["Контейнерная платформа"]
+    web["Web application"]
+    api["Application API x N"]
+    workers["Workers x N"]
+    observability["Logs, metrics, traces"]
+  end
+
+  subgraph data["Контур данных"]
+    db[("PostgreSQL HA")]
+    broker[("Message Broker")]
+    objects[("Object Storage")]
+    backup[("Encrypted Backup")]
+  end
+
+  browser -->|"HTTPS"| ingress
+  ingress --> web
+  ingress --> api
+  api --> idp
+  api --> db
+  api --> broker
+  workers --> broker
+  workers --> db
+  workers --> objects
+  workers <-->|"TLS"| ext
+  api --> observability
+  workers --> observability
+  db --> backup
+  objects --> backup

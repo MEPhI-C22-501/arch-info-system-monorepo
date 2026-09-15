@@ -1,0 +1,42 @@
+flowchart LR
+  api["Application API"]
+  tracker["Integration Worker / Task Tracker"]
+  resource["Resource Planning module"]
+  financial["Financial Planning module"]
+  broker[("Message Broker")]
+  db[("PostgreSQL")]
+
+  subgraph core["Planning Core"]
+    portfolio["Portfolio Component<br/>Инициативы, программы, приоритеты"]
+    project["Project Component<br/>Проекты, этапы, вехи"]
+    version["Plan Version Component<br/>Сценарии и базовые линии"]
+    schedule["Scheduling Component<br/>Даты, зависимости, Гант"]
+    approval["Approval Component<br/>Маршруты и решения"]
+    progress["Progress Component<br/>Снимки статуса и отклонения"]
+    outbox["Outbox Component<br/>Надежная публикация событий"]
+  end
+
+  api --> portfolio
+  api --> project
+  api --> version
+  api --> approval
+  portfolio --> project
+  project --> version
+  version --> schedule
+  version --> approval
+  tracker --> progress
+  progress --> schedule
+  schedule --> resource
+  schedule --> financial
+  portfolio --> db
+  project --> db
+  version --> db
+  schedule --> db
+  approval --> db
+  progress --> db
+  approval --> outbox
+  version --> outbox
+  outbox --> broker
+
+  classDef component fill:#3b82f6,color:#fff,stroke:#1d4ed8;
+  class portfolio,project,version,schedule,approval,progress,outbox component;

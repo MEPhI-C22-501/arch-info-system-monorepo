@@ -1,0 +1,82 @@
+classDiagram
+  class Portfolio {
+    +UUID id
+    +String name
+    +Status status
+  }
+  class Project {
+    +UUID id
+    +String code
+    +Date targetStart
+    +Date targetFinish
+    +Priority priority
+  }
+  class PlanVersion {
+    +UUID id
+    +Integer version
+    +PlanStatus status
+    +Instant dataAsOf
+  }
+  class PlanItem {
+    +UUID id
+    +ItemType type
+    +Decimal plannedHours
+    +Date start
+    +Date finish
+  }
+  class Dependency {
+    +DependencyType type
+    +Integer lagDays
+  }
+  class ResourceDemand {
+    +Role role
+    +Grade grade
+    +Decimal hours
+    +Period period
+  }
+  class Allocation {
+    +UUID employeeId
+    +Decimal hours
+    +Period period
+  }
+  class FundingSource {
+    +UUID id
+    +String type
+    +String currency
+    +Decimal limit
+  }
+  class BudgetVersion {
+    +UUID id
+    +BudgetStatus status
+    +Instant dataAsOf
+  }
+  class BudgetLine {
+    +CostCategory category
+    +Period period
+    +Decimal amount
+    +String currency
+  }
+  class ActualCost {
+    +UUID externalId
+    +Decimal amount
+    +Date postingDate
+  }
+  class ApprovalDecision {
+    +Decision decision
+    +UUID actorId
+    +Instant madeAt
+  }
+
+  Portfolio "1" o-- "0..*" Project
+  Project "1" *-- "1..*" PlanVersion
+  PlanVersion "1" *-- "0..*" PlanItem
+  PlanItem "1" --> "0..*" Dependency : predecessor
+  PlanItem "1" *-- "0..*" ResourceDemand
+  ResourceDemand "1" o-- "0..*" Allocation
+  Project "1" o-- "1..*" FundingSource
+  Project "1" *-- "1..*" BudgetVersion
+  BudgetVersion "1" *-- "0..*" BudgetLine
+  FundingSource "1" <-- "0..*" BudgetLine : funded by
+  BudgetLine "1" o-- "0..*" ActualCost
+  PlanVersion "1" o-- "0..*" ApprovalDecision
+  BudgetVersion "1" o-- "0..*" ApprovalDecision
