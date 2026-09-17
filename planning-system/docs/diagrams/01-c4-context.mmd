@@ -1,41 +1,9 @@
 flowchart LR
-  sponsor["Спонсор / владелец портфеля"]
-  planner["PMO / планировщик"]
-  pm["Руководитель проекта"]
-  resource["Ресурсный руководитель"]
-  finance["Финансовый контролер"]
-  employee["Участник команды"]
-
-  ps["Planning System<br/>Портфельное, ресурсное, календарное<br/>и финансовое планирование"]
-
-  idp["Keycloak<br/>SSO и учетные записи"]
-  tracker["Task Tracker<br/>Задачи, история, итерации, тесты и дефекты"]
-  hr["HR-система<br/>Сотрудники, оргструктура, отсутствия"]
-  fin["Финансовая система<br/>Обязательства и фактические расходы"]
-  ref["Reference Manager<br/>Общие справочники"]
-  bi["BI / корпоративная отчетность"]
-  notify["Сервис уведомлений"]
-  tfs["TFS<br/>Внешний обмен дефектами"]
-
-  sponsor -->|"утверждает портфель и лимиты"| ps
-  planner -->|"создает версии и сценарии"| ps
-  pm -->|"планирует проект и прогнозирует"| ps
-  resource -->|"распределяет мощности"| ps
-  finance -->|"контролирует бюджет и источники"| ps
-  employee -->|"просматривает назначения"| ps
-
-  ps -->|"аутентификация"| idp
-  ps <-->|"планы работ, статусы, часы"| tracker
-  ps <-->|"сотрудники, календари, ставки"| hr
-  ps <-->|"лимиты, обязательства, факт"| fin
-  ps -->|"читает классификаторы"| ref
-  ps -->|"публикует витрины/выгрузки"| bi
-  ps -->|"отправляет события"| notify
-  tracker <-->|"дефекты, статусы, комментарии"| tfs
-
-  classDef person fill:#084c61,color:#fff,stroke:#063645;
-  classDef system fill:#2b6cb0,color:#fff,stroke:#1a4971;
-  classDef external fill:#e8eef7,color:#172b4d,stroke:#6b7a90;
-  class sponsor,planner,pm,resource,finance,employee person;
-  class ps system;
-  class idp,tracker,hr,fin,ref,bi,notify,tfs external;
+  user["Пользователи Planning System"] --> ps["Planning System<br/>Проекты, ресурсы, сроки и прогноз"]
+  ps -->|"OIDC"| kc["Keycloak"]
+  ps <-->|"справочники"| ref["Reference Manager"]
+  ps -->|"проекты и плановые рамки"| tt["Task Tracker"]
+  tt -->|"задачи и факт исполнения"| ps
+  ps -->|"запросы оповещений"| ns["Notification Service"]
+  ps <-->|"файлы"| os["Object Storage"]
+  ps -->|"проекции"| rpt["Reporting"]

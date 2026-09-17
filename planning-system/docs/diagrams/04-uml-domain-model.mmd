@@ -1,82 +1,49 @@
 classDiagram
-  class Portfolio {
-    +UUID id
-    +String name
-    +Status status
-  }
-  class Project {
-    +UUID id
-    +String code
-    +Date targetStart
-    +Date targetFinish
-    +Priority priority
-  }
+  class Project
   class PlanVersion {
-    +UUID id
-    +Integer version
-    +PlanStatus status
-    +Instant dataAsOf
+    +version
+    +status
+    +dataAsOf
   }
   class PlanItem {
-    +UUID id
-    +ItemType type
-    +Decimal plannedHours
-    +Date start
-    +Date finish
-  }
-  class Dependency {
-    +DependencyType type
-    +Integer lagDays
+    +type
+    +plannedHours
+    +start
+    +finish
   }
   class ResourceDemand {
-    +Role role
-    +Grade grade
-    +Decimal hours
-    +Period period
+    +role
+    +grade
+    +hours
   }
   class Allocation {
-    +UUID employeeId
-    +Decimal hours
-    +Period period
+    +employeeId
+    +hours
+    +period
   }
-  class FundingSource {
-    +UUID id
-    +String type
-    +String currency
-    +Decimal limit
+  class TaskSnapshot {
+    +externalTaskId
+    +status
+    +actualHours
+    +changedAt
   }
-  class BudgetVersion {
-    +UUID id
-    +BudgetStatus status
-    +Instant dataAsOf
+  class ForecastSnapshot {
+    +remainingHours
+    +remainingDuration
+    +budgetAdjustment
   }
-  class BudgetLine {
-    +CostCategory category
-    +Period period
-    +Decimal amount
-    +String currency
-  }
-  class ActualCost {
-    +UUID externalId
-    +Decimal amount
-    +Date postingDate
-  }
-  class ApprovalDecision {
-    +Decision decision
-    +UUID actorId
-    +Instant madeAt
+  class Attachment {
+    +objectKey
+    +fileName
+    +contentType
+    +uploadedBy
   }
 
-  Portfolio "1" o-- "0..*" Project
   Project "1" *-- "1..*" PlanVersion
   PlanVersion "1" *-- "0..*" PlanItem
-  PlanItem "1" --> "0..*" Dependency : predecessor
   PlanItem "1" *-- "0..*" ResourceDemand
   ResourceDemand "1" o-- "0..*" Allocation
-  Project "1" o-- "1..*" FundingSource
-  Project "1" *-- "1..*" BudgetVersion
-  BudgetVersion "1" *-- "0..*" BudgetLine
-  FundingSource "1" <-- "0..*" BudgetLine : funded by
-  BudgetLine "1" o-- "0..*" ActualCost
-  PlanVersion "1" o-- "0..*" ApprovalDecision
-  BudgetVersion "1" o-- "0..*" ApprovalDecision
+  Project "1" o-- "0..*" TaskSnapshot
+  PlanVersion "1" o-- "0..*" ForecastSnapshot
+  Project "1" o-- "0..*" Attachment
+  PlanVersion "1" o-- "0..*" Attachment

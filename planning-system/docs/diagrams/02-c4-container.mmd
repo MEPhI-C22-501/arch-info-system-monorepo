@@ -1,45 +1,14 @@
 flowchart TB
-  user["Пользователь"]
-  ext["Смежные системы"]
-
-  subgraph ps["Planning System"]
-    web["Web application<br/>SPA, рабочие места и аналитика"]
-    api["Application API<br/>REST/BFF, авторизация, orchestration"]
-    core["Planning Core<br/>Портфель, планы, календарь, workflow"]
-    res["Resource Planning<br/>Мощности, назначения, конфликты"]
-    money["Financial Planning<br/>Источники, бюджет, факт, прогноз"]
-    calc["Scenario & Forecast Engine<br/>Пересчет сценариев и показателей"]
-    report["Reporting Worker<br/>XLSX/CSV, витрины и тяжелые отчеты"]
-    integration["Integration Worker<br/>Inbox/outbox, импорт и синхронизация"]
-    db[("PostgreSQL<br/>Транзакционные данные и аудит")]
-    objects[("Object Storage<br/>Импорты и сформированные отчеты")]
-    broker[("Message Broker<br/>Доменные и интеграционные события")]
-  end
-
-  user -->|"HTTPS"| web
-  web -->|"JSON/HTTPS"| api
-  api --> core
-  api --> res
-  api --> money
-  core --> calc
-  res --> calc
-  money --> calc
-  core --> db
-  res --> db
-  money --> db
-  calc --> db
-  api -->|"ставит задания"| broker
-  report --> broker
-  integration --> broker
-  report --> db
-  report --> objects
-  integration --> db
-  integration <-->|"REST / events / files"| ext
-
-  classDef boundary fill:#f8fafc,stroke:#94a3b8;
-  classDef container fill:#2563eb,color:#fff,stroke:#1e40af;
-  classDef worker fill:#0f766e,color:#fff,stroke:#115e59;
-  classDef store fill:#f59e0b,color:#111827,stroke:#b45309;
-  class web,api,core,res,money,calc container;
-  class report,integration worker;
-  class db,objects,broker store;
+  web["Web application"] --> api["Application API"]
+  api --> core["Planning Core<br/>Проекты, версии, календарь"]
+  api --> resource["Resource Planning<br/>Доступность и назначения"]
+  core --> forecast["Forecast Engine<br/>Скользящий прогноз и сценарии"]
+  api --> attach["Attachment Component"]
+  api --> notify["Notification Component"]
+  core --> db[("PostgreSQL")]
+  resource --> db
+  forecast --> db
+  attach --> storage[("Object Storage")]
+  integration["Integration Worker"] --> db
+  integration --> broker[("Message Broker")]
+  notify --> broker
