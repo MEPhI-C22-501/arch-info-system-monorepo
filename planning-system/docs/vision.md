@@ -1,8 +1,8 @@
 # Vision: Planning System
 
-**Версия:** 1.0
+**Версия:** 1.1
 **Статус:** финальная
-**Дата:** 17.09.2026
+**Дата:** 21.09.2026
 
 ## 1. Видение
 
@@ -94,3 +94,145 @@ sequenceDiagram
 утвердить версию, опубликовать проекты в Task Tracker и получить обратно факт для
 единого прогноза. Keycloak, справочники, вложения и оповещения работают в составе
 первой версии.
+
+## 6. Архитектурные принципы и границы
+
+- Planning System является мастер-системой проектов и плановых версий; Task Tracker
+  является мастер-системой задач и факта их исполнения.
+- Keycloak используется как готовый компонент аутентификации; отдельный сервис входа
+  не создается.
+- Интеграции с Keycloak, Reference Manager, Task Tracker, Notification Service и
+  Object Storage входят в первую версию.
+- Утвержденная версия плана неизменна; обмен выполняется через версионированные API
+  и идемпотентные события.
+
+### 6.1. C4 Context
+
+```mermaid
+flowchart LR
+  user["Пользователи Planning System"] --> ps["Planning System<br/>Проекты, ресурсы, сроки и прогноз"]
+  ps -->|"OIDC"| kc["Keycloak"]
+  ps <-->|"справочники"| ref["Reference Manager"]
+  ps -->|"проекты и плановые рамки"| tt["Task Tracker"]
+  tt -->|"задачи и факт исполнения"| ps
+  ps -->|"запросы оповещений"| ns["Notification Service"]
+  ps <-->|"файлы"| os["Object Storage"]
+  ps -->|"проекции"| rpt["Reporting"]
+```
+
+### 6.2. C4 Containers
+
+```mermaid
+flowchart TB
+  web["Web application"] --> api["Application API"]
+  api --> core["Planning Core<br/>Проекты, версии, календарь"]
+  api --> resource["Resource Planning<br/>Доступность и назначения"]
+  core --> forecast["Forecast Engine<br/>Скользящий прогноз и сценарии"]
+  api --> attach["Attachment Component"]
+  api --> notify["Notification Component"]
+  core --> db[("PostgreSQL")]
+  resource --> db
+  forecast --> db
+  attach --> storage[("Object Storage")]
+  integration["Integration Worker"] --> db
+  integration --> broker[("Message Broker")]
+  notify --> broker
+```
+
+### 6.3. Компоненты Planning Core
+
+```mermaid
+flowchart LR
+  portfolio["Portfolio<br/>Проекты и приоритеты"] --> version["Plan Version<br/>Версии и baseline"]
+  version --> schedule["Scheduling<br/>Даты и зависимости"]
+  schedule --> capacity["Capacity<br/>Роли, грейды и назначения"]
+  schedule --> forecast["Forecast<br/>Остаток и корректировки"]
+  version --> approval["Approval<br/>Решения"]
+  version --> publication["Publication<br/>Передача проектов в Task Tracker"]
+  progress["Task Progress<br/>События задач"] --> forecast
+  progress --> notification["Notification<br/>Оповещения"]
+  attachment["Attachment<br/>Метаданные файлов"] --> portfolio
+  attachment --> version
+```
+
+### 6.4. UML: концептуальная модель
+
+```mermaid
+classDiagram
+  class Project
+  class PlanVersion {
+    +version
+    +status
+    +dataAsOf
+  }
+  class PlanItem {
+    +type
+    +plannedHours
+    +start
+    +finish
+  }
+  class ResourceDemand {
+    +role
+    +grade
+    +hours
+  }
+  class Allocation {
+    +employeeId
+    +hours
+    +period
+  }
+  class TaskSnapshot {
+    +externalTaskId
+    +status
+    +actualHours
+    +changedAt
+  }
+  class ForecastSnapshot {
+    +remainingHours
+    +remainingDuration
+    +budgetAdjustment
+  }
+  class Attachment {
+    +objectKey
+    +fileName
+    +contentType
+    +uploadedBy
+  }
+
+  Project "1" *-- "1..*" PlanVersion
+  PlanVersion "1" *-- "0..*" PlanItem
+  PlanItem "1" *-- "0..*" ResourceDemand
+  ResourceDemand "1" o-- "0..*" Allocation
+  Project "1" o-- "0..*" TaskSnapshot
+  PlanVersion "1" o-- "0..*" ForecastSnapshot
+  Project "1" o-- "0..*" Attachment
+  PlanVersion "1" o-- "0..*" Attachment
+```
+
+## 7. Интеграции и владение данными
+
+| Данные | Мастер-система | Правило обмена |
+|---|---|---|
+| Проект, декомпозиция, версия плана, сценарий, назначение | Planning System | публикуются в Task Tracker |
+| Задача, статус, история, комментарий, фактические часы | Task Tracker | передаются в Planning System через API и события |
+| Пользователь, пароль, сессия, группа | Keycloak | аутентификация по OIDC |
+| Роль, грейд, календарь и классификатор | Reference Manager | чтение по стабильным кодам |
+| Файл вложения | Object Storage | Planning System хранит связь и метаданные |
+
+После публикации проекта Task Tracker хранит его внешний идентификатор из Planning
+System. Проекты не импортируются из Task Tracker; обмен задачами через файлы не
+предусмотрен. Planning System отправляет запросы оповещений в Notification Service
+и плановые проекции в Reporting.
+
+Исходящие события: `ProjectCreated`, `ProjectChanged`, `PlanActivated`,
+`AllocationChanged`, `RemainingForecastChanged`, `BudgetAdjustmentChanged`,
+`NotificationRequested`. Входящие: `TaskCreated`, `TaskChanged`, `TaskCommented`,
+`TimeLogged`, `NotificationDelivered`, `ReferenceItemChanged`. Каждое событие
+содержит `eventId`, `eventType`, `occurredAt`, `producer`, `schemaVersion`,
+`correlationId` и идентификатор проекта Planning System.
+
+## 8. Развертывание
+
+Planning System использует общую инфраструктуру проекта: Keycloak, PostgreSQL,
+брокер сообщений, Object Storage, централизованные журналы, метрики и трассировку.
+Секреты задаются средствами среды развертывания и не хранятся в репозитории.
