@@ -1,0 +1,22 @@
+type: object
+
+required:
+  - ready
+  - failedDependencies
+
+properties:
+  ready:
+    type: boolean
+
+  failedDependencies:
+    type: array
+    items:
+      type: object
+      required:
+        - name
+        - error
+      properties:
+        name:
+          type: string
+        error:
+          type: string

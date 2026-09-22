@@ -3,7 +3,7 @@ package retry
 import "time"
 
 type Config struct {
-	AttemptsCount  int           `yaml:"attempts_count" env-default:"5"`
+	AttemptsCount  int           `yaml:"attempts_count" env-default:"0"`
 	AttemptTimeout time.Duration `yaml:"attempt_timeout" env-default:"5s"`
 	InitialDelay   time.Duration `yaml:"initial_delay" env-default:"1s"`
 	MaxDelay       time.Duration `yaml:"max_delay" env-default:"5s"`
