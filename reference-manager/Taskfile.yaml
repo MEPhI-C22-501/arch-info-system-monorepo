@@ -4,7 +4,8 @@ tasks:
   generate:
     desc: Generate all artifacts
     cmds:
-      - echo "not implemented"
+      - go tool oapi-codegen -config api/openapi/v1/codegen.server.yaml api/openapi/v1/openapi.yaml
+      - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
 
   build:
     desc: Build the reference manager application binary

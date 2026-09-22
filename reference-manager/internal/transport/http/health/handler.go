@@ -1,17 +1,18 @@
 package health
 
-import (
-	"encoding/json"
-	"net/http"
-)
+import "net/http"
 
-func NewHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+type Handler struct {
+}
 
-		w.WriteHeader(http.StatusOK)
+func NewHandler() *Handler {
+	return &Handler{}
+}
 
-		response := map[string]string{"status": "READY"}
-		_ = json.NewEncoder(w).Encode(response)
-	}
+func (h *Handler) GetLiveness(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) GetReadiness(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }

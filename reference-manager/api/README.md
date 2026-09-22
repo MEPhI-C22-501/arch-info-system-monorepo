@@ -1,1 +1,0 @@
-# Reference Manager API Specification
