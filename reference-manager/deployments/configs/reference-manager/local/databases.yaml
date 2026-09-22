@@ -8,7 +8,6 @@ databases:
 
     connect_retry:
       enabled: true
-      attempts_count: 0 # means endless retry
       attempt_timeout: 5s
       initial_delay: 1s
       max_delay: 5s

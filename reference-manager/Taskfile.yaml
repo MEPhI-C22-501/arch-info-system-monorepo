@@ -7,16 +7,6 @@ tasks:
       - go tool oapi-codegen -config api/openapi/v1/codegen.server.yaml api/openapi/v1/openapi.yaml
       - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
 
-  build:
-    desc: Build the reference manager application binary
-    deps: [generate]
-    env:
-      CGO_ENABLED: 0
-      GOOS: linux
-      GOARCH: amd64
-    cmds:
-      - go build -ldflags="-s -w" -o ./bin/reference-manager ./cmd/reference-manager
-
   lint:
     desc: Run linter checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
@@ -33,16 +23,14 @@ tasks:
     cmds:
       - migrate create -ext sql -dir deployments/migrations -seq {{.CLI_ARGS}}
 
-  images:
-    desc: Build Docker images for the reference manager application
-    deps: [build]
+  build:
+    desc: Build Docker image for the reference manager application
     cmds:
       - docker build -f deployments/docker/reference-manager.dockerfile -t erp/reference-manager:latest .
-      - docker build -f deployments/docker/reference-manager-debug.dockerfile -t erp/reference-manager-debug:latest .
 
   up:
     desc: Start the local development environment using Docker Compose
-    deps: [images]
+    deps: [build]
     cmds:
       - docker compose -f deployments/docker-compose.yaml up -d
   

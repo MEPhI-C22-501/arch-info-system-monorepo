@@ -1,15 +1,21 @@
-FROM busybox:1.37 AS prepare
+# syntax=docker/dockerfile:1
 
-RUN mkdir -p /app/log/reference-manager \
-    && chown -R 65532:65532 /app/log
+FROM golang:1.27-alpine AS builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+  -o /reference-manager ./cmd/reference-manager
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 
-COPY --from=prepare /app/log /app/log
-COPY --chown=65532:65532 bin/reference-manager /app/reference-manager
+COPY --from=builder --chmod=0555 /reference-manager /app/reference-manager
+USER 65532:65532
 
-USER nonroot:nonroot
-
-ENTRYPOINT ["/app/reference-manager"]
+ENTRYPOINT [ "/app/reference-manager" ]

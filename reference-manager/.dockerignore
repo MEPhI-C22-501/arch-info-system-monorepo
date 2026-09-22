@@ -1,0 +1,29 @@
+
+# Ignore everything by default
+**
+
+# Go dependencies
+!go.mod
+!go.sum
+
+# Application source
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!pkg/
+!pkg/**
+
+# Exclude generated binaries
+**/bin/
+**/*.exe
+**/*.test
+**/*.out
+
+# Exclude local and sensitive files
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
