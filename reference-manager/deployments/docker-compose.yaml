@@ -1,6 +1,7 @@
 services:
   reference-manager:
     container_name: reference_manager
+    image: erp/reference-manager:dev
     build:
       context: ..
       dockerfile: deployments/docker/reference-manager.dockerfile

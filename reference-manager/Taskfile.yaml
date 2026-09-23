@@ -8,13 +8,13 @@ tasks:
       - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
 
   lint:
-    desc: Run linter checks (pass extra flags after '--', e.g., 'task lint -- --fix')
+    desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
       - golangci-lint run ./... {{.CLI_ARGS}}
+      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < deployments/docker/reference-manager.dockerfile
 
   tests:
     desc: Run all tests
-    deps: [lint]
     cmds:
       - echo "not implemented"
 
@@ -30,9 +30,8 @@ tasks:
 
   up:
     desc: Start the local development environment using Docker Compose
-    deps: [build]
     cmds:
-      - docker compose -f deployments/docker-compose.yaml up -d
+      - docker compose -f deployments/docker-compose.yaml up -d --build
   
   down:
     desc: Stop the local environment and remove associated volumes
