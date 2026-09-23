@@ -7,4 +7,4 @@ log:
     - name: reference-manager-info-console
       type: console
       level: debug
-      format: text
+      format: json

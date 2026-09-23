@@ -3,7 +3,7 @@ databases:
     host: reference-manager-database
     port: 5432
     user: reference_manager
-    password: reference_manager_wrong_password
+    password: reference_manager
     database: reference_manager
 
     connect_retry:

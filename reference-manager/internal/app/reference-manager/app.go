@@ -35,7 +35,10 @@ func NewApp(cfg *Config) (*App, error) {
 	readinessManager := ready.NewManager(log, postgresClient.ReadinessCheck())
 
 	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
-	httpServer.RegisterRouter(httptr.NewRouter(readinessManager))
+	httpServer.RegisterRouter(httptr.NewRouter(
+		log,
+		readinessManager,
+	))
 
 	log.Info("application initialized successfully")
 	return &App{

@@ -30,9 +30,8 @@ tasks:
 
   up:
     desc: Start the local development environment using Docker Compose
-    deps: [build]
     cmds:
-      - docker compose -f deployments/docker-compose.yaml up -d
+      - docker compose -f deployments/docker-compose.yaml up -d --build
   
   down:
     desc: Stop the local environment and remove associated volumes
