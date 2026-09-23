@@ -2,6 +2,7 @@ package httptr
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -9,6 +10,7 @@ import (
 	apiv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1"
 	logmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/log"
 	recoverymw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/recovery"
+	timeoutmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/timeout"
 )
 
 func NewRouter(
@@ -20,6 +22,7 @@ func NewRouter(
 	r.Use(
 		logmw.NewMiddleware(log),
 		recoverymw.NewMiddleware(log),
+		timeoutmw.NewMiddleware(1*time.Second),
 	)
 
 	r.Mount("/v1", apiv1.Handler(
