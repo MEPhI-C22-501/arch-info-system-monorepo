@@ -11,6 +11,7 @@ import (
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/log"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"
 )
 
 type App struct {
@@ -31,8 +32,10 @@ func NewApp(cfg *Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize postgres client: %w", err)
 	}
 
+	readinessManager := ready.NewManager(log, postgresClient.ReadinessCheck())
+
 	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
-	httpServer.RegisterRouter(httptr.NewRouter())
+	httpServer.RegisterRouter(httptr.NewRouter(readinessManager))
 
 	log.Info("application initialized successfully")
 	return &App{

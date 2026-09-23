@@ -18,9 +18,8 @@ func Retry(ctx context.Context, fn RetryableFunc, opts ...Option) error {
 	}
 
 	var lastErr error
-
 	attempt, currentDelay := 1, options.initialDelay
-	for attempt <= options.attemptsCount {
+	for options.attemptsCount == 0 || attempt <= options.attemptsCount {
 		errCh := make(chan error)
 		go func() {
 			fnCtx, cancel := context.WithTimeout(ctx, options.timeout)

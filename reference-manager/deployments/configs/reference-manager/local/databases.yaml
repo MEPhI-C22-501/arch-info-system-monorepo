@@ -3,12 +3,11 @@ databases:
     host: reference-manager-database
     port: 5432
     user: reference_manager
-    password: reference_manager
+    password: reference_manager_wrong_password
     database: reference_manager
 
     connect_retry:
       enabled: true
-      attempts_count: 5
       attempt_timeout: 5s
       initial_delay: 1s
       max_delay: 5s

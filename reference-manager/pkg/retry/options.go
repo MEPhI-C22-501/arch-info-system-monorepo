@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	DefaultAttempts int           = 3
+	DefaultAttempts int           = 0
 	DefaultDelay    time.Duration = 100 * time.Millisecond
 	DefaultMaxDelay time.Duration = 5 * time.Second
 	DefaultTimeout  time.Duration = 5 * time.Second

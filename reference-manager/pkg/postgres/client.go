@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/retry"
 )
 
@@ -58,10 +59,11 @@ func NewClient(cfg *Config, log *slog.Logger) (*Client, error) {
 }
 
 func (c *Client) Startup(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	started := c.pool != nil
+	c.mu.RUnlock()
 
-	if c.pool != nil {
+	if started {
 		return ErrAlreadyStarted
 	}
 
@@ -72,11 +74,12 @@ func (c *Client) Startup(ctx context.Context) error {
 
 	if err := c.ping(ctx, pool); err != nil {
 		pool.Close()
-
 		return err
 	}
 
+	c.mu.Lock()
 	c.pool = pool
+	c.mu.Unlock()
 
 	return nil
 }
@@ -125,13 +128,10 @@ func (c *Client) Ping(ctx context.Context) error {
 	return pool.Ping(ctx)
 }
 
-func (c *Client) IsReady(ctx context.Context) bool {
-	pool, err := c.getPool()
-	if err != nil {
-		return false
-	}
-
-	return pool.Ping(ctx) == nil
+func (c *Client) ReadinessCheck() *ready.Check {
+	return ready.NewCheck("postgres", func(ctx context.Context) error {
+		return c.Ping(ctx)
+	})
 }
 
 func (c *Client) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {

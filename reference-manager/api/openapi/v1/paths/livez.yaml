@@ -1,0 +1,6 @@
+get:
+  operationId: getLiveness
+  summary: Liveness probe
+  responses:
+    "200":
+      description: Service is alive

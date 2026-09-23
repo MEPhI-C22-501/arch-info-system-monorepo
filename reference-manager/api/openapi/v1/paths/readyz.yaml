@@ -1,0 +1,8 @@
+get:
+  operationId: getReadiness
+  summary: Readiness probe
+  responses:
+    "200":
+      description: Service is ready
+    "503":
+      description: Service is not ready
