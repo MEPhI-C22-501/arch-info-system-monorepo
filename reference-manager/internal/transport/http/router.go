@@ -23,8 +23,8 @@ func NewRouter(
 	r.Use(
 		logmw.NewMiddleware(log),
 		recoverymw.NewMiddleware(log),
-		ratelimitmw.NewMiddleware(10, 100),
-		timeoutmw.NewMiddleware(1*time.Second),
+		ratelimitmw.NewMiddleware(10, 100),     // TODO: implement middleware init via special configuration
+		timeoutmw.NewMiddleware(1*time.Second), // TODO: implement middleware init via special configuration
 	)
 
 	r.Mount("/v1", apiv1.Handler(

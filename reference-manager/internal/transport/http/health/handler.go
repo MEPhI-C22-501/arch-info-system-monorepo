@@ -43,7 +43,7 @@ func (h *Handler) GetReadiness(w http.ResponseWriter, r *http.Request) {
 	err := h.readinessChecker.CheckReadiness(r.Context())
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(ReadinessResponse{Ready: true})
+		_ = json.NewEncoder(w).Encode(ReadinessResponse{Ready: true})
 
 		return
 	}
