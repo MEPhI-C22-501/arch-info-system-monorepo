@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Tracker — прототип</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">Task&nbsp;Tracker<small>Live-прототип · документ 115</small></div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-screen="backlog">📋 Бэклог</button>
+      <button class="nav-item" data-screen="board">🗂 Канбан-доска</button>
+      <button class="nav-item" data-screen="iteration">🔁 Итерации</button>
+      <button class="nav-item" data-screen="notifications">🔔 Уведомления <span class="badge" id="unreadBadge"></span></button>
+      <button class="nav-item" data-screen="admin" id="navAdmin">⚙️ Админ-панель</button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="role-switcher">
+        <label for="roleSelect">Просмотр от роли (демо)</label>
+        <select id="roleSelect">
+          <option value="member">Участник команды</option>
+          <option value="lead" selected>Руководитель / планировщик</option>
+          <option value="admin">Администратор</option>
+        </select>
+      </div>
+      <div class="user-chip">
+        <div class="avatar" id="currentUserAvatar">РП</div>
+        <div>
+          <div class="user-name" id="currentUserName">Руководитель</div>
+          <div class="user-role" id="currentUserRole">Руководитель / планировщик</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- ============ БЭКЛОГ ============ -->
+    <section id="screen-backlog" class="screen active">
+      <div class="screen-header">
+        <div>
+          <h1>Бэклог</h1>
+          <p>Единый упорядоченный список рабочих элементов — см. 7.1 в system-requirements.md</p>
+        </div>
+        <div class="screen-actions">
+          <button class="btn" id="btnExport">⬇ Экспорт в Excel</button>
+          <button class="btn" id="btnImport">⬆ Импорт из Excel</button>
+          <button class="btn primary" id="btnCreateItem">+ Создать элемент</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <select id="filterType"><option value="">Тип: все</option></select>
+        <select id="filterStatus"><option value="">Статус: все</option></select>
+        <select id="filterPriority"><option value="">Приоритет: все</option></select>
+        <select id="filterAssignee"><option value="">Исполнитель: все</option></select>
+        <select id="filterIteration"><option value="">Итерация: все</option></select>
+        <div class="spacer"></div>
+        <input type="text" id="filterSearch" placeholder="Поиск по наименованию…">
+      </div>
+
+      <div class="panel">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Наименование</th><th>Тип</th><th>Статус</th><th>Приоритет</th>
+              <th>Исполнитель</th><th>Срок</th><th>План/Факт/Остаток</th><th>Итерация</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="backlogBody"></tbody>
+        </table>
+        <div class="empty-state" id="backlogEmpty" hidden>Нет рабочих элементов по заданным фильтрам.</div>
+      </div>
+    </section>
+
+    <!-- ============ КАНБАН-ДОСКА ============ -->
+    <section id="screen-board" class="screen">
+      <div class="screen-header">
+        <div>
+          <h1>Канбан-доска</h1>
+          <p>Перетащите карточку в другую колонку, чтобы сменить статус — создаётся запись истории и уведомление.</p>
+        </div>
+      </div>
+
+      <div class="filters">
+        <select id="boardFilterAssignee"><option value="">Исполнитель: все</option></select>
+        <select id="boardFilterPriority"><option value="">Приоритет: все</option></select>
+        <select id="boardFilterIteration"><option value="">Итерация: все</option></select>
+      </div>
+
+      <div class="board-columns" id="boardColumns"></div>
+    </section>
+
+    <!-- ============ ИТЕРАЦИИ ============ -->
+    <section id="screen-iteration" class="screen">
+      <div class="screen-header">
+        <div>
+          <h1>Итерация</h1>
+          <p>Планирование, ёмкость участников, контроль показателей и план-факт после завершения.</p>
+        </div>
+        <div class="screen-actions" id="iterationActions"></div>
+      </div>
+
+      <div class="iteration-picker" id="iterationPicker"></div>
+
+      <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+        <div class="field-grid" id="iterationMeta"></div>
+      </div>
+
+      <div class="metric-grid" id="iterationMetrics"></div>
+
+      <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+        <div class="section-title" style="margin-top:0">Ёмкость участников</div>
+        <div id="capacityRows"></div>
+      </div>
+
+      <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+        <div class="section-title" style="margin-top:0">Распределение по статусам</div>
+        <div class="status-dist" id="statusDist"></div>
+      </div>
+
+      <div class="panel" style="padding:16px 18px;" id="baselinePanel" hidden>
+        <div class="section-title" style="margin-top:0">План-факт (базовый план vs. факт)</div>
+        <table class="data-table baseline-table">
+          <thead><tr><th>Показатель</th><th>Базовый план</th><th>Факт</th><th>Отклонение</th></tr></thead>
+          <tbody id="baselineBody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Рабочие элементы итерации</div>
+      <div class="panel">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Наименование</th><th>Статус</th><th>Исполнитель</th><th>Остаток</th><th></th></tr></thead>
+          <tbody id="iterationItemsBody"></tbody>
+        </table>
+        <div class="empty-state" id="iterationItemsEmpty" hidden>В итерации нет рабочих элементов.</div>
+      </div>
+    </section>
+
+    <!-- ============ УВЕДОМЛЕНИЯ ============ -->
+    <section id="screen-notifications" class="screen">
+      <div class="screen-header">
+        <div>
+          <h1>Уведомления</h1>
+          <p>Создаются встроенно при любом успешном изменении рабочего элемента (FR из vision.md).</p>
+        </div>
+        <div class="screen-actions">
+          <button class="btn" id="btnMarkAllRead">Отметить все прочитанными</button>
+        </div>
+      </div>
+      <div class="panel">
+        <ul class="notif-list" id="notifList"></ul>
+        <div class="empty-state" id="notifEmpty" hidden>Уведомлений нет.</div>
+      </div>
+    </section>
+
+    <!-- ============ АДМИН-ПАНЕЛЬ ============ -->
+    <section id="screen-admin" class="screen">
+      <div class="screen-header">
+        <div>
+          <h1>Админ-панель</h1>
+          <p>Статусы, типы и права, синхронизация со справочником пользователей — раздел 7.6 требований.</p>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <div>
+          <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+            <div class="section-title" style="margin-top:0">Статусы канбан-доски</div>
+            <div id="statusList"></div>
+            <div class="add-row">
+              <input type="text" id="newStatusName" placeholder="Наименование нового статуса">
+              <button class="btn" id="btnAddStatus">+ Добавить</button>
+            </div>
+          </div>
+
+          <div class="panel" style="padding:16px 18px;">
+            <div class="section-title" style="margin-top:0">Типы рабочих элементов</div>
+            <table class="role-readonly-table">
+              <thead><tr><th>Тип</th><th>Назначение</th></tr></thead>
+              <tbody>
+                <tr><td>Проект</td><td>Верхнеуровневая инициатива, объединяющая эпики и задачи</td></tr>
+                <tr><td>Эпик</td><td>Крупный блок работ внутри проекта</td></tr>
+                <tr><td>Задача</td><td>Самостоятельная единица плановой работы</td></tr>
+                <tr><td>Ошибка</td><td>Дефект; может создаваться сервисом тестирования через API</td></tr>
+                <tr><td>Подзадача</td><td>Часть задачи или ошибки</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+            <div class="section-title" style="margin-top:0">Синхронизация со справочником пользователей</div>
+            <div class="sync-box">
+              <div>
+                <div style="font-size:13px;font-weight:600;">Пользователи, команды, подразделения</div>
+                <div class="sync-time" id="syncTime"></div>
+              </div>
+              <button class="btn" id="btnSyncNow">Синхронизировать сейчас</button>
+            </div>
+            <div class="sync-log" id="syncLog"></div>
+          </div>
+
+          <div class="panel" style="padding:16px 18px;">
+            <div class="section-title" style="margin-top:0">Права по ролям (сводно, см. 070.role-matrix.md)</div>
+            <table class="role-readonly-table">
+              <thead><tr><th>Действие</th><th>Участник</th><th>Руководитель</th><th>Админ</th></tr></thead>
+              <tbody>
+                <tr><td>Создание элемента</td><td>✅</td><td>✅</td><td>—</td></tr>
+                <tr><td>Жёсткое удаление</td><td>—</td><td>—</td><td>✅</td></tr>
+                <tr><td>Экспорт/импорт Excel</td><td>—</td><td>✅</td><td>—</td></tr>
+                <tr><td>Настройка статусов/типов</td><td>—</td><td>по праву</td><td>✅</td></tr>
+                <tr><td>Запуск синхронизации справочников</td><td>—</td><td>—</td><td>✅</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============ КАРТОЧКА РАБОЧЕГО ЭЛЕМЕНТА ============ -->
+<div class="overlay" id="itemCardOverlay">
+  <div class="card-panel">
+    <div class="card-panel-header">
+      <div>
+        <div class="breadcrumb" id="itemBreadcrumb"></div>
+        <div class="badges" id="itemBadges"></div>
+        <h2 id="itemTitle"></h2>
+      </div>
+      <button class="btn ghost" id="btnCloseCard">✕</button>
+    </div>
+    <div class="card-panel-body">
+      <div class="field-grid" id="itemFields"></div>
+
+      <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em;">Описание (автосохранение)</label>
+      <div class="description-box" id="itemDescription" contenteditable="true"></div>
+      <div class="autosave-hint" id="autosaveHint">Черновик сохранён автоматически</div>
+
+      <div id="itemHierarchy"></div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="attachments">Вложения</button>
+        <button class="tab-btn" data-tab="timelog">Трудозатраты</button>
+        <button class="tab-btn" data-tab="comments">Комментарии</button>
+        <button class="tab-btn" data-tab="history">История изменений</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-attachments">
+        <ul class="attachment-list" id="attachmentList"></ul>
+        <div class="add-row"><button class="btn small" id="btnAddAttachment">📎 Загрузить файл</button></div>
+      </div>
+
+      <div class="tab-panel" id="tab-timelog">
+        <ul class="timelog-list" id="timelogList"></ul>
+        <div class="timelog-total" id="timelogTotal"></div>
+        <div class="add-row">
+          <input type="number" id="timelogHours" placeholder="Часы" min="0" step="0.25" style="max-width:100px">
+          <input type="text" id="timelogComment" placeholder="Комментарий (необязательно)">
+          <button class="btn small" id="btnAddTimelog">Добавить</button>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-comments">
+        <ul class="comment-list" id="commentList"></ul>
+        <div class="add-row">
+          <textarea id="newComment" placeholder="Написать комментарий…"></textarea>
+          <button class="btn small" id="btnAddComment">Отправить</button>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-history">
+        <ul class="history-list" id="historyList"></ul>
+      </div>
+    </div>
+    <div class="card-panel-footer">
+      <button class="btn danger" id="btnHardDelete">Жёсткое удаление</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="btnCloseCard2">Назад</button>
+        <button class="btn primary" id="btnSaveCard">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО ============ -->
+<div class="overlay" id="modalOverlay">
+  <div class="modal-panel" id="modalPanel"></div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "TaskTrackerDomainEvents.v1",
+  "title": "Task Tracker internal domain events",
+  "oneOf": [
+    { "$ref": "#/$defs/WorkItemCreated" },
+    { "$ref": "#/$defs/WorkItemFieldsChanged" },
+    { "$ref": "#/$defs/AssigneeChanged" },
+    { "$ref": "#/$defs/StatusChanged" },
+    { "$ref": "#/$defs/HierarchyChanged" },
+    { "$ref": "#/$defs/CommentChanged" },
+    { "$ref": "#/$defs/TimeLogged" },
+    { "$ref": "#/$defs/AttachmentChanged" },
+    { "$ref": "#/$defs/IterationCompositionChanged" },
+    { "$ref": "#/$defs/IterationActivated" },
+    { "$ref": "#/$defs/IterationCompleted" },
+    { "$ref": "#/$defs/WorkItemHardDeleted" },
+    { "$ref": "#/$defs/BugCreatedFromTesting" },
+    { "$ref": "#/$defs/DirectorySynchronized" },
+    { "$ref": "#/$defs/ExcelImportCompleted" },
+    { "$ref": "#/$defs/NotificationCreated" }
+  ],
+  "$defs": {
+    "BaseEvent": {
+      "type": "object",
+      "required": [
+        "eventId",
+        "eventType",
+        "aggregateId",
+        "occurredAt",
+        "correlationId",
+        "actor",
+        "payload"
+      ],
+      "properties": {
+        "eventId": { "type": "string", "format": "uuid" },
+        "eventType": { "type": "string" },
+        "aggregateId": { "type": "string" },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "correlationId": { "type": "string", "minLength": 1 },
+        "actor": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "WorkItemCreated": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "WorkItemCreated" },
+            "payload": {
+              "type": "object",
+              "required": ["type", "title", "statusId", "priorityId"],
+              "properties": {
+                "type": { "type": "string" },
+                "title": { "type": "string" },
+                "statusId": { "type": "string", "format": "uuid" },
+                "priorityId": { "type": "string", "format": "uuid" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "WorkItemFieldsChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "WorkItemFieldsChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["changedFields", "oldValues", "newValues"],
+              "properties": {
+                "changedFields": { "type": "array", "items": { "type": "string" } },
+                "oldValues": { "type": "object" },
+                "newValues": { "type": "object" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "AssigneeChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "AssigneeChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["oldAssigneeId", "newAssigneeId"],
+              "properties": {
+                "oldAssigneeId": { "type": ["string", "null"] },
+                "newAssigneeId": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "StatusChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "StatusChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["fromStatusId", "toStatusId"],
+              "properties": {
+                "fromStatusId": { "type": "string", "format": "uuid" },
+                "toStatusId": { "type": "string", "format": "uuid" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "HierarchyChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "HierarchyChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["oldParentId", "newParentId"],
+              "properties": {
+                "oldParentId": { "type": ["string", "null"], "format": "uuid" },
+                "newParentId": { "type": ["string", "null"], "format": "uuid" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CommentChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "CommentChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["commentId", "operation"],
+              "properties": {
+                "commentId": { "type": "string", "format": "uuid" },
+                "operation": { "enum": ["created", "updated", "deleted"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TimeLogged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "TimeLogged" },
+            "payload": {
+              "type": "object",
+              "required": ["timeLogId", "hours", "loggedDate"],
+              "properties": {
+                "timeLogId": { "type": "string", "format": "uuid" },
+                "hours": { "type": "number", "minimum": 0 },
+                "loggedDate": { "type": "string", "format": "date" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "AttachmentChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "AttachmentChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["attachmentId", "operation", "fileName"],
+              "properties": {
+                "attachmentId": { "type": "string", "format": "uuid" },
+                "operation": { "enum": ["added", "removed"] },
+                "fileName": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "IterationCompositionChanged": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "IterationCompositionChanged" },
+            "payload": {
+              "type": "object",
+              "required": ["iterationId", "operation", "workItemId"],
+              "properties": {
+                "iterationId": { "type": "string", "format": "uuid" },
+                "operation": { "enum": ["included", "excluded"] },
+                "workItemId": { "type": "string", "format": "uuid" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "IterationActivated": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "IterationActivated" },
+            "payload": {
+              "type": "object",
+              "required": ["iterationId", "baselineVersion"],
+              "properties": {
+                "iterationId": { "type": "string", "format": "uuid" },
+                "baselineVersion": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "IterationCompleted": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "IterationCompleted" },
+            "payload": {
+              "type": "object",
+              "required": ["iterationId", "resultVersion"],
+              "properties": {
+                "iterationId": { "type": "string", "format": "uuid" },
+                "resultVersion": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "WorkItemHardDeleted": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "WorkItemHardDeleted" },
+            "payload": {
+              "type": "object",
+              "required": ["workItemPublicId", "workItemTitle", "recipientId"],
+              "properties": {
+                "workItemPublicId": { "type": "string" },
+                "workItemTitle": { "type": "string" },
+                "recipientId": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "BugCreatedFromTesting": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "BugCreatedFromTesting" },
+            "payload": {
+              "type": "object",
+              "required": ["externalSource", "externalDefectId", "severity"],
+              "properties": {
+                "externalSource": { "type": "string" },
+                "externalDefectId": { "type": "string" },
+                "severity": { "enum": ["low", "medium", "high", "critical"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DirectorySynchronized": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "DirectorySynchronized" },
+            "payload": {
+              "type": "object",
+              "required": ["directoryVersion", "userCount", "teamCount", "departmentCount"],
+              "properties": {
+                "directoryVersion": { "type": "string" },
+                "userCount": { "type": "integer", "minimum": 0 },
+                "teamCount": { "type": "integer", "minimum": 0 },
+                "departmentCount": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ExcelImportCompleted": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "ExcelImportCompleted" },
+            "payload": {
+              "type": "object",
+              "required": ["created", "updated", "rejected", "reportId"],
+              "properties": {
+                "created": { "type": "integer", "minimum": 0 },
+                "updated": { "type": "integer", "minimum": 0 },
+                "rejected": { "type": "integer", "minimum": 0 },
+                "reportId": { "type": "string", "format": "uuid" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "NotificationCreated": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "NotificationCreated" },
+            "payload": {
+              "type": "object",
+              "required": ["notificationId", "recipientId", "changeKind"],
+              "properties": {
+                "notificationId": { "type": "string", "format": "uuid" },
+                "recipientId": { "type": "string" },
+                "changeKind": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

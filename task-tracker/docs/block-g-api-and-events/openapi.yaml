@@ -1,0 +1,166 @@
+openapi: 3.1.0
+info:
+  title: Task Tracker API
+  version: 1.0.0-draft
+  description: Draft contract; authentication details and directory-provider contract remain open decisions.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /bugs:
+    post:
+      operationId: createBugFromTesting
+      summary: Idempotently create a Bug from the testing service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBugRequest' }
+            example:
+              externalSource: test-management
+              externalDefectId: TM-4821
+              title: Export hangs
+              description: Reproduction steps
+              severity: high
+              environment: staging-2
+              testRunUrl: https://test.example/runs/998
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BugResult' } } } }
+        '200': { description: Existing bug returned for the same source and external ID, content: { application/json: { schema: { $ref: '#/components/schemas/BugResult' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /reports/work-items:
+    get:
+      operationId: listReportWorkItems
+      summary: Read-only paginated work-item data for reporting
+      parameters:
+        - { name: periodFrom, in: query, schema: { type: string, format: date } }
+        - { name: periodTo, in: query, schema: { type: string, format: date } }
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: iterationId, in: query, schema: { type: string, format: uuid } }
+        - { name: type, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: assigneeId, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: Page of work items, content: { application/json: { schema: { $ref: '#/components/schemas/WorkItemPage' } } } }
+        '403': { $ref: '#/components/responses/Error' }
+  /reports/iterations:
+    get:
+      operationId: listReportIterations
+      summary: Read-only iteration baselines and outcomes
+      responses:
+        '200': { description: Iteration data }
+        '403': { $ref: '#/components/responses/Error' }
+  /reports/time-logs:
+    get:
+      operationId: listReportTimeLogs
+      summary: Read-only dated time-log entries
+      responses:
+        '200': { description: Time-log data }
+        '403': { $ref: '#/components/responses/Error' }
+  /work-items/{id}/attachments:
+    parameters:
+      - { $ref: '#/components/parameters/WorkItemId' }
+    get:
+      summary: List attachments
+      responses: { '200': { description: Attachment metadata } }
+    post:
+      summary: Upload attachment
+      requestBody:
+        required: true
+        content: { multipart/form-data: { schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } } } }
+      responses: { '201': { description: Uploaded }, '422': { $ref: '#/components/responses/Error' } }
+  /work-items/{id}/attachments/{attachmentId}:
+    parameters:
+      - { $ref: '#/components/parameters/WorkItemId' }
+      - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Download attachment
+      responses: { '200': { description: Binary file } }
+    delete:
+      summary: Delete attachment when authorized
+      responses: { '204': { description: Deleted }, '403': { $ref: '#/components/responses/Error' } }
+  /exports/work-items:
+    post:
+      summary: Export selected work items as XLSX
+      responses:
+        '200': { description: XLSX file, content: { application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } } } }
+  /imports/work-items:
+    post:
+      summary: Validate and import a Task Tracker XLSX file
+      requestBody:
+        required: true
+        content: { multipart/form-data: { schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } } } }
+      responses:
+        '200': { description: Import report with created, updated and rejected counts }
+        '422': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, description: Token format and identity provider are an open decision. }
+  parameters:
+    WorkItemId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Error:
+      description: Structured error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    CreateBugRequest:
+      type: object
+      required: [externalSource, externalDefectId, title, description, severity]
+      properties:
+        externalSource: { type: string }
+        externalDefectId: { type: string }
+        title: { type: string, minLength: 1 }
+        description: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        environment: { type: string }
+        build: { type: string }
+        testRunUrl: { type: string, format: uri }
+        testCaseUrl: { type: string, format: uri }
+      anyOf:
+        - required: [environment]
+        - required: [build]
+      allOf:
+        - anyOf:
+            - required: [testRunUrl]
+            - required: [testCaseUrl]
+    BugResult:
+      type: object
+      required: [id, status, workItemUrl]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [created, already-exists] }
+        workItemUrl: { type: string }
+    WorkItemPage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, type, status, plannedHours, actualHours, remainingHours]
+            properties:
+              id: { type: string, format: uuid }
+              projectId: { type: string, format: uuid }
+              type: { type: string }
+              status: { type: string }
+              assigneeId: { type: string }
+              dueDate: { type: string, format: date }
+              plannedHours: { type: number }
+              actualHours: { type: number }
+              remainingHours: { type: number }
+              iterationId: { type: string, format: uuid }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    Error:
+      type: object
+      required: [correlationId, errors]
+      properties:
+        correlationId: { type: string }
+        errors: { type: array, items: { type: object, properties: { field: { type: string }, reason: { type: string } } } }
