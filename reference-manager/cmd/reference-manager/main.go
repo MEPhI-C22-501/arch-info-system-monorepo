@@ -18,7 +18,15 @@ func main() {
 	flag.Parse()
 
 	cfg := errors.Must(config.Read[app.Config](configs))
-	app := errors.Must(app.NewApp(cfg))
+
+	initCtx, initCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	app, err := app.NewApp(initCtx, cfg)
+	if err != nil {
+		initCancel()
+		panic(err)
+	}
+
+	initCancel()
 
 	startupCtx, startupCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	if err := app.Startup(startupCtx); err != nil {
@@ -26,7 +34,6 @@ func main() {
 		panic(err)
 	}
 
-	<-startupCtx.Done()
 	startupCancel()
 
 	shutdownCtx, shutdownCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
