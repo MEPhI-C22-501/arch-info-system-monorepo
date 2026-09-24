@@ -310,6 +310,9 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   box-shadow: var(--shadow);
 }
 .board-card:active { cursor: grabbing; }
+.board-card:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.board-card.readonly { cursor: pointer; }
+.board-card.readonly:active { cursor: pointer; }
 .board-card.dragging { opacity: .4; }
 .board-card .bc-id { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
 .board-card .bc-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; line-height: 1.3; }

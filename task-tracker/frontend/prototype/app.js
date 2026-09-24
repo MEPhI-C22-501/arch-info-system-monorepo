@@ -1,11 +1,10 @@
 /*
  * Task Tracker — live-прототип (документ 115, см. docs/block-e-ui-ux-design/).
  * Чистый JS без сборки/зависимостей: вся логика — имитация поведения, описанного
- * в vision.md / system-requirements.md / docs/block-*, с данными в памяти (localStorage
- * используется только чтобы демо не сбрасывалось при перезагрузке страницы).
+ * в vision.md / system-requirements.md / docs/block-*, с данными в памяти вкладки.
  *
  * Это макет для проверки UI/UX-гипотез, а не рабочее приложение: нет ни бэкенда,
- * ни настоящего Keycloak/Excel/Kafka — переключатель роли в сайдбаре имитирует то,
+ * ни настоящего провайдера аутентификации/Excel/брокера сообщений — переключатель роли имитирует то,
  * что в реальной системе определяется токеном и правами на сервере (NFR-003).
  */
 
@@ -128,6 +127,7 @@
     activeScreen: "backlog",
     openItemCode: null,
     activeTab: "attachments",
+    descriptionDrafts: {},
     currentIterationId: "it1",
     dragCode: null,
   };
@@ -163,7 +163,11 @@
 
   function currentUser() { return byId(USERS, state.currentUserId); }
   function canHardDelete() { return state.role === "admin"; }
-  function canExportImport() { return state.role === "lead" || state.role === "admin"; }
+  function canExportImport() { return state.role === "lead"; }
+  function canCreateItem() { return state.role === "member" || state.role === "lead"; }
+  function canEditWorkItem(w) { return state.role === "lead" || (state.role === "member" && w.assigneeId === state.currentUserId); }
+  function canCollaborate() { return state.role === "member" || state.role === "lead"; }
+  function canManageIterations() { return state.role === "lead"; }
 
   function toast(message, kind) {
     const el = document.createElement("div");
@@ -179,7 +183,13 @@
 
   function notify(recipientId, workItemCode, message) {
     if (!recipientId) return;
-    NOTIFICATIONS.unshift({ id: uid("n"), recipientId, workItemCode, message, createdAt: new Date().toISOString(), readAt: null });
+    const workItem = item(workItemCode);
+    NOTIFICATIONS.unshift({
+      id: uid("n"), recipientId, workItemCode,
+      workItemPublicId: workItemCode, workItemTitle: workItem ? workItem.title : "",
+      actor: currentUser() ? currentUser().name : ROLE_LABEL[state.role],
+      message, createdAt: new Date().toISOString(), readAt: null,
+    });
   }
 
   /* ============================== НАВИГАЦИЯ ============================== */
@@ -203,7 +213,9 @@
     $("#navAdmin").hidden = state.role !== "admin";
     $("#btnExport").hidden = !canExportImport();
     $("#btnImport").hidden = !canExportImport();
+    $("#btnCreateItem").hidden = !canCreateItem();
     if (state.role !== "admin" && state.activeScreen === "admin") switchScreen("backlog");
+    if (state.openItemCode) renderItemCard();
   }
 
   function updateUnreadBadge() {
@@ -317,7 +329,15 @@
   function renderBoardCard(w) {
     const card = document.createElement("div");
     card.className = "board-card";
-    card.draggable = true;
+    card.dataset.workItemCode = w.code;
+    const editable = canEditWorkItem(w);
+    card.classList.toggle("readonly", !editable);
+    card.draggable = editable;
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", editable
+      ? `${w.code}: ${w.title}. Статус: ${statusName(w.statusId)}. Стрелки влево и вправо меняют статус, Enter открывает карточку.`
+      : `${w.code}: ${w.title}. Статус: ${statusName(w.statusId)}. Enter открывает карточку только для просмотра.`);
     const rem = remainingHours(w.code);
     card.innerHTML = `
       <div class="bc-id">${w.code} · <span class="badge-pill type-${w.type}" style="padding:1px 6px;">${w.type}</span></div>
@@ -333,12 +353,33 @@
     card.addEventListener("dragstart", () => { state.dragCode = w.code; card.classList.add("dragging"); });
     card.addEventListener("dragend", () => { card.classList.remove("dragging"); state.dragCode = null; });
     card.addEventListener("click", () => openItemCard(w.code));
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openItemCard(w.code);
+        return;
+      }
+      if (!editable || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+      const columns = STATUSES.filter((s) => s.onBoard && s.active).sort((a, b) => a.order - b.order);
+      const currentIndex = columns.findIndex((s) => s.id === w.statusId);
+      const targetIndex = currentIndex + (e.key === "ArrowLeft" ? -1 : 1);
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= columns.length) return;
+      e.preventDefault();
+      moveItemToStatus(w.code, columns[targetIndex].id);
+      const movedCard = $all(".board-card").find((el) => el.dataset.workItemCode === w.code);
+      if (movedCard) movedCard.focus();
+    });
     return card;
   }
 
   function moveItemToStatus(code, statusId) {
     const w = item(code);
     if (!w || w.statusId === statusId) return;
+    if (!canEditWorkItem(w)) {
+      toast("Недостаточно прав для смены статуса этого элемента.", "error");
+      renderBoard();
+      return;
+    }
     const targetStatus = byId(STATUSES, statusId);
     if (targetStatus.name !== "Бэклог" && !w.assigneeId) {
       toast(`Нельзя перевести «${code}» из бэклога без назначенного исполнителя — карточка возвращена.`, "error");
@@ -383,7 +424,9 @@
     $("#itemBadges").innerHTML = `<span class="badge-pill type-${w.type}">${w.type}</span>${statusChip(w.statusId)}<span class="badge-pill priority-${w.priorityId}">${w.priorityId}</span>` +
       (w.externalSource ? `<span class="badge-pill" style="background:#eef0f3;color:#4b5563;">Из ${escapeHtml(w.externalSource)} · ${escapeHtml(w.externalDefectId)}</span>` : "");
     $("#itemTitle").textContent = w.title;
-    $("#itemDescription").textContent = w.description || "";
+    $("#itemDescription").textContent = Object.hasOwn(state.descriptionDrafts, w.code)
+      ? state.descriptionDrafts[w.code]
+      : (w.description || "");
 
     const leaf = isLeaf(w.code);
     $("#itemFields").innerHTML = `
@@ -411,6 +454,13 @@
     renderHistory(w.code);
     setActiveTab(state.activeTab);
 
+    const editAllowed = canEditWorkItem(w);
+    $all("input, select", $("#itemFields")).forEach((control) => { control.disabled = !editAllowed; });
+    $("#itemDescription").contentEditable = editAllowed ? "true" : "false";
+    $("#btnSaveCard").hidden = !editAllowed;
+    $("#btnAddAttachment").hidden = !canCollaborate();
+    $("#btnAddTimelog").hidden = !canCollaborate();
+    $("#btnAddComment").hidden = !canCollaborate();
     $("#btnHardDelete").hidden = !canHardDelete();
   }
 
@@ -483,9 +533,9 @@
 
     const actions = $("#iterationActions");
     actions.innerHTML = "";
-    if (it.state === "Запланирована") {
+    if (canManageIterations() && it.state === "Запланирована") {
       actions.innerHTML = `<button class="btn primary" id="btnStartIteration">Запустить итерацию</button>`;
-    } else if (it.state === "Активна") {
+    } else if (canManageIterations() && it.state === "Активна") {
       actions.innerHTML = `<button class="btn primary" id="btnCompleteIteration">Завершить итерацию</button>`;
     }
 
@@ -544,6 +594,7 @@
   }
 
   function startIteration() {
+    if (!canManageIterations()) return;
     const it = byId(ITERATIONS, state.currentIterationId);
     const items = WORK_ITEMS.filter((w) => w.iterationId === it.id);
     const overloaded = it.capacities.filter((cap) => {
@@ -571,6 +622,7 @@
   }
 
   function completeIteration() {
+    if (!canManageIterations()) return;
     const it = byId(ITERATIONS, state.currentIterationId);
     const items = WORK_ITEMS.filter((w) => w.iterationId === it.id);
     const unfinished = items.filter((w) => statusName(w.statusId) !== "Завершена");
@@ -591,7 +643,7 @@
         <span class="notif-dot"></span>
         <div class="notif-body">
           <div class="notif-title">${escapeHtml(n.message)}</div>
-          <div class="notif-meta">${n.workItemCode} · ${fmtDateTime(n.createdAt)}</div>
+          <div class="notif-meta">${escapeHtml(n.actor || "Система")} · ${escapeHtml(n.workItemCode || n.workItemPublicId || "удалённый элемент")} · ${fmtDateTime(n.createdAt)}</div>
         </div>
       </li>`).join("");
   }
@@ -663,12 +715,25 @@
     $("#modalCancel").onclick = closeModal;
     $("#modalConfirm").onclick = () => {
       const code = w.code;
+      const title = w.title;
+      const recipientId = w.assigneeId;
       WORK_ITEMS = WORK_ITEMS.filter((x) => x.code !== code);
       TIMELOGS = TIMELOGS.filter((x) => x.workItemCode !== code);
       COMMENTS = COMMENTS.filter((x) => x.workItemCode !== code);
       ATTACHMENTS = ATTACHMENTS.filter((x) => x.workItemCode !== code);
       HISTORY = HISTORY.filter((x) => x.workItemCode !== code);
-      NOTIFICATIONS = NOTIFICATIONS.filter((x) => x.workItemCode !== code);
+      NOTIFICATIONS = NOTIFICATIONS.map((n) => n.workItemCode === code
+        ? { ...n, workItemCode: null, workItemPublicId: code, workItemTitle: title }
+        : n);
+      if (recipientId) {
+        NOTIFICATIONS.unshift({
+          id: uid("n"), recipientId, workItemCode: null, workItemPublicId: code,
+          workItemTitle: title, actor: currentUser() ? currentUser().name : ROLE_LABEL[state.role],
+          message: `Рабочий элемент «${title}» удалён безвозвратно`,
+          createdAt: new Date().toISOString(), readAt: null,
+        });
+      }
+      delete state.descriptionDrafts[code];
       closeModal();
       closeItemCard();
       toast(`Элемент ${code} удалён безвозвратно.`);
@@ -696,9 +761,11 @@
         plannedHours: Number($("#field_newHours").value || 0), parentCode: null, iterationId: null,
       });
       pushHistory(code, currentUser() ? currentUser().name : ROLE_LABEL[state.role], [{ field: "Элемент", from: "—", to: "Создан" }]);
+      const created = item(code);
+      if (created.assigneeId) notify(created.assigneeId, code, `Вам назначен рабочий элемент «${created.title}»`);
       closeModal();
       toast(`Элемент ${code} создан.`);
-      renderBacklog();
+      renderBacklog(); updateUnreadBadge();
     };
   }
 
@@ -735,9 +802,12 @@
       const code = "TT-" + nextCode++;
       WORK_ITEMS.push({ code, type: "Задача", title: "Загружено из Excel: провести ретро", description: "", statusId: "s1", priorityId: "Средний", assigneeId: null, startDate: "", dueDate: "", plannedHours: 2, parentCode: null, iterationId: null });
       const updated = WORK_ITEMS[0];
-      pushHistory(updated.code, "Импорт из Excel", [{ field: "Приоритет", from: updated.priorityId, to: updated.priorityId }]);
+      const oldPriority = updated.priorityId;
+      updated.priorityId = oldPriority === "Высокий" ? "Средний" : "Высокий";
+      pushHistory(updated.code, "Импорт из Excel", [{ field: "Приоритет", from: oldPriority, to: updated.priorityId }]);
+      if (updated.assigneeId) notify(updated.assigneeId, updated.code, `Карточка «${updated.title}» обновлена импортом из Excel`);
       $("#importReportHolder").innerHTML = `<div class="import-report">Импорт завершён: создано 1, обновлено 1, отклонено 0.</div>`;
-      renderBacklog();
+      renderBacklog(); updateUnreadBadge();
     };
     $("#btnImportBad").onclick = () => {
       $("#importReportHolder").innerHTML = `<div class="import-report">
@@ -791,14 +861,20 @@
       const notifRow = e.target.closest("[data-notif]");
       if (notifRow) {
         const n = byId(NOTIFICATIONS, notifRow.dataset.notif);
-        if (n) { n.readAt = n.readAt || new Date().toISOString(); updateUnreadBadge(); renderNotifications(); if (n.workItemCode) openItemCard(n.workItemCode); }
+        if (n) {
+          n.readAt = n.readAt || new Date().toISOString();
+          updateUnreadBadge();
+          renderNotifications();
+          if (n.workItemCode && item(n.workItemCode)) openItemCard(n.workItemCode);
+          else toast("Рабочий элемент удалён; уведомление сохранено без ссылки на карточку.", "warn");
+        }
       }
       if (e.target.id === "btnAddAttachment") {
         const w = item(state.openItemCode);
         const [fileName, size] = MOCK_FILES[Math.floor(Math.random() * MOCK_FILES.length)];
         ATTACHMENTS.push({ id: uid("a"), workItemCode: w.code, fileName, size, uploadedBy: state.currentUserId || "u5", uploadedAt: new Date().toISOString() });
         pushHistory(w.code, currentUser() ? currentUser().name : ROLE_LABEL[state.role], [{ field: "Вложение", from: "—", to: fileName }]);
-        if (w.assigneeId && w.assigneeId !== state.currentUserId) notify(w.assigneeId, w.code, `Добавлено вложение к «${w.title}»`);
+        if (w.assigneeId) notify(w.assigneeId, w.code, `Добавлено вложение к «${w.title}»`);
         renderAttachments(w.code); renderHistory(w.code); updateUnreadBadge();
       }
       if (e.target.id === "btnAddTimelog") {
@@ -806,8 +882,10 @@
         const hours = Number($("#timelogHours").value);
         if (!hours || hours <= 0) { toast("Укажите часы больше нуля", "warn"); return; }
         TIMELOGS.push({ workItemCode: w.code, userId: state.currentUserId || "u5", date: new Date().toISOString().slice(0, 10), hours, comment: $("#timelogComment").value.trim() });
+        pushHistory(w.code, currentUser() ? currentUser().name : ROLE_LABEL[state.role], [{ field: "Трудозатраты", from: "—", to: fmtHours(hours) }]);
+        if (w.assigneeId) notify(w.assigneeId, w.code, `Добавлены трудозатраты к «${w.title}»: ${fmtHours(hours)}`);
         $("#timelogHours").value = ""; $("#timelogComment").value = "";
-        renderTimelog(w.code); renderItemFieldsHoursOnly(w.code);
+        renderTimelog(w.code); renderHistory(w.code); renderItemFieldsHoursOnly(w.code); updateUnreadBadge();
       }
       if (e.target.id === "btnAddComment") {
         const w = item(state.openItemCode);
@@ -815,8 +893,9 @@
         if (!text) return;
         COMMENTS.push({ id: uid("c"), workItemCode: w.code, authorId: state.currentUserId || "u5", text, createdAt: new Date().toISOString() });
         $("#newComment").value = "";
-        if (w.assigneeId && w.assigneeId !== state.currentUserId) notify(w.assigneeId, w.code, `Новый комментарий к «${w.title}»`);
-        renderComments(w.code); updateUnreadBadge();
+        pushHistory(w.code, currentUser() ? currentUser().name : ROLE_LABEL[state.role], [{ field: "Комментарий", from: "—", to: text }]);
+        if (w.assigneeId) notify(w.assigneeId, w.code, `Новый комментарий к «${w.title}»`);
+        renderComments(w.code); renderHistory(w.code); updateUnreadBadge();
       }
       if (e.target.id === "btnMarkAllRead") {
         NOTIFICATIONS.filter((n) => n.recipientId === state.currentUserId).forEach((n) => { n.readAt = n.readAt || new Date().toISOString(); });
@@ -853,7 +932,7 @@
     $("#itemDescription").addEventListener("input", () => {
       const w = item(state.openItemCode);
       if (!w) return;
-      w.description = $("#itemDescription").textContent;
+      state.descriptionDrafts[w.code] = $("#itemDescription").textContent;
       $("#autosaveHint").textContent = "Сохранение…";
       clearTimeout(window.__descTimer);
       window.__descTimer = setTimeout(() => { $("#autosaveHint").textContent = "Черновик сохранён автоматически"; }, 500);
@@ -869,6 +948,15 @@
     const w = item(state.openItemCode);
     if (!w) return;
     const changes = [];
+    const startEl = $("#fieldStart"), dueEl = $("#fieldDue"), plannedEl = $("#fieldPlanned");
+    if (startEl && dueEl && startEl.value && dueEl.value && dueEl.value < startEl.value) {
+      toast("Срок выполнения не может быть раньше даты начала", "error");
+      return;
+    }
+    if (plannedEl && Number(plannedEl.value) < 0) {
+      toast("Трудоёмкость не может быть отрицательной", "error");
+      return;
+    }
     const map = { statusId: "Статус", priorityId: "Приоритет", assigneeId: "Исполнитель", iterationId: "Итерация" };
     Object.keys(map).forEach((key) => {
       const el = $("#field_" + key);
@@ -880,16 +968,18 @@
         w[key] = newVal;
       }
     });
-    const startEl = $("#fieldStart"), dueEl = $("#fieldDue"), plannedEl = $("#fieldPlanned");
     if (startEl && startEl.value !== w.startDate) { changes.push({ field: "Дата начала", from: fmtDate(w.startDate), to: fmtDate(startEl.value) }); w.startDate = startEl.value; }
     if (dueEl && dueEl.value !== w.dueDate) {
-      if (w.startDate && dueEl.value && dueEl.value < w.startDate) { toast("Срок выполнения не может быть раньше даты начала", "error"); return; }
       changes.push({ field: "Срок выполнения", from: fmtDate(w.dueDate), to: fmtDate(dueEl.value) }); w.dueDate = dueEl.value;
     }
     if (plannedEl && Number(plannedEl.value) !== Number(w.plannedHours)) {
-      if (Number(plannedEl.value) < 0) { toast("Трудоёмкость не может быть отрицательной", "error"); return; }
       changes.push({ field: "Плановая трудоёмкость", from: fmtHours(w.plannedHours || 0), to: fmtHours(Number(plannedEl.value)) });
       w.plannedHours = Number(plannedEl.value);
+    }
+    if (Object.hasOwn(state.descriptionDrafts, w.code) && state.descriptionDrafts[w.code] !== w.description) {
+      changes.push({ field: "Описание", from: w.description || "—", to: state.descriptionDrafts[w.code] || "—" });
+      w.description = state.descriptionDrafts[w.code];
+      delete state.descriptionDrafts[w.code];
     }
     if (changes.length) {
       pushHistory(w.code, currentUser() ? currentUser().name : ROLE_LABEL[state.role], changes);
