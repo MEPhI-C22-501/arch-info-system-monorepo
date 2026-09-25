@@ -22,14 +22,12 @@ func NewBuilder(registry *Registry) *Builder {
 	}
 }
 
-func (b *Builder) Build(cfg config.Config, externalHandler slog.Handler) (*slog.Logger, error) {
+func (b *Builder) Build(cfg config.Config) (*slog.Logger, error) {
 	if len(cfg.Handlers) == 0 {
 		return nil, ErrNoHandlers
 	}
 
-	handlers := make([]slog.Handler, 0, len(cfg.Handlers)+1)
-	handlers = append(handlers, externalHandler)
-
+	handlers := make([]slog.Handler, 0, len(cfg.Handlers))
 	for _, cfg := range cfg.Handlers {
 		h, err := b.buildHandler(cfg)
 		if err != nil {
