@@ -9,23 +9,25 @@ import (
 
 	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http"
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
-	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/log"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/telemetry"
 )
 
 type App struct {
-	log *slog.Logger
-
+	log            *slog.Logger
+	telemetry      *telemetry.Telemetry
 	httpServer     *httpserver.Server
 	postgresClient *postgres.Client
 }
 
 func NewApp(cfg *Config) (*App, error) {
-	log, err := log.New(cfg.Log)
+	telemetry, err := telemetry.NewTelemetry(&cfg.Telemetry)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize logger: %w", err)
+		return nil, fmt.Errorf("failed to initialize telemetry: %w", err)
 	}
+
+	log := telemetry.Logger()
 
 	postgresClient, err := postgres.NewClient(&cfg.Databases.Postgres, log)
 	if err != nil {
@@ -43,6 +45,7 @@ func NewApp(cfg *Config) (*App, error) {
 	log.Info("application initialized successfully")
 	return &App{
 		log:            log,
+		telemetry:      telemetry,
 		httpServer:     httpServer,
 		postgresClient: postgresClient,
 	}, nil
