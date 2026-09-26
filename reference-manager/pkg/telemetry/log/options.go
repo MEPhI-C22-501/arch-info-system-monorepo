@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	DefaultFormat Format     = TextFormat
-	DefaultLevel  slog.Level = slog.LevelDebug
+	DefaultFormat = TextFormat
+	DefaultLevel  = slog.LevelDebug
 )
 
 type options struct {
