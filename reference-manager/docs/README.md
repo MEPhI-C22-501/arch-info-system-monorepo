@@ -17,7 +17,7 @@
 | C | [080 - администратор](block-c-requirements-and-roles/080.admin-user-stories.md) | US-AD-01..08 |
 | C | [080 - читатель](block-c-requirements-and-roles/080.reader-user-stories.md) | US-RD-01..05 |
 | C | [080 - команда-заказчик](block-c-requirements-and-roles/080.requester-team-user-stories.md) | US-RQ-01..04 |
-| C | [080 - сервис-потребитель](block-c-requirements-and-roles/080.consumer-service-user-stories.md) | US-CS-01..05 |
+| C | [080 - сервис-потребитель](block-c-requirements-and-roles/080.consumer-service-user-stories.md) | US-CS-01..06 |
 | C | [090 - Эпики](block-c-requirements-and-roles/090.features-epics.md) | E-01..E-11 (E-07 отозван), приоритеты, вехи M4 и M5 |
 | D | [095 - Матрица покрытия](block-d-verification/095.requirements-check.md) | Трассировка FR, INT, BR, NFR к UC, историям и тестам |
 | E | [110 - UI/UX](block-e-ui-ux-design/110.ui-ux.md) | Экраны S-01..S-04, навигация, видимость по ролям |
