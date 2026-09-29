@@ -27,7 +27,7 @@ func NewRouter(
 		timeoutmw.NewMiddleware(1*time.Second), // TODO: implement middleware init via special configuration
 	)
 
-	r.Mount("", apiv1.Handler(
+	r.Mount("/v1", apiv1.Handler(
 		health.NewHandler(readinessChecker)),
 	)
 

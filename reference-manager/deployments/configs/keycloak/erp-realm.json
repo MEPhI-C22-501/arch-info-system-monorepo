@@ -1,0 +1,30 @@
+{
+  "realm": "erp",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "reference-manager",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "secret": "reference-manager"
+    }
+  ],
+  "users": [
+    {
+      "username": "developer",
+      "enabled": true,
+      "email": "developer@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "developer",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
