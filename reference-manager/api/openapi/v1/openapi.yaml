@@ -5,8 +5,8 @@ info:
   version: 0.0.0
 
 paths:
-  /livez:
+  /v1/livez:
     $ref: "./paths/livez.yaml"
 
-  /readyz:
+  /v1/readyz:
     $ref: "./paths/readyz.yaml"
