@@ -1,4 +1,4 @@
-package httptr
+package serverhttp
 
 import (
 	"log/slog"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/v1/health"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/servers/http/v1/health"
 	apiv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1"
 	logmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/log"
 	ratelimitmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/ratelimit"

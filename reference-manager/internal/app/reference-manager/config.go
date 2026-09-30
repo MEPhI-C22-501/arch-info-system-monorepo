@@ -1,7 +1,7 @@
 package app
 
 import (
-	httpconfig "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
+	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/telemetry"
 )
@@ -13,7 +13,7 @@ type Config struct {
 }
 
 type TransportConfig struct {
-	HTTP httpconfig.Config `yaml:"http"`
+	HTTP httpserver.Config `yaml:"http"`
 }
 
 type DatabasesConfig struct {

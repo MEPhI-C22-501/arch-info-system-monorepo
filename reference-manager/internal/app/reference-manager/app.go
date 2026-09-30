@@ -7,7 +7,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http"
+	serverhttp "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/servers/http"
+
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"
@@ -37,7 +38,7 @@ func NewApp(cfg *Config) (*App, error) {
 	readinessManager := ready.NewManager(log, postgresClient.ReadinessCheck())
 
 	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
-	httpServer.RegisterRouter(httptr.NewRouter(
+	httpServer.RegisterRouter(serverhttp.NewRouter(
 		log,
 		readinessManager,
 	))
