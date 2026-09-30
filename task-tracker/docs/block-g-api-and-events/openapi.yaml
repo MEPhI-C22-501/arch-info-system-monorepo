@@ -1,13 +1,189 @@
 openapi: 3.1.0
 info:
   title: Task Tracker API
-  version: 1.0.0-draft
-  description: Draft contract; authentication details and directory-provider contract remain open decisions.
+  version: 1.0.0
+  description: Keycloak OIDC bearer tokens with task-tracker audience. Directory snapshot provider remains a draft external contract.
 servers:
   - url: /api/v1
 security:
   - bearerAuth: []
 paths:
+  /me:
+    get:
+      summary: Current user, local role and effective permissions
+      responses: { '200': { description: Identity and permissions }, '403': { $ref: '#/components/responses/Error' } }
+  /statuses:
+    get:
+      summary: List configured statuses
+      responses: { '200': { description: Status list } }
+  /priorities:
+    get:
+      summary: List configured priorities
+      responses: { '200': { description: Priority list } }
+  /types:
+    get:
+      summary: List work-item types and availability
+      responses: { '200': { description: Type list } }
+  /users:
+    get:
+      summary: List cached directory users
+      responses: { '200': { description: User list } }
+  /work-items:
+    get:
+      summary: Paginated backlog with type, statusId, priorityId, assigneeId, iterationId, search and sort filters
+      responses: { '200': { description: Work-item page } }
+    post:
+      summary: Create a work item
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { '201': { description: Created }, '422': { $ref: '#/components/responses/Error' } }
+  /work-items/{id}:
+    parameters: [{ $ref: '#/components/parameters/WorkItemId' }]
+    get:
+      summary: Read a work item with computed totals and hierarchy
+      responses: { '200': { description: Work item }, '403': { $ref: '#/components/responses/Error' } }
+    patch:
+      summary: Update a work item; version provides optimistic concurrency control
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { '200': { description: Updated }, '409': { $ref: '#/components/responses/Error' } }
+    delete:
+      summary: Permanently delete a childless work item
+      parameters: [{ name: X-Confirm-Hard-Delete, in: header, required: true, schema: { type: string, format: uuid } }]
+      responses: { '204': { description: Deleted }, '409': { $ref: '#/components/responses/Error' } }
+  /work-items/{id}/history:
+    parameters: [{ $ref: '#/components/parameters/WorkItemId' }]
+    get:
+      summary: List field-level audit entries
+      responses: { '200': { description: Audit entries } }
+  /work-items/{id}/comments:
+    parameters: [{ $ref: '#/components/parameters/WorkItemId' }]
+    get:
+      summary: List comments
+      responses: { '200': { description: Comments } }
+    post:
+      summary: Add a comment
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string } } } } } }
+      responses: { '201': { description: Added } }
+  /work-items/{id}/comments/{commentId}:
+    parameters: [{ $ref: '#/components/parameters/WorkItemId' }, { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      summary: Edit an own comment or manage another with permission
+      responses: { '200': { description: Updated } }
+    delete:
+      summary: Delete a comment
+      responses: { '204': { description: Deleted } }
+  /work-items/{id}/time-logs:
+    parameters: [{ $ref: '#/components/parameters/WorkItemId' }]
+    get:
+      summary: List actual-hours entries
+      responses: { '200': { description: Time logs } }
+    post:
+      summary: Register hours on a leaf item
+      responses: { '201': { description: Added } }
+  /iterations:
+    get:
+      summary: List iterations
+      responses: { '200': { description: Iterations } }
+    post:
+      summary: Create an iteration
+      responses: { '201': { description: Created } }
+  /iterations/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      summary: Read iteration metrics, baseline and outcome
+      responses: { '200': { description: Iteration } }
+    patch:
+      summary: Update a non-completed iteration
+      responses: { '200': { description: Updated } }
+  /iterations/{id}/capacity:
+    parameters: [{ $ref: '#/components/parameters/IterationId' }]
+    put:
+      summary: Set participant capacity
+      responses: { '200': { description: Updated iteration } }
+  /iterations/{id}/items/{itemId}:
+    parameters: [{ $ref: '#/components/parameters/IterationId' }, { $ref: '#/components/parameters/ItemId' }]
+    put:
+      summary: Add a work item to an iteration
+      responses: { '200': { description: Updated iteration } }
+    delete:
+      summary: Remove a work item from an iteration
+      responses: { '200': { description: Updated iteration } }
+  /iterations/{id}/activate:
+    parameters: [{ $ref: '#/components/parameters/IterationId' }]
+    post:
+      summary: Freeze baseline and start iteration
+      responses: { '200': { description: Activated iteration } }
+  /iterations/{id}/complete:
+    parameters: [{ $ref: '#/components/parameters/IterationId' }]
+    post:
+      summary: Freeze outcome and complete iteration
+      responses: { '200': { description: Completed iteration } }
+  /notifications:
+    get:
+      summary: List current user's in-app notifications
+      responses: { '200': { description: Notifications } }
+  /notifications/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      summary: Mark notification read
+      responses: { '204': { description: Marked read } }
+  /admin/statuses:
+    post:
+      summary: Create status
+      responses: { '201': { description: Created } }
+  /admin/statuses/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      summary: Configure status
+      responses: { '200': { description: Updated } }
+  /admin/priorities:
+    post:
+      summary: Create priority
+      responses: { '201': { description: Created } }
+  /admin/priorities/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      summary: Configure priority
+      responses: { '200': { description: Updated } }
+  /admin/types/{type}:
+    parameters: [{ name: type, in: path, required: true, schema: { type: string } }]
+    patch:
+      summary: Enable or disable creation of a type
+      responses: { '204': { description: Updated } }
+  /admin/access:
+    get:
+      summary: List local admission and roles
+      responses: { '200': { description: Access entries } }
+  /admin/access/{userId}:
+    parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+    put:
+      summary: Set local admission and role
+      responses: { '204': { description: Updated } }
+  /admin/permissions:
+    get:
+      summary: Read configurable role matrix
+      responses: { '200': { description: Role permissions } }
+  /admin/permissions/{role}/{permission}:
+    parameters: [{ name: role, in: path, required: true, schema: { type: string } }, { name: permission, in: path, required: true, schema: { type: string } }]
+    put:
+      summary: Update a role permission
+      responses: { '204': { description: Updated } }
+  /admin/severity-mapping:
+    get:
+      summary: Read severity to priority mapping
+      responses: { '200': { description: Mapping } }
+  /admin/severity-mapping/{severity}:
+    parameters: [{ name: severity, in: path, required: true, schema: { type: string } }]
+    put:
+      summary: Configure severity to active-priority mapping
+      responses: { '204': { description: Updated } }
+  /admin/directory:
+    get:
+      summary: Read directory synchronization state
+      responses: { '200': { description: State and recent logs } }
+  /admin/directory/sync:
+    post:
+      summary: Synchronize directory snapshot now
+      responses: { '200': { description: Synchronization result }, '503': { $ref: '#/components/responses/Error' } }
   /bugs:
     post:
       operationId: createBugFromTesting
@@ -62,6 +238,13 @@ paths:
       responses:
         '200': { description: Time-log data }
         '403': { $ref: '#/components/responses/Error' }
+  /reports/statuses:
+    get:
+      operationId: listReportStatuses
+      summary: Read-only status dictionary for reports
+      responses:
+        '200': { description: Status dictionary }
+        '403': { $ref: '#/components/responses/Error' }
   /work-items/{id}/attachments:
     parameters:
       - { $ref: '#/components/parameters/WorkItemId' }
@@ -100,9 +283,11 @@ paths:
         '422': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
-    bearerAuth: { type: http, scheme: bearer, description: Token format and identity provider are an open decision. }
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT, description: Keycloak OIDC token with task-tracker audience; local admission and permissions are checked server-side. }
   parameters:
     WorkItemId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    IterationId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    ItemId: { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
   responses:
     Error:
       description: Structured error

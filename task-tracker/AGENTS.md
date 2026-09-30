@@ -2,9 +2,9 @@
 
 ## Project Structure & Module Organization
 
-The project is currently in the requirements phase. `docs/system-requirements.md` defines the domain, workflows, data model, and acceptance criteria. Keep product and architecture notes under `docs/` and link decisions to IDs such as `FR-IT-05` or `NFR-03`.
+`docs/system-requirements.md` defines the domain, workflows, data model, and acceptance criteria. Keep product and architecture notes under `docs/` and link decisions to IDs such as `FR-IT-05` or `NFR-03`.
 
-No application source or build configuration exists yet. When implementation begins, use top-level `backend/` and `frontend/` modules, keep tests with their owning module, document layout changes here, and exclude generated output.
+The application lives in `backend/` and `frontend/`; local integration fixtures live in `dev/`. Keep tests with their owning module and exclude generated output.
 
 ## Required Technology Stack
 
@@ -14,13 +14,10 @@ Work at senior-engineer quality: clarify ambiguity, preserve domain invariants, 
 
 ## Build, Test, and Development Commands
 
-There is no configured build or application runtime yet. Useful repository checks are:
-
-- `rg --files` — list the files currently in scope.
-- `git diff --check` — detect trailing whitespace and malformed patch formatting.
-- `git diff -- docs/` — review requirement changes before committing.
-
-Add reproducible build, test, lint, and local-run commands here with the toolchain.
+- `docker compose up --build` — run the local stack from `task-tracker/`.
+- `cd backend && mvn test` — compile and test backend code.
+- `cd frontend && npm ci && npm run build` — compile the frontend.
+- `docker compose config --quiet` and `git diff --check` — validate configuration and patch formatting.
 
 ## Documentation Style & Naming Conventions
 
