@@ -1,0 +1,7 @@
+package: currency
+
+generate:
+  chi-server: true
+  models: false
+
+output: pkg/api/v1/currency/server.gen.go

@@ -1,0 +1,47 @@
+post:
+  tags:
+    - Currency
+
+  operationId: createCurrency
+
+  summary: Create a currency
+
+  description: |
+    Creates a new currency resource according to ISO 4217.
+
+  parameters:
+    - name: currencyId
+      in: query
+      required: true
+      description: |
+        User-specified identifier of the currency resource.
+
+        The identifier must be the lowercase ISO 4217 alphabetic code.
+      schema:
+        type: string
+        pattern: "^[a-z]{3}$"
+      example: eur
+
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../components/schemas/currency.yaml"
+
+  responses:
+    "201":
+      description: Currency successfully created
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/currency.yaml"
+
+    "400":
+      description: Invalid request
+
+    "409":
+      description: Currency already exists
+
+    "500":
+      description: Internal server error

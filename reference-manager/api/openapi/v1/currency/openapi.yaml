@@ -1,0 +1,20 @@
+openapi: 3.0.3
+
+info:
+  title: Reference Manager Currency API
+  description: |
+    API for managing currencies according to ISO 4217.
+  version: 1.0.0
+
+tags:
+  - name: Currency
+    description: Currency reference data management
+
+paths:
+  /v1/currencies:
+    $ref: "./paths/currencies.yaml"
+
+components:
+  schemas:
+    Currency:
+      $ref: "./components/schemas/currency.yaml"

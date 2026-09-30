@@ -1,0 +1,66 @@
+type: object
+
+required:
+  - code
+  - numericCode
+  - displayName
+
+properties:
+  name:
+    type: string
+    readOnly: true
+    description: |
+      Resource name of the currency.
+
+      Format: currencies/{currency}
+    example: currencies/eur
+
+  uid:
+    type: string
+    format: uuid
+    readOnly: true
+    description: System-assigned unique identifier of the currency.
+    example: 550e8400-e29b-41d4-a716-446655440000
+
+  code:
+    type: string
+    minLength: 3
+    maxLength: 3
+    pattern: "^[A-Z]{3}$"
+    description: ISO 4217 alphabetic currency code.
+    example: EUR
+
+  numericCode:
+    type: string
+    minLength: 3
+    maxLength: 3
+    pattern: "^[0-9]{3}$"
+    description: ISO 4217 numeric currency code.
+    example: "978"
+
+  displayName:
+    type: string
+    minLength: 1
+    maxLength: 255
+    description: Human-readable currency name.
+    example: Euro
+
+  minorUnits:
+    type: integer
+    format: int32
+    minimum: 0
+    nullable: true
+    description: Number of decimal digits used for the minor currency unit.
+    example: 2
+
+  createTime:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Time when the currency was created.
+
+  updateTime:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Time when the currency was last updated.
