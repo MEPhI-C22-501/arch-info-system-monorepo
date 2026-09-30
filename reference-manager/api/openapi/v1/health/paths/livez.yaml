@@ -1,0 +1,17 @@
+get:
+  tags:
+    - Health
+
+  operationId: getLiveness
+
+  summary: Check service liveness
+
+  description: |
+    Checks whether the Reference Manager process is running
+    and able to handle HTTP requests.
+
+    This endpoint does not check external dependencies such as databases.
+
+  responses:
+    "200":
+      description: Service is alive

@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/servers/http/v1/health"
-	apiv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1"
+	healthv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/health"
 	logmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/log"
 	ratelimitmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/ratelimit"
 	recoverymw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/recovery"
@@ -27,9 +27,7 @@ func NewRouter(
 		timeoutmw.NewMiddleware(1*time.Second), // TODO: implement middleware init via special configuration
 	)
 
-	r.Mount("/v1", apiv1.Handler(
-		health.NewHandler(readinessChecker)),
-	)
+	healthv1.HandlerFromMux(health.NewHandler(readinessChecker), r)
 
 	return r
 }

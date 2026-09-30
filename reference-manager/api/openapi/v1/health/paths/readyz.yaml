@@ -1,0 +1,42 @@
+get:
+  tags:
+    - Health
+
+  operationId: getReadiness
+
+  summary: Check service readiness
+
+  description: |
+    Checks whether the Reference Manager is ready to serve requests.
+
+    The check includes availability of required external dependencies,
+    such as the database.
+
+  responses:
+    "200":
+      description: Service is ready
+
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/readiness.yaml"
+
+          example:
+            ready: true
+            failedDependencies: []
+
+    "503":
+      description: |
+        Service is running but is not ready to serve requests because
+        one or more required dependencies are unavailable.
+
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/readiness.yaml"
+
+          example:
+            ready: false
+            failedDependencies:
+              - name: postgres
+                error: connection refused

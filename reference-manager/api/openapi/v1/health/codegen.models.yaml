@@ -1,0 +1,8 @@
+# api/openapi/v1/health/codegen.models.yaml
+
+package: healthv1
+
+generate:
+  models: true
+
+output: pkg/api/v1/health/models.gen.go

@@ -1,0 +1,9 @@
+# api/openapi/v1/health/codegen.server.yaml
+
+package: healthv1
+
+generate:
+  chi-server: true
+  models: false
+
+output: pkg/api/v1/health/server.gen.go

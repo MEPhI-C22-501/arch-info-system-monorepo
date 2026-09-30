@@ -4,8 +4,17 @@ tasks:
   generate:
     desc: Generate all artifacts
     cmds:
-      - go tool oapi-codegen -config api/openapi/v1/codegen.server.yaml api/openapi/v1/openapi.yaml
-      - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
+      - |
+        find api/openapi/v1 -type f -name 'openapi.yaml' | sort | while read -r spec; do
+          dir="$(dirname "$spec")"
+
+          for config in "$dir"/codegen.*.yaml; do
+            [ -f "$config" ] || continue
+
+            echo "Generating: $config"
+            go tool oapi-codegen -config "$config" "$spec"
+          done
+        done
 
   lint:
     desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
@@ -37,3 +46,25 @@ tasks:
     desc: Stop the local environment and remove associated volumes
     cmds:
       - docker compose -f deployments/docker-compose.yaml down -v
+
+  swagger:
+    desc: Run Swagger UI
+    silent: true
+    cmds:
+      - |
+        URLS="$(
+          find api/openapi/v1 -mindepth 2 -type f -name 'openapi.yaml' \
+            | sort \
+            | awk -F/ '{
+                name=$(NF-1)
+                printf "%s{\"name\":\"%s\",\"url\":\"/specs/%s/openapi.yaml\"}",
+                  sep, name, name
+                sep=","
+              } END { print "" }'
+        )"
+
+        docker run --rm \
+          -p 8083:8080 \
+          -v "$(pwd)/api/openapi/v1:/usr/share/nginx/html/specs:ro" \
+          -e URLS="[$URLS]" \
+          docker.swagger.io/swaggerapi/swagger-ui
