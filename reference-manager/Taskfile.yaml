@@ -4,8 +4,17 @@ tasks:
   generate:
     desc: Generate all artifacts
     cmds:
-      - go tool oapi-codegen -config api/openapi/v1/codegen.server.yaml api/openapi/v1/openapi.yaml
-      - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
+      - |
+        find api/openapi/ -type f -name 'openapi.yaml' | sort | while read -r spec; do
+          dir="$(dirname "$spec")"
+
+          for config in "$dir"/codegen.*.yaml; do
+            [ -f "$config" ] || continue
+
+            echo "Generating: $config"
+            go tool oapi-codegen -config "$config" "$spec"
+          done
+        done
 
   lint:
     desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
