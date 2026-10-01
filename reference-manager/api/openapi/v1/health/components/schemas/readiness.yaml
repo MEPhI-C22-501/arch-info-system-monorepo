@@ -1,5 +1,7 @@
 type: object
 
+description: Result of the service readiness check.
+
 required:
   - ready
   - failedDependencies
@@ -7,16 +9,30 @@ required:
 properties:
   ready:
     type: boolean
+    description: Indicates whether the service is ready to handle requests.
+    example: true
 
   failedDependencies:
     type: array
+    description: |
+      List of dependencies that failed the readiness check.
+
+      The list is empty when the service is ready.
+
     items:
       type: object
+
       required:
         - name
         - error
+
       properties:
         name:
           type: string
+          description: Name of the failed dependency.
+          example: postgres
+
         error:
           type: string
+          description: Description of the readiness check failure.
+          example: connection refused

@@ -1,12 +1,26 @@
-openapi: 3.2.0
+openapi: 3.0.3
 
 info:
-  title: Reference Manager API
-  version: 0.0.0
+  title: Reference Manager Health API
+  description: |
+    API for checking the health status of the Reference Manager service.
+
+    Used by orchestration and monitoring systems to perform
+    liveness and readiness checks.
+  version: 1.0.0
+
+tags:
+  - name: Health
+    description: Service health and availability checks
 
 paths:
-  /livez:
+  /v1/health/livez:
     $ref: "./paths/livez.yaml"
 
-  /readyz:
+  /v1/health/readyz:
     $ref: "./paths/readyz.yaml"
+
+components:
+  schemas:
+    Readiness:
+      $ref: "./components/schemas/readiness.yaml"

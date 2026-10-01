@@ -1,7 +1,10 @@
-package: apiv1
+package: healthv1
 
 generate:
   chi-server: true
   models: false
 
-output: pkg/api/v1/server.gen.go
+output-options:
+  skip-prune: true
+
+output: pkg/api/v1/health/server.gen.go
