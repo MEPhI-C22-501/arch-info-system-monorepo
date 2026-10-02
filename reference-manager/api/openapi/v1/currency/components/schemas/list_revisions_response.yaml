@@ -1,0 +1,17 @@
+type: object
+description: Paginated list of currency revisions.
+
+required:
+  - revisions
+
+properties:
+  revisions:
+    type: array
+    description: List of revisions for the current page.
+    items:
+      $ref: './currency_revision.yaml'
+
+  next_page_token:
+    type: string
+    description: Token to retrieve the next page of results.
+    example: "eyJyZXZpc2lvbiI6MTB9"

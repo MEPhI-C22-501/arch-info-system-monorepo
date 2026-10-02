@@ -1,0 +1,43 @@
+type: object
+description: Represents a historical revision or change log entry for a currency.
+
+properties:
+  id:
+    type: integer
+    format: int64
+    description: Unique identifier of the revision record.
+    example: 101
+
+  currency_id:
+    type: integer
+    format: int64
+    description: Identifier of the currency this revision belongs to.
+    example: 1
+
+  revision:
+    type: integer
+    format: int32
+    description: The revision number associated with this change.
+    example: 4
+
+  change:
+    type: object
+    description: |
+      Arbitrary JSON object representing the exact changes made to the currency fields.
+      Contains only the modified fields and their new values.
+    additionalProperties: true
+    example:
+      name: "United States Dollar (Updated)"
+      minor_units: 2
+
+  changed_by:
+    type: string
+    format: uuid
+    description: UUID of the user or system that performed the change.
+    example: "123e4567-e89b-12d3-a456-426614174000"
+
+  changed_at:
+    type: string
+    format: date-time
+    description: Timestamp of when the change was applied.
+    example: "2026-10-03T09:30:00Z"

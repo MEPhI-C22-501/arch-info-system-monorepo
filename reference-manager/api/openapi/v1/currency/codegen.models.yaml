@@ -1,0 +1,9 @@
+package: currencyv1
+
+generate:
+  models: true
+
+output-options:
+  skip-prune: true
+
+output: pkg/api/v1/currency/models.gen.go

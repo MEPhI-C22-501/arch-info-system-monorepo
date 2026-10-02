@@ -1,0 +1,53 @@
+/v1/currency:
+  post:
+    summary: Create a new currency
+    description: Creates a new currency record based on the ISO 4217 standard.
+    operationId: createCurrency
+    tags:
+      - Currencies
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/currency.yaml'
+    responses:
+      '201':
+        description: Currency created successfully.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/expanded_currency.yaml'
+      '400':
+        description: Invalid input (e.g., invalid ISO code).
+      '409':
+        description: Currency with this code already exists.
+
+  get:
+    summary: List currencies
+    description: Retrieves a paginated list of currencies using ExpandedCurrency DTO.
+    operationId: listCurrencies
+    tags:
+      - Currencies
+    parameters:
+      - name: page_size
+        in: query
+        description: Maximum number of currencies to return (1-1000).
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1000
+          default: 100
+      - name: page_token
+        in: query
+        description: Token for pagination, obtained from a previous list request.
+        schema:
+          type: string
+    responses:
+      '200':
+        description: A paginated list of currencies.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/list_currencies_response.yaml'

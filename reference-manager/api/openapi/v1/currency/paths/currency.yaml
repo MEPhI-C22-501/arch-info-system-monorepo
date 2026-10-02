@@ -1,0 +1,152 @@
+/v1/currency/{currency_id}:
+  get:
+    summary: Get currency
+    description: Retrieves detailed information about a specific currency.
+    operationId: getCurrency
+    tags:
+      - Currency
+    parameters:
+      - name: currency_id
+        in: path
+        required: true
+        description: Unique identifier of the currency.
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: Currency details.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/expanded_currency.yaml'
+      '404':
+        description: Currency not found.
+
+  patch:
+    summary: Update currency
+    description: |
+      Updates a currency. Follows Google AIP-134. 
+      The `update_mask` query parameter specifies which fields to update.
+    operationId: updateCurrency
+    tags:
+      - Currency
+    parameters:
+      - name: currency_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: update_mask
+        in: query
+        required: true
+        description: |
+          Comma-separated list of fields to update (e.g., "name,symbol").
+          If "*", all provided fields in the body will be updated.
+        schema:
+          type: string
+          example: "name,symbol"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/currency.yaml'
+    responses:
+      '200':
+        description: Currency updated successfully.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/expanded_currency.yaml'
+      '400':
+        description: Invalid update_mask or payload.
+      '404':
+        description: Currency not found.
+
+  delete:
+    summary: Delete currency
+    description: Soft or hard delete of a currency record.
+    operationId: deleteCurrency
+    tags:
+      - Currency
+    parameters:
+      - name: currency_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '204':
+        description: Currency deleted successfully.
+      '404':
+        description: Currency not found.
+
+/v1/currency/{currency_id}/revisions:
+  get:
+    summary: List currency revisions
+    description: Retrieves a paginated list of historical revisions for a specific currency.
+    operationId: listCurrencyRevisions
+    tags:
+      - CurrencyRevisions
+    parameters:
+      - name: currency_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1000
+          default: 100
+      - name: page_token
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: A paginated list of revisions.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/list_revisions_response.yaml'
+      '404':
+        description: Currency not found.
+
+/v1/currency/{currency_id}/revisions/{revision_number}:
+  get:
+    summary: Get specific revision
+    description: Retrieves details of a specific revision by its revision number.
+    operationId: getCurrencyRevision
+    tags:
+      - CurrencyRevisions
+    parameters:
+      - name: currency_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: revision_number
+        in: path
+        required: true
+        description: The specific revision number to retrieve.
+        schema:
+          type: integer
+          format: int32
+    responses:
+      '200':
+        description: Revision details.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/currency_revision.yaml'
+      '404':
+        description: Currency or revision not found.

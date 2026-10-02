@@ -1,0 +1,35 @@
+openapi: 3.0.3
+info:
+  title: Currency Management API
+  description: API for managing ISO 4217 currencies and their revisions.
+  version: 1.0.0
+
+paths:
+  /v1/currency:
+    $ref: './paths/currencies.yaml#/~1v1~1currency'
+  
+  /v1/currency/{currency_id}:
+    $ref: './paths/currency.yaml#/~1v1~1currency~1{currency_id}'
+    
+  /v1/currency/{currency_id}/revisions:
+    $ref: './paths/currency.yaml#/~1v1~1currency~1{currency_id}~1revisions'
+    
+  /v1/currency/{currency_id}/revisions/{revision_number}:
+    $ref: './paths/currency.yaml#/~1v1~1currency~1{currency_id}~1revisions~1{revision_number}'
+
+components:
+  schemas:
+    Currency:
+      $ref: './components/schemas/currency.yaml'
+    
+    ExpandedCurrency:
+      $ref: './components/schemas/expanded_currency.yaml'
+    
+    CurrencyRevision:
+      $ref: './components/schemas/currency_revision.yaml'
+    
+    ListCurrenciesResponse:
+      $ref: './components/schemas/list_currencies_response.yaml'
+    
+    ListRevisionsResponse:
+      $ref: './components/schemas/list_revisions_response.yaml'

@@ -1,0 +1,17 @@
+type: object
+description: Paginated list of expanded currencies.
+
+required:
+  - currencies
+
+properties:
+  currencies:
+    type: array
+    description: List of currencies for the current page.
+    items:
+      $ref: './expanded_currency.yaml'
+
+  next_page_token:
+    type: string
+    description: Token to retrieve the next page of results. Empty if no more results.
+    example: "eyJpZCI6MTAwfQ=="

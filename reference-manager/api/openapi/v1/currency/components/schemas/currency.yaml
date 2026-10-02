@@ -1,0 +1,39 @@
+type: object
+description: Base representation of a currency according to the ISO 4217 standard.
+
+properties:
+  id:
+    type: integer
+    format: int64
+    description: Unique identifier of the currency.
+    example: 1
+
+  code_alpha:
+    type: string
+    description: Three-letter ISO 4217 alphabetic code.
+    minLength: 3
+    maxLength: 3
+    example: USD
+
+  code_num:
+    type: string
+    description: Three-letter ISO 4217 numeric code.
+    minLength: 3
+    maxLength: 3
+    example: "840"
+
+  name:
+    type: string
+    description: Full official name of the currency.
+    example: United States Dollar
+
+  minor_units:
+    type: integer
+    format: int32
+    description: Number of minor units (decimal places).
+    example: 2
+
+  symbol:
+    type: string
+    description: Currency symbol.
+    example: "$"
