@@ -2,7 +2,7 @@
 
 **Reference Manager** is a reference data management service within an ERP system.
 
-The service provides centralized storage and management of reference data such as countries, currencies, users, and other master data. It exposes a REST API for creating, retrieving, updating, and deleting reference directories and their entries.
+The service is the single source of reference data and HR master data: employees (HR profiles), organizational units, positions with dated assignments, salaries and absences, and shared classifiers such as currencies and countries. User accounts, passwords and access roles live in Keycloak; the service creates an account when an employee is hired and disables it on dismissal. It exposes a REST API with one collection per catalog for listing, reading, creating, updating and soft-deleting records. Requirements and design documents are in [documents/](documents/README.md).
 
 ## Requirements
 
