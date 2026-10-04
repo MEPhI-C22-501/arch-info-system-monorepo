@@ -1,0 +1,10 @@
+package: healthv1
+
+generate:
+  chi-server: true
+  embedded-spec: true
+  
+output-options:
+  skip-prune: false
+  
+output: pkg/api/v1/health/server.gen.go

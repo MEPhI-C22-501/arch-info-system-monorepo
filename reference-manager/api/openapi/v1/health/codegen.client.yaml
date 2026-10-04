@@ -1,0 +1,9 @@
+package: healthv1
+
+generate:
+  client: true
+  
+output-options:
+  skip-prune: false
+  
+output: pkg/api/v1/health/client.gen.go
