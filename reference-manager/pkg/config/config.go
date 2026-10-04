@@ -41,7 +41,7 @@ func ReadFromDir[Config any](dirPath string) (*Config, error) {
 
 func ReadFromEnv[Config any]() (*Config, error) {
 	var cfg Config
-	if err := cleanenv.ReadEnv(cfg); err != nil {
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to read configuration from environment: %w", err)
 	}
 

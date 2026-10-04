@@ -1,0 +1,8 @@
+telemetry:
+  resource:
+    service_name: reference-manager
+    environment: local
+
+  log:
+    level: debug
+    format: text
