@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reports.arch.local/schemas/events/ScheduledReportReady/1.0.0",
+  "title": "ScheduledReportReady",
+  "description": "Регламентный отчёт сформирован, права получателя проверены. Одно событие на одного получателя.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "occurredAt", "producer", "schemaVersion", "correlationId", "recipientSub", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid", "description": "Уникальный идентификатор события; ключ дедупликации" },
+    "eventType": { "type": "string", "const": "ScheduledReportReady" },
+    "occurredAt": { "type": "string", "format": "date-time", "description": "Момент доставки получателю, UTC" },
+    "producer": { "type": "string", "const": "Reports" },
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "correlationId": { "type": "string", "minLength": 1, "description": "Идентификатор запуска подписки" },
+    "recipientSub": { "type": "string", "minLength": 1, "description": "sub получателя в Keycloak; ключ партиционирования" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subscriptionId", "snapshotId", "reportId", "dataAsOf", "viewPath"],
+      "properties": {
+        "subscriptionId": { "type": "string", "format": "uuid" },
+        "snapshotId": { "type": "string", "format": "uuid" },
+        "reportId": { "type": "string", "pattern": "^R-(0[1-9]|1[01])$" },
+        "dataAsOf": { "type": "string", "format": "date-time", "description": "Наиболее раннее время актуальности источников отчёта" },
+        "viewPath": { "type": "string", "pattern": "^/snapshots/[0-9a-f-]{36}$", "description": "Путь в веб-интерфейсе Reports; открытие требует входа и проверяет права" }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "eventId": "3c6f2b10-8d4e-4f6a-9b1c-2a7e5d9f0c11",
+  "eventType": "ReportExportReady",
+  "occurredAt": "2026-10-05T08:41:12Z",
+  "producer": "Reports",
+  "schemaVersion": "1.0.0",
+  "correlationId": "0a9d7c1e-55b2-4c18-8d0e-7b6a5f4e3d21",
+  "recipientSub": "5f2c8e7a-1b3d-4c6e-9f0a-8b7c6d5e4f32",
+  "payload": {
+    "exportId": "b7e1c3d5-2f4a-4b6c-8d9e-0f1a2b3c4d5e",
+    "reportId": "R-01",
+    "format": "xlsx",
+    "rowCount": 48210,
+    "expiresAt": "2026-10-08T08:41:12Z",
+    "downloadPath": "/api/v1/exports/b7e1c3d5-2f4a-4b6c-8d9e-0f1a2b3c4d5e/file"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reports.arch.local/schemas/events/ReportExportReady/1.0.0",
+  "title": "ReportExportReady",
+  "description": "Файл выгрузки отчёта готов. Содержимое отчёта в событие не входит.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "occurredAt", "producer", "schemaVersion", "correlationId", "recipientSub", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid", "description": "Уникальный идентификатор события; ключ дедупликации" },
+    "eventType": { "type": "string", "const": "ReportExportReady" },
+    "occurredAt": { "type": "string", "format": "date-time", "description": "Момент перехода задания в COMPLETED, UTC" },
+    "producer": { "type": "string", "const": "Reports" },
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "correlationId": { "type": "string", "minLength": 1, "description": "X-Correlation-Id исходного запроса выгрузки" },
+    "recipientSub": { "type": "string", "minLength": 1, "description": "sub получателя в Keycloak; ключ партиционирования" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exportId", "reportId", "format", "rowCount", "expiresAt", "downloadPath"],
+      "properties": {
+        "exportId": { "type": "string", "format": "uuid" },
+        "reportId": { "type": "string", "pattern": "^R-(0[1-9]|1[01])$|^CUBE$", "description": "Отчёт или CUBE для среза куба" },
+        "format": { "type": "string", "enum": ["xlsx", "csv"] },
+        "rowCount": { "type": "integer", "minimum": 0 },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "downloadPath": { "type": "string", "pattern": "^/api/v1/exports/[0-9a-f-]{36}/file$", "description": "Путь API Reports; скачивание требует токен и проверяет права" }
+      }
+    }
+  }
+}
