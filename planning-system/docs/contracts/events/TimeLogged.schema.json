@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TimeLogged",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "TimeLogged",
+      "description": "Имя события"
+    },
+    "occurredAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Момент UTC",
+      "examples": [
+        "2026-10-05T12:00:00Z"
+      ],
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "const": "TaskTracker",
+      "description": "Модуль издателя"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semver"
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ключ партиции и область проекта",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "externalTaskId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID задачи TT",
+          "examples": [
+            "task-1"
+          ]
+        },
+        "sourceRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Монотонная редакция абсолютного среза",
+          "examples": [
+            1
+          ]
+        },
+        "sourceChangedAt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Момент UTC",
+          "examples": [
+            "2026-10-05T12:00:00Z"
+          ],
+          "format": "date-time"
+        },
+        "logicalItemId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "description": "Устойчивый UUID",
+          "examples": [
+            null
+          ],
+          "format": "uuid"
+        },
+        "taskStatus": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Непрозрачный статус TT",
+          "examples": [
+            "InProgress"
+          ]
+        },
+        "actualHours": {
+          "type": "number",
+          "minimum": 0,
+          "multipleOf": 0.01,
+          "description": "Абсолютный итог, не приращение",
+          "examples": [
+            8
+          ]
+        },
+        "sourceRemainingHours": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "multipleOf": 0.01,
+          "description": "Арифметический остаток TT, знак сохраняется",
+          "examples": [
+            null
+          ]
+        },
+        "remainingHours": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "multipleOf": 0.01,
+          "description": "ETC только по согласованной методике",
+          "examples": [
+            null
+          ]
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Явное удаление источника",
+          "examples": [
+            false
+          ]
+        }
+      },
+      "required": [
+        "externalTaskId",
+        "sourceRevision",
+        "sourceChangedAt",
+        "logicalItemId",
+        "taskStatus",
+        "actualHours",
+        "sourceRemainingHours",
+        "remainingHours",
+        "isDeleted"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "eventId",
+    "eventType",
+    "occurredAt",
+    "producer",
+    "schemaVersion",
+    "correlationId",
+    "projectId",
+    "payload"
+  ],
+  "additionalProperties": false
+}

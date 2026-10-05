@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NotificationDelivered",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "NotificationDelivered",
+      "description": "Имя события"
+    },
+    "occurredAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Момент UTC",
+      "examples": [
+        "2026-10-05T12:00:00Z"
+      ],
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "const": "NotificationService",
+      "description": "Модуль издателя"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semver"
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ключ партиции и область проекта",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "notificationId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Устойчивый UUID",
+          "examples": [
+            "10000000-0000-4000-8000-000000000001"
+          ],
+          "format": "uuid"
+        },
+        "deliveryReceipt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Подтверждение канала",
+          "examples": [
+            "receipt-1"
+          ]
+        },
+        "deliveredAt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Момент UTC",
+          "examples": [
+            "2026-10-05T12:00:00Z"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "notificationId",
+        "deliveryReceipt",
+        "deliveredAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "eventId",
+    "eventType",
+    "occurredAt",
+    "producer",
+    "schemaVersion",
+    "correlationId",
+    "projectId",
+    "payload"
+  ],
+  "additionalProperties": false
+}

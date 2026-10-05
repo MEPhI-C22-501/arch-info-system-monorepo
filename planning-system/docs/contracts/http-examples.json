@@ -1,0 +1,1330 @@
+[
+  {
+    "operationId": "listProjects",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "items": [],
+          "nextCursor": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "createProject",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager",
+          "id": "10000000-0000-4000-8000-000000000001",
+          "revision": 1,
+          "priority": 1,
+          "status": "DRAFT",
+          "activePlanVersionId": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getProject",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager",
+          "id": "10000000-0000-4000-8000-000000000001",
+          "revision": 1,
+          "priority": 1,
+          "status": "DRAFT",
+          "activePlanVersionId": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "updateProject",
+    "success": {
+      "request": {
+        "method": "PATCH",
+        "path": "/api/v1/projects/{projectId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "name": "demo",
+          "goal": "demo"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager",
+          "id": "10000000-0000-4000-8000-000000000001",
+          "revision": 1,
+          "priority": 1,
+          "status": "DRAFT",
+          "activePlanVersionId": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "PATCH",
+        "path": "/api/v1/projects/{projectId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "name": "demo",
+          "goal": "demo"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "archiveProject",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects/{projectId}/archive",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "reason": "demo"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "programId": null,
+          "code": "ERP-A",
+          "name": "Планирование ERP",
+          "goal": "Прозрачный план ресурсов",
+          "managerSubject": "demo-manager",
+          "id": "10000000-0000-4000-8000-000000000001",
+          "revision": 1,
+          "priority": 1,
+          "status": "DRAFT",
+          "activePlanVersionId": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects/{projectId}/archive",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "reason": "demo"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "createVersion",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects/{projectId}/versions",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "baseVersionId": "10000000-0000-4000-8000-000000000001",
+          "kind": "PLAN",
+          "name": "Сценарий 2"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/projects/{projectId}/versions",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "baseVersionId": "10000000-0000-4000-8000-000000000001",
+          "kind": "PLAN",
+          "name": "Сценарий 2"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getVersion",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/versions/{versionId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/versions/{versionId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "saveDraft",
+    "success": {
+      "request": {
+        "method": "PUT",
+        "path": "/api/v1/versions/{versionId}/draft",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": []
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "PUT",
+        "path": "/api/v1/versions/{versionId}/draft",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": []
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "submitReview",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/submit",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "reviewers": []
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/submit",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "reviewers": []
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "recordDecision",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/decisions",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "reviewRound": 1,
+          "contentRevision": 1,
+          "decision": "APPROVE",
+          "comment": null
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/decisions",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "reviewRound": 1,
+          "contentRevision": 1,
+          "decision": "APPROVE",
+          "comment": null
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "activatePlan",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/activate",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "projectRevision": 1
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "name": "Годовой план",
+          "planningMode": "ANNUAL",
+          "horizonStart": "2026-10-05",
+          "horizonEnd": "2026-10-05",
+          "items": [],
+          "dependencies": [],
+          "demands": [],
+          "allocations": [],
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "versionNumber": 1,
+          "revision": 1,
+          "contentRevision": 1,
+          "reviewRound": 0,
+          "kind": "PLAN",
+          "baseVersionId": null,
+          "status": "DRAFT",
+          "dataAsOf": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/activate",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "projectRevision": 1
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "calculateForecast",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/forecasts",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "contentRevision": 1
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "operationId": "10000000-0000-4000-8000-000000000001",
+          "status": "PENDING",
+          "resultId": null,
+          "errorCode": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/versions/{versionId}/forecasts",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "contentRevision": 1
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getOperation",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/operations/{operationId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "operationId": "10000000-0000-4000-8000-000000000001",
+          "status": "PENDING",
+          "resultId": null,
+          "errorCode": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/operations/{operationId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getForecast",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/forecasts/{forecastId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "10000000-0000-4000-8000-000000000001",
+          "planVersionId": "10000000-0000-4000-8000-000000000001",
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "calculatedAt": "2026-10-05T12:00:00Z",
+          "quality": "COMPLETE",
+          "missingInputs": [],
+          "remainingHours": null,
+          "forecastFinish": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/forecasts/{forecastId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getReleaseContext",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}/release-context",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "planVersionId": "10000000-0000-4000-8000-000000000001",
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "quality": "COMPLETE",
+          "missingInputs": [],
+          "items": [],
+          "iterations": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}/release-context",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getReportProjection",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}/projection",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "plan": {
+            "name": "Годовой план",
+            "planningMode": "ANNUAL",
+            "horizonStart": "2026-10-05",
+            "horizonEnd": "2026-10-05",
+            "items": [],
+            "dependencies": [],
+            "demands": [],
+            "allocations": [],
+            "id": "10000000-0000-4000-8000-000000000001",
+            "projectId": "10000000-0000-4000-8000-000000000001",
+            "versionNumber": 1,
+            "revision": 1,
+            "contentRevision": 1,
+            "reviewRound": 0,
+            "kind": "PLAN",
+            "baseVersionId": null,
+            "status": "DRAFT",
+            "dataAsOf": null
+          },
+          "forecast": null,
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "quality": "COMPLETE"
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/projects/{projectId}/projection",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "createExport",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/exports",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "batchId": "10000000-0000-4000-8000-000000000001",
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "schemaVersion": "1.0.0",
+          "status": "PENDING",
+          "expiresAt": "2026-10-05T12:00:00Z",
+          "counts": []
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/exports",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "portfolioId": "10000000-0000-4000-8000-000000000001"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getExport",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/exports/{batchId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "batchId": "10000000-0000-4000-8000-000000000001",
+          "portfolioId": "10000000-0000-4000-8000-000000000001",
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "schemaVersion": "1.0.0",
+          "status": "PENDING",
+          "expiresAt": "2026-10-05T12:00:00Z",
+          "counts": []
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/exports/{batchId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "exportRows",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/exports/{batchId}/rows",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "batchId": "10000000-0000-4000-8000-000000000001",
+          "dataAsOf": "2026-10-05T12:00:00Z",
+          "items": [],
+          "nextCursor": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/exports/{batchId}/rows",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getPublication",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/publications/{publicationId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "publicationId": "10000000-0000-4000-8000-000000000001",
+          "idempotencyKey": "10000000-0000-4000-8000-000000000001",
+          "plan": {
+            "name": "Годовой план",
+            "planningMode": "ANNUAL",
+            "horizonStart": "2026-10-05",
+            "horizonEnd": "2026-10-05",
+            "items": [],
+            "dependencies": [],
+            "demands": [],
+            "allocations": [],
+            "id": "10000000-0000-4000-8000-000000000001",
+            "projectId": "10000000-0000-4000-8000-000000000001",
+            "versionNumber": 1,
+            "revision": 1,
+            "contentRevision": 1,
+            "reviewRound": 0,
+            "kind": "PLAN",
+            "baseVersionId": null,
+            "status": "DRAFT",
+            "dataAsOf": null
+          }
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/publications/{publicationId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "publicationReceipt",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/publications/{publicationId}/receipt",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "publicationId": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "planVersionId": "10000000-0000-4000-8000-000000000001",
+          "status": "APPLIED",
+          "externalReceipt": "tt-receipt-1",
+          "sourceRevision": 1
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "publicationId": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "planVersionId": "10000000-0000-4000-8000-000000000001",
+          "status": "APPLIED",
+          "externalReceipt": "tt-receipt-1",
+          "sourceRevision": 1
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/publications/{publicationId}/receipt",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "publicationId": "10000000-0000-4000-8000-000000000001",
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "planVersionId": "10000000-0000-4000-8000-000000000001",
+          "status": "APPLIED",
+          "externalReceipt": "tt-receipt-1",
+          "sourceRevision": 1
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "retryPublication",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/publications/{publicationId}/retry",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "body": {
+          "reason": "demo"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "operationId": "10000000-0000-4000-8000-000000000001",
+          "status": "PENDING",
+          "resultId": null,
+          "errorCode": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/publications/{publicationId}/retry",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        },
+        "body": {
+          "reason": "demo"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "uploadAttachment",
+    "success": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/attachments",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        },
+        "multipart": {
+          "ownerType": "PROJECT",
+          "ownerId": "10000000-0000-4000-8000-000000000001",
+          "fileName": "justification.txt",
+          "text": "Обоснование"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": null,
+          "planVersionId": null,
+          "fileName": "justification.txt",
+          "contentType": "text/plain",
+          "sizeBytes": 12,
+          "status": "UPLOADING",
+          "checksum": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/attachments",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getAttachment",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/attachments/{attachmentId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": null,
+          "planVersionId": null,
+          "fileName": "justification.txt",
+          "contentType": "text/plain",
+          "sizeBytes": 12,
+          "status": "UPLOADING",
+          "checksum": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/attachments/{attachmentId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "deleteAttachment",
+    "success": {
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/attachments/{attachmentId}",
+        "headers": {
+          "Authorization": "Bearer <test-token>",
+          "If-Match": "\"1\"",
+          "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "id": "10000000-0000-4000-8000-000000000001",
+          "projectId": null,
+          "planVersionId": null,
+          "fileName": "justification.txt",
+          "contentType": "text/plain",
+          "sizeBytes": 12,
+          "status": "UPLOADING",
+          "checksum": null
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/attachments/{attachmentId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "downloadAttachment",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/attachments/{attachmentId}/content",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "<bytes>"
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/attachments/{attachmentId}/content",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  }
+]

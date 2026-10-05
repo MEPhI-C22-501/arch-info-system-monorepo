@@ -22,7 +22,7 @@ flowchart LR
   tt -->|"задачи и факт исполнения"| ps
   ps -->|"запросы оповещений"| ns["Notification Service"]
   ps <-->|"файлы"| os["Object Storage"]
-  ps -->|"проекции"| rpt["Reporting"]
+  ps -->|"проекции"| rpt["Reports"]
 ```
 
 ## 3. C4 Containers

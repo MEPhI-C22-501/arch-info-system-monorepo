@@ -1,0 +1,4208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Task Tracker receiving Planning System — proposal D-01",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://task-tracker.example.invalid"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/planning/projects/{projectId}/versions/{planVersionId}": {
+      "put": {
+        "operationId": "acceptPlanningVersion",
+        "summary": "Предложенный приёмник TT, не реализованный API соседа",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Устойчивый UUID",
+              "examples": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "planVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Устойчивый UUID",
+              "examples": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "projectId + planVersionId",
+              "examples": [
+                "demo"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Название варианта",
+                    "examples": [
+                      "Годовой план"
+                    ]
+                  },
+                  "planningMode": {
+                    "type": "string",
+                    "enum": [
+                      "ANNUAL",
+                      "ROLLING"
+                    ],
+                    "description": "Режим",
+                    "examples": [
+                      "ANNUAL"
+                    ]
+                  },
+                  "horizonStart": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "horizonEnd": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "logicalItemId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Идентичность работы между версиями",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "parentItemId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            null
+                          ],
+                          "format": "uuid"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "FEATURE",
+                            "STAGE",
+                            "MILESTONE",
+                            "EPIC",
+                            "RELEASE"
+                          ],
+                          "description": "Тип работы",
+                          "examples": [
+                            "FEATURE"
+                          ]
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Название работы",
+                          "examples": [
+                            "Интерфейс планирования"
+                          ]
+                        },
+                        "start": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "finish": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "plannedHours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "logicalItemId",
+                        "parentItemId",
+                        "type",
+                        "name",
+                        "start",
+                        "finish",
+                        "plannedHours"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "predecessorId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "successorId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "FS"
+                          ],
+                          "description": "Зависимость",
+                          "examples": [
+                            "FS"
+                          ]
+                        },
+                        "lagWorkingDays": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Лаг рабочих дней",
+                          "examples": [
+                            0
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "predecessorId",
+                        "successorId",
+                        "type",
+                        "lagWorkingDays"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "demands": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "planItemId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "roleCode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Код проектной роли",
+                          "examples": [
+                            "developer"
+                          ]
+                        },
+                        "gradeCode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Код грейда",
+                          "examples": [
+                            "middle"
+                          ]
+                        },
+                        "periodStart": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "periodEnd": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "planItemId",
+                        "roleCode",
+                        "gradeCode",
+                        "periodStart",
+                        "periodEnd",
+                        "hours"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "allocations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "demandId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "employeeId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Resource name HR",
+                          "examples": [
+                            "employees/demo-1"
+                          ]
+                        },
+                        "date": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PROPOSED",
+                            "CONFIRMED",
+                            "CANCELLED"
+                          ],
+                          "description": "Состояние назначения",
+                          "examples": [
+                            "PROPOSED"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "demandId",
+                        "employeeId",
+                        "date",
+                        "hours",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "versionNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Номер версии",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Техническая редакция",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "contentRevision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Редакция содержимого",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "reviewRound": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Раунд",
+                    "examples": [
+                      0
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "PLAN",
+                      "SCENARIO"
+                    ],
+                    "description": "Вид",
+                    "examples": [
+                      "PLAN"
+                    ]
+                  },
+                  "baseVersionId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      null
+                    ],
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ON_REVIEW",
+                      "APPROVED",
+                      "ACTIVE",
+                      "SUPERSEDED",
+                      "ARCHIVED"
+                    ],
+                    "description": "Состояние",
+                    "examples": [
+                      "DRAFT"
+                    ]
+                  },
+                  "dataAsOf": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Момент UTC",
+                    "examples": [
+                      null
+                    ],
+                    "format": "date-time"
+                  },
+                  "baselineBudget": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "multipleOf": 0.01,
+                    "description": "Сумма в валюте currencyCode",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "currencyCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Валюта",
+                    "examples": [
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "planningMode",
+                  "horizonStart",
+                  "horizonEnd",
+                  "items",
+                  "dependencies",
+                  "demands",
+                  "allocations",
+                  "id",
+                  "projectId",
+                  "versionNumber",
+                  "revision",
+                  "contentRevision",
+                  "reviewRound",
+                  "kind",
+                  "baseVersionId",
+                  "status",
+                  "dataAsOf"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "name": "Годовой план",
+                "planningMode": "ANNUAL",
+                "horizonStart": "2026-10-05",
+                "horizonEnd": "2026-10-05",
+                "items": [],
+                "dependencies": [],
+                "demands": [],
+                "allocations": [],
+                "id": "10000000-0000-4000-8000-000000000001",
+                "projectId": "10000000-0000-4000-8000-000000000001",
+                "versionNumber": 1,
+                "revision": 1,
+                "contentRevision": 1,
+                "reviewRound": 0,
+                "kind": "PLAN",
+                "baseVersionId": null,
+                "status": "ACTIVE",
+                "dataAsOf": null
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Версия применена или уже принята",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publicationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        "10000000-0000-4000-8000-000000000001"
+                      ],
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        "10000000-0000-4000-8000-000000000001"
+                      ],
+                      "format": "uuid"
+                    },
+                    "planVersionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        "10000000-0000-4000-8000-000000000001"
+                      ],
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "APPLIED",
+                        "REJECTED"
+                      ],
+                      "description": "Результат применения",
+                      "examples": [
+                        "APPLIED"
+                      ]
+                    },
+                    "externalReceipt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивое подтверждение получателя",
+                      "examples": [
+                        "tt-receipt-1"
+                      ]
+                    },
+                    "sourceRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Редакция применения в TT",
+                      "examples": [
+                        1
+                      ]
+                    }
+                  },
+                  "required": [
+                    "publicationId",
+                    "projectId",
+                    "planVersionId",
+                    "status",
+                    "externalReceipt",
+                    "sourceRevision"
+                  ],
+                  "additionalProperties": false
+                },
+                "example": {
+                  "publicationId": "10000000-0000-4000-8000-000000000001",
+                  "projectId": "10000000-0000-4000-8000-000000000001",
+                  "planVersionId": "10000000-0000-4000-8000-000000000001",
+                  "status": "APPLIED",
+                  "externalReceipt": "tt-receipt-1",
+                  "sourceRevision": 1
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Старая версия либо тот же ключ с иным содержимым",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Машинный код",
+                      "examples": [
+                        "REVISION_CONFLICT"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Понятная причина",
+                      "examples": [
+                        "Редакция изменилась; перечитайте объект"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        "10000000-0000-4000-8000-000000000001"
+                      ],
+                      "format": "uuid"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Поле",
+                            "examples": [
+                              "revision"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Причина",
+                            "examples": [
+                              "Ожидалась текущая редакция"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "field",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Список"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "correlationId",
+                    "details"
+                  ],
+                  "additionalProperties": false
+                },
+                "example": {
+                  "code": "REVISION_CONFLICT",
+                  "message": "Редакция изменилась; перечитайте объект",
+                  "correlationId": "10000000-0000-4000-8000-000000000001",
+                  "details": []
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Item": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "logicalItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Идентичность работы между версиями",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "parentItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FEATURE",
+              "STAGE",
+              "MILESTONE",
+              "EPIC",
+              "RELEASE"
+            ],
+            "description": "Тип работы",
+            "examples": [
+              "FEATURE"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название работы",
+            "examples": [
+              "Интерфейс планирования"
+            ]
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "finish": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "plannedHours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "logicalItemId",
+          "parentItemId",
+          "type",
+          "name",
+          "start",
+          "finish",
+          "plannedHours"
+        ],
+        "additionalProperties": false
+      },
+      "Demand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "planItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "roleCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Код проектной роли",
+            "examples": [
+              "developer"
+            ]
+          },
+          "gradeCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Код грейда",
+            "examples": [
+              "middle"
+            ]
+          },
+          "periodStart": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "planItemId",
+          "roleCode",
+          "gradeCode",
+          "periodStart",
+          "periodEnd",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "Allocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "demandId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "employeeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Resource name HR",
+            "examples": [
+              "employees/demo-1"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "CONFIRMED",
+              "CANCELLED"
+            ],
+            "description": "Состояние назначения",
+            "examples": [
+              "PROPOSED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "demandId",
+          "employeeId",
+          "date",
+          "hours",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Dependency": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "predecessorId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "successorId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FS"
+            ],
+            "description": "Зависимость",
+            "examples": [
+              "FS"
+            ]
+          },
+          "lagWorkingDays": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Лаг рабочих дней",
+            "examples": [
+              0
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "predecessorId",
+          "successorId",
+          "type",
+          "lagWorkingDays"
+        ],
+        "additionalProperties": false
+      },
+      "Availability": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "employeeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "HR resource name",
+            "examples": [
+              "employees/demo-1"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "calendarCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Плановый календарь",
+            "examples": [
+              "demo-week"
+            ]
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA TZ",
+            "examples": [
+              "Europe/Moscow"
+            ]
+          },
+          "nominalHours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          },
+          "absenceHours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          },
+          "availableHours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              8
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "DRAFT",
+              "SUPERSEDED"
+            ],
+            "description": "Состояние",
+            "examples": [
+              "CONFIRMED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "employeeId",
+          "date",
+          "calendarCode",
+          "timeZone",
+          "nominalHours",
+          "absenceHours",
+          "availableHours",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectInput": {
+        "type": "object",
+        "properties": {
+          "portfolioId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "programId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Код внутри портфеля",
+            "examples": [
+              "ERP-A"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название",
+            "examples": [
+              "Планирование ERP"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Цель",
+            "examples": [
+              "Прозрачный план ресурсов"
+            ]
+          },
+          "managerSubject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keycloak sub",
+            "examples": [
+              "demo-manager"
+            ]
+          }
+        },
+        "required": [
+          "portfolioId",
+          "programId",
+          "code",
+          "name",
+          "goal",
+          "managerSubject"
+        ],
+        "additionalProperties": false
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "portfolioId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "programId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Код внутри портфеля",
+            "examples": [
+              "ERP-A"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название",
+            "examples": [
+              "Планирование ERP"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Цель",
+            "examples": [
+              "Прозрачный план ресурсов"
+            ]
+          },
+          "managerSubject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keycloak sub",
+            "examples": [
+              "demo-manager"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция",
+            "examples": [
+              1
+            ]
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Приоритет",
+            "examples": [
+              1
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "ON_HOLD",
+              "COMPLETED",
+              "ARCHIVED"
+            ],
+            "description": "Состояние",
+            "examples": [
+              "DRAFT"
+            ]
+          },
+          "activePlanVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "portfolioId",
+          "programId",
+          "code",
+          "name",
+          "goal",
+          "managerSubject",
+          "id",
+          "revision",
+          "priority",
+          "status",
+          "activePlanVersionId"
+        ],
+        "additionalProperties": false
+      },
+      "Draft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название варианта",
+            "examples": [
+              "Годовой план"
+            ]
+          },
+          "planningMode": {
+            "type": "string",
+            "enum": [
+              "ANNUAL",
+              "ROLLING"
+            ],
+            "description": "Режим",
+            "examples": [
+              "ANNUAL"
+            ]
+          },
+          "horizonStart": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "horizonEnd": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "logicalItemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Идентичность работы между версиями",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "parentItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    null
+                  ],
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "FEATURE",
+                    "STAGE",
+                    "MILESTONE",
+                    "EPIC",
+                    "RELEASE"
+                  ],
+                  "description": "Тип работы",
+                  "examples": [
+                    "FEATURE"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Название работы",
+                  "examples": [
+                    "Интерфейс планирования"
+                  ]
+                },
+                "start": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "finish": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "plannedHours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "logicalItemId",
+                "parentItemId",
+                "type",
+                "name",
+                "start",
+                "finish",
+                "plannedHours"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "predecessorId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "successorId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "FS"
+                  ],
+                  "description": "Зависимость",
+                  "examples": [
+                    "FS"
+                  ]
+                },
+                "lagWorkingDays": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Лаг рабочих дней",
+                  "examples": [
+                    0
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "predecessorId",
+                "successorId",
+                "type",
+                "lagWorkingDays"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "demands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "planItemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "roleCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Код проектной роли",
+                  "examples": [
+                    "developer"
+                  ]
+                },
+                "gradeCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Код грейда",
+                  "examples": [
+                    "middle"
+                  ]
+                },
+                "periodStart": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "periodEnd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "hours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "planItemId",
+                "roleCode",
+                "gradeCode",
+                "periodStart",
+                "periodEnd",
+                "hours"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "demandId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "employeeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Resource name HR",
+                  "examples": [
+                    "employees/demo-1"
+                  ]
+                },
+                "date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "hours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "PROPOSED",
+                    "CONFIRMED",
+                    "CANCELLED"
+                  ],
+                  "description": "Состояние назначения",
+                  "examples": [
+                    "PROPOSED"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "demandId",
+                "employeeId",
+                "date",
+                "hours",
+                "status"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          }
+        },
+        "required": [
+          "name",
+          "planningMode",
+          "horizonStart",
+          "horizonEnd",
+          "items",
+          "dependencies",
+          "demands",
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название варианта",
+            "examples": [
+              "Годовой план"
+            ]
+          },
+          "planningMode": {
+            "type": "string",
+            "enum": [
+              "ANNUAL",
+              "ROLLING"
+            ],
+            "description": "Режим",
+            "examples": [
+              "ANNUAL"
+            ]
+          },
+          "horizonStart": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "horizonEnd": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "logicalItemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Идентичность работы между версиями",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "parentItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    null
+                  ],
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "FEATURE",
+                    "STAGE",
+                    "MILESTONE",
+                    "EPIC",
+                    "RELEASE"
+                  ],
+                  "description": "Тип работы",
+                  "examples": [
+                    "FEATURE"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Название работы",
+                  "examples": [
+                    "Интерфейс планирования"
+                  ]
+                },
+                "start": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "finish": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "plannedHours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "logicalItemId",
+                "parentItemId",
+                "type",
+                "name",
+                "start",
+                "finish",
+                "plannedHours"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "predecessorId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "successorId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "FS"
+                  ],
+                  "description": "Зависимость",
+                  "examples": [
+                    "FS"
+                  ]
+                },
+                "lagWorkingDays": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Лаг рабочих дней",
+                  "examples": [
+                    0
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "predecessorId",
+                "successorId",
+                "type",
+                "lagWorkingDays"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "demands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "planItemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "roleCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Код проектной роли",
+                  "examples": [
+                    "developer"
+                  ]
+                },
+                "gradeCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Код грейда",
+                  "examples": [
+                    "middle"
+                  ]
+                },
+                "periodStart": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "periodEnd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "hours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "planItemId",
+                "roleCode",
+                "gradeCode",
+                "periodStart",
+                "periodEnd",
+                "hours"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "demandId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "employeeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Resource name HR",
+                  "examples": [
+                    "employees/demo-1"
+                  ]
+                },
+                "date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "hours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "PROPOSED",
+                    "CONFIRMED",
+                    "CANCELLED"
+                  ],
+                  "description": "Состояние назначения",
+                  "examples": [
+                    "PROPOSED"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "demandId",
+                "employeeId",
+                "date",
+                "hours",
+                "status"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Номер версии",
+            "examples": [
+              1
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Техническая редакция",
+            "examples": [
+              1
+            ]
+          },
+          "contentRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция содержимого",
+            "examples": [
+              1
+            ]
+          },
+          "reviewRound": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Раунд",
+            "examples": [
+              0
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PLAN",
+              "SCENARIO"
+            ],
+            "description": "Вид",
+            "examples": [
+              "PLAN"
+            ]
+          },
+          "baseVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ON_REVIEW",
+              "APPROVED",
+              "ACTIVE",
+              "SUPERSEDED",
+              "ARCHIVED"
+            ],
+            "description": "Состояние",
+            "examples": [
+              "DRAFT"
+            ]
+          },
+          "dataAsOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              null
+            ],
+            "format": "date-time"
+          },
+          "baselineBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "multipleOf": 0.01,
+            "description": "Сумма в валюте currencyCode",
+            "examples": [
+              null
+            ]
+          },
+          "currencyCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Валюта",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "planningMode",
+          "horizonStart",
+          "horizonEnd",
+          "items",
+          "dependencies",
+          "demands",
+          "allocations",
+          "id",
+          "projectId",
+          "versionNumber",
+          "revision",
+          "contentRevision",
+          "reviewRound",
+          "kind",
+          "baseVersionId",
+          "status",
+          "dataAsOf"
+        ],
+        "additionalProperties": false
+      },
+      "Forecast": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "planVersionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "COMPLETE",
+              "PARTIAL"
+            ],
+            "description": "Полнота расчётных входов",
+            "examples": [
+              "COMPLETE"
+            ]
+          },
+          "missingInputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Причина неполноты",
+              "examples": [
+                "demo"
+              ]
+            },
+            "description": "Список"
+          },
+          "remainingHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Неотрицательные человеко-часы",
+            "examples": [
+              null
+            ]
+          },
+          "forecastFinish": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              null
+            ],
+            "format": "date"
+          },
+          "estimatedTotalCost": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "multipleOf": 0.01,
+            "description": "Сумма в валюте currencyCode",
+            "examples": [
+              null
+            ]
+          },
+          "budgetAdjustment": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "multipleOf": 0.01,
+            "description": "Может быть отрицательной",
+            "examples": [
+              null
+            ]
+          },
+          "currencyCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Код валюты",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "planVersionId",
+          "dataAsOf",
+          "calculatedAt",
+          "quality",
+          "missingInputs",
+          "remainingHours",
+          "forecastFinish"
+        ],
+        "additionalProperties": false
+      },
+      "Iteration": {
+        "type": "object",
+        "properties": {
+          "externalIterationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID Task Tracker",
+            "examples": [
+              "iteration-1"
+            ]
+          },
+          "releaseLogicalItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "TaskTracker"
+            ],
+            "description": "Мастер итерации",
+            "examples": [
+              "TaskTracker"
+            ]
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция источника",
+            "examples": [
+              1
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название итерации",
+            "examples": [
+              "Итерация 1"
+            ]
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "finish": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Включительная календарная дата",
+            "examples": [
+              "2026-10-05"
+            ],
+            "format": "date"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "externalIterationId",
+          "releaseLogicalItemId",
+          "source",
+          "sourceRevision",
+          "name",
+          "start",
+          "finish",
+          "dataAsOf"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseContext": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "planVersionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "COMPLETE",
+              "PARTIAL"
+            ],
+            "description": "Полнота расчётных входов",
+            "examples": [
+              "COMPLETE"
+            ]
+          },
+          "missingInputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Причина",
+              "examples": [
+                "demo"
+              ]
+            },
+            "description": "Список"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "logicalItemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Идентичность работы между версиями",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                },
+                "parentItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    null
+                  ],
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "FEATURE",
+                    "STAGE",
+                    "MILESTONE",
+                    "EPIC",
+                    "RELEASE"
+                  ],
+                  "description": "Тип работы",
+                  "examples": [
+                    "FEATURE"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Название работы",
+                  "examples": [
+                    "Интерфейс планирования"
+                  ]
+                },
+                "start": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "finish": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "plannedHours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01,
+                  "description": "Неотрицательные человеко-часы",
+                  "examples": [
+                    8
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "logicalItemId",
+                "parentItemId",
+                "type",
+                "name",
+                "start",
+                "finish",
+                "plannedHours"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Только RELEASE/MILESTONE/EPIC/FEATURE выбранной утверждённой версии"
+          },
+          "iterations": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "externalIterationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID Task Tracker",
+                  "examples": [
+                    "iteration-1"
+                  ]
+                },
+                "releaseLogicalItemId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    null
+                  ],
+                  "format": "uuid"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "TaskTracker"
+                  ],
+                  "description": "Мастер итерации",
+                  "examples": [
+                    "TaskTracker"
+                  ]
+                },
+                "sourceRevision": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Редакция источника",
+                  "examples": [
+                    1
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Название итерации",
+                  "examples": [
+                    "Итерация 1"
+                  ]
+                },
+                "start": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "finish": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Включительная календарная дата",
+                  "examples": [
+                    "2026-10-05"
+                  ],
+                  "format": "date"
+                },
+                "dataAsOf": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Момент UTC",
+                  "examples": [
+                    "2026-10-05T12:00:00Z"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "externalIterationId",
+                "releaseLogicalItemId",
+                "source",
+                "sourceRevision",
+                "name",
+                "start",
+                "finish",
+                "dataAsOf"
+              ],
+              "additionalProperties": false
+            },
+            "description": "null если нет подтверждённого среза TT; [] только при известном пустом наборе"
+          }
+        },
+        "required": [
+          "projectId",
+          "planVersionId",
+          "dataAsOf",
+          "quality",
+          "missingInputs",
+          "items",
+          "iterations"
+        ],
+        "additionalProperties": false
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED"
+            ],
+            "description": "Состояние задания",
+            "examples": [
+              "PENDING"
+            ]
+          },
+          "resultId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Машинный код ошибки",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "operationId",
+          "status",
+          "resultId",
+          "errorCode"
+        ],
+        "additionalProperties": false
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "planVersionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED"
+            ],
+            "description": "Результат применения",
+            "examples": [
+              "APPLIED"
+            ]
+          },
+          "externalReceipt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивое подтверждение получателя",
+            "examples": [
+              "tt-receipt-1"
+            ]
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция применения в TT",
+            "examples": [
+              1
+            ]
+          }
+        },
+        "required": [
+          "publicationId",
+          "projectId",
+          "planVersionId",
+          "status",
+          "externalReceipt",
+          "sourceRevision"
+        ],
+        "additionalProperties": false
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "planVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Отображаемое имя",
+            "examples": [
+              "justification.txt"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Проверенный MIME",
+            "examples": [
+              "text/plain"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Размер байт",
+            "examples": [
+              12
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPLOADING",
+              "AVAILABLE",
+              "UPLOAD_FAILED",
+              "DELETE_PENDING",
+              "DELETED"
+            ],
+            "description": "Состояние",
+            "examples": [
+              "UPLOADING"
+            ]
+          },
+          "checksum": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "SHA-256",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "planVersionId",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "status",
+          "checksum"
+        ],
+        "additionalProperties": false
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "externalTaskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID задачи TT",
+            "examples": [
+              "task-1"
+            ]
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Монотонная редакция абсолютного среза",
+            "examples": [
+              1
+            ]
+          },
+          "sourceChangedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "logicalItemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "taskStatus": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Непрозрачный статус TT",
+            "examples": [
+              "InProgress"
+            ]
+          },
+          "actualHours": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Абсолютный итог, не приращение",
+            "examples": [
+              8
+            ]
+          },
+          "sourceRemainingHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "multipleOf": 0.01,
+            "description": "Арифметический остаток TT, знак сохраняется",
+            "examples": [
+              null
+            ]
+          },
+          "remainingHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "ETC только по согласованной методике",
+            "examples": [
+              null
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean",
+            "description": "Явное удаление источника",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "externalTaskId",
+          "sourceRevision",
+          "sourceChangedAt",
+          "logicalItemId",
+          "taskStatus",
+          "actualHours",
+          "sourceRemainingHours",
+          "remainingHours",
+          "isDeleted"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Машинный код",
+            "examples": [
+              "REVISION_CONFLICT"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Понятная причина",
+            "examples": [
+              "Редакция изменилась; перечитайте объект"
+            ]
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Поле",
+                  "examples": [
+                    "revision"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Причина",
+                  "examples": [
+                    "Ожидалась текущая редакция"
+                  ]
+                }
+              },
+              "required": [
+                "field",
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "correlationId",
+          "details"
+        ],
+        "additionalProperties": false
+      },
+      "ExportRow": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "const": "plan"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Устойчивый UUID",
+                "examples": [
+                  "10000000-0000-4000-8000-000000000001"
+                ],
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Название варианта",
+                    "examples": [
+                      "Годовой план"
+                    ]
+                  },
+                  "planningMode": {
+                    "type": "string",
+                    "enum": [
+                      "ANNUAL",
+                      "ROLLING"
+                    ],
+                    "description": "Режим",
+                    "examples": [
+                      "ANNUAL"
+                    ]
+                  },
+                  "horizonStart": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "horizonEnd": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "logicalItemId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Идентичность работы между версиями",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "parentItemId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            null
+                          ],
+                          "format": "uuid"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "FEATURE",
+                            "STAGE",
+                            "MILESTONE",
+                            "EPIC",
+                            "RELEASE"
+                          ],
+                          "description": "Тип работы",
+                          "examples": [
+                            "FEATURE"
+                          ]
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Название работы",
+                          "examples": [
+                            "Интерфейс планирования"
+                          ]
+                        },
+                        "start": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "finish": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "plannedHours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "logicalItemId",
+                        "parentItemId",
+                        "type",
+                        "name",
+                        "start",
+                        "finish",
+                        "plannedHours"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "predecessorId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "successorId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "FS"
+                          ],
+                          "description": "Зависимость",
+                          "examples": [
+                            "FS"
+                          ]
+                        },
+                        "lagWorkingDays": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Лаг рабочих дней",
+                          "examples": [
+                            0
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "predecessorId",
+                        "successorId",
+                        "type",
+                        "lagWorkingDays"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "demands": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "planItemId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "roleCode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Код проектной роли",
+                          "examples": [
+                            "developer"
+                          ]
+                        },
+                        "gradeCode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Код грейда",
+                          "examples": [
+                            "middle"
+                          ]
+                        },
+                        "periodStart": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "periodEnd": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "planItemId",
+                        "roleCode",
+                        "gradeCode",
+                        "periodStart",
+                        "periodEnd",
+                        "hours"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "allocations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "demandId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Устойчивый UUID",
+                          "examples": [
+                            "10000000-0000-4000-8000-000000000001"
+                          ],
+                          "format": "uuid"
+                        },
+                        "employeeId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Resource name HR",
+                          "examples": [
+                            "employees/demo-1"
+                          ]
+                        },
+                        "date": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Включительная календарная дата",
+                          "examples": [
+                            "2026-10-05"
+                          ],
+                          "format": "date"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "minimum": 0,
+                          "multipleOf": 0.01,
+                          "description": "Неотрицательные человеко-часы",
+                          "examples": [
+                            8
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PROPOSED",
+                            "CONFIRMED",
+                            "CANCELLED"
+                          ],
+                          "description": "Состояние назначения",
+                          "examples": [
+                            "PROPOSED"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "demandId",
+                        "employeeId",
+                        "date",
+                        "hours",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Список"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "versionNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Номер версии",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Техническая редакция",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "contentRevision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Редакция содержимого",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "reviewRound": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Раунд",
+                    "examples": [
+                      0
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "PLAN",
+                      "SCENARIO"
+                    ],
+                    "description": "Вид",
+                    "examples": [
+                      "PLAN"
+                    ]
+                  },
+                  "baseVersionId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      null
+                    ],
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ON_REVIEW",
+                      "APPROVED",
+                      "ACTIVE",
+                      "SUPERSEDED",
+                      "ARCHIVED"
+                    ],
+                    "description": "Состояние",
+                    "examples": [
+                      "DRAFT"
+                    ]
+                  },
+                  "dataAsOf": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Момент UTC",
+                    "examples": [
+                      null
+                    ],
+                    "format": "date-time"
+                  },
+                  "baselineBudget": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "multipleOf": 0.01,
+                    "description": "Сумма в валюте currencyCode",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "currencyCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Валюта",
+                    "examples": [
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "planningMode",
+                  "horizonStart",
+                  "horizonEnd",
+                  "items",
+                  "dependencies",
+                  "demands",
+                  "allocations",
+                  "id",
+                  "projectId",
+                  "versionNumber",
+                  "revision",
+                  "contentRevision",
+                  "reviewRound",
+                  "kind",
+                  "baseVersionId",
+                  "status",
+                  "dataAsOf"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entityType",
+              "entityId",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "const": "demand"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Устойчивый UUID",
+                "examples": [
+                  "10000000-0000-4000-8000-000000000001"
+                ],
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "planItemId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "roleCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Код проектной роли",
+                    "examples": [
+                      "developer"
+                    ]
+                  },
+                  "gradeCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Код грейда",
+                    "examples": [
+                      "middle"
+                    ]
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "hours": {
+                    "type": "number",
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      8
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "planItemId",
+                  "roleCode",
+                  "gradeCode",
+                  "periodStart",
+                  "periodEnd",
+                  "hours"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entityType",
+              "entityId",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "const": "availability"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Устойчивый UUID",
+                "examples": [
+                  "10000000-0000-4000-8000-000000000001"
+                ],
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "employeeId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "HR resource name",
+                    "examples": [
+                      "employees/demo-1"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "calendarCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Плановый календарь",
+                    "examples": [
+                      "demo-week"
+                    ]
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "IANA TZ",
+                    "examples": [
+                      "Europe/Moscow"
+                    ]
+                  },
+                  "nominalHours": {
+                    "type": "number",
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      8
+                    ]
+                  },
+                  "absenceHours": {
+                    "type": "number",
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      8
+                    ]
+                  },
+                  "availableHours": {
+                    "type": "number",
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      8
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CONFIRMED",
+                      "DRAFT",
+                      "SUPERSEDED"
+                    ],
+                    "description": "Состояние",
+                    "examples": [
+                      "CONFIRMED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "employeeId",
+                  "date",
+                  "calendarCode",
+                  "timeZone",
+                  "nominalHours",
+                  "absenceHours",
+                  "availableHours",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entityType",
+              "entityId",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "const": "allocation"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Устойчивый UUID",
+                "examples": [
+                  "10000000-0000-4000-8000-000000000001"
+                ],
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "demandId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "employeeId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Resource name HR",
+                    "examples": [
+                      "employees/demo-1"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      "2026-10-05"
+                    ],
+                    "format": "date"
+                  },
+                  "hours": {
+                    "type": "number",
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      8
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PROPOSED",
+                      "CONFIRMED",
+                      "CANCELLED"
+                    ],
+                    "description": "Состояние назначения",
+                    "examples": [
+                      "PROPOSED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "demandId",
+                  "employeeId",
+                  "date",
+                  "hours",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entityType",
+              "entityId",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "const": "forecast"
+              },
+              "entityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Устойчивый UUID",
+                "examples": [
+                  "10000000-0000-4000-8000-000000000001"
+                ],
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "planVersionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Устойчивый UUID",
+                    "examples": [
+                      "10000000-0000-4000-8000-000000000001"
+                    ],
+                    "format": "uuid"
+                  },
+                  "dataAsOf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Момент UTC",
+                    "examples": [
+                      "2026-10-05T12:00:00Z"
+                    ],
+                    "format": "date-time"
+                  },
+                  "calculatedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Момент UTC",
+                    "examples": [
+                      "2026-10-05T12:00:00Z"
+                    ],
+                    "format": "date-time"
+                  },
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "COMPLETE",
+                      "PARTIAL"
+                    ],
+                    "description": "Полнота расчётных входов",
+                    "examples": [
+                      "COMPLETE"
+                    ]
+                  },
+                  "missingInputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Причина неполноты",
+                      "examples": [
+                        "demo"
+                      ]
+                    },
+                    "description": "Список"
+                  },
+                  "remainingHours": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "multipleOf": 0.01,
+                    "description": "Неотрицательные человеко-часы",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "forecastFinish": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Включительная календарная дата",
+                    "examples": [
+                      null
+                    ],
+                    "format": "date"
+                  },
+                  "estimatedTotalCost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "multipleOf": 0.01,
+                    "description": "Сумма в валюте currencyCode",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "budgetAdjustment": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "multipleOf": 0.01,
+                    "description": "Может быть отрицательной",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "currencyCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Код валюты",
+                    "examples": [
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "planVersionId",
+                  "dataAsOf",
+                  "calculatedAt",
+                  "quality",
+                  "missingInputs",
+                  "remainingHours",
+                  "forecastFinish"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entityType",
+              "entityId",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Manifest": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Момент UTC",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "schemaVersion": {
+            "type": "string",
+            "enum": [
+              "1.0.0"
+            ],
+            "description": "Версия",
+            "examples": [
+              "1.0.0"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "READY",
+              "FAILED",
+              "EXPIRED"
+            ],
+            "description": "Состояние",
+            "examples": [
+              "PENDING"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Срок хранения партии",
+            "examples": [
+              "2026-10-05T12:00:00Z"
+            ],
+            "format": "date-time"
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "enum": [
+                    "plan",
+                    "demand",
+                    "availability",
+                    "allocation",
+                    "forecast"
+                  ],
+                  "description": "Тип",
+                  "examples": [
+                    "plan"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Число строк",
+                  "examples": [
+                    0
+                  ]
+                }
+              },
+              "required": [
+                "entityType",
+                "count"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Список"
+          }
+        },
+        "required": [
+          "batchId",
+          "portfolioId",
+          "dataAsOf",
+          "schemaVersion",
+          "status",
+          "expiresAt",
+          "counts"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

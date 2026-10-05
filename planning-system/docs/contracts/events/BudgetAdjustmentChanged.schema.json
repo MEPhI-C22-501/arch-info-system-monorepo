@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BudgetAdjustmentChanged",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "BudgetAdjustmentChanged",
+      "description": "Имя события"
+    },
+    "occurredAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Момент UTC",
+      "examples": [
+        "2026-10-05T12:00:00Z"
+      ],
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "const": "PlanningSystem",
+      "description": "Модуль издателя"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semver"
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Устойчивый UUID",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ключ партиции и область проекта",
+      "examples": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "forecastId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Устойчивый UUID",
+          "examples": [
+            "10000000-0000-4000-8000-000000000001"
+          ],
+          "format": "uuid"
+        },
+        "planVersionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Устойчивый UUID",
+          "examples": [
+            "10000000-0000-4000-8000-000000000001"
+          ],
+          "format": "uuid"
+        },
+        "dataAsOf": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Момент UTC",
+          "examples": [
+            "2026-10-05T12:00:00Z"
+          ],
+          "format": "date-time"
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "COMPLETE",
+            "PARTIAL"
+          ],
+          "description": "Полнота расчётных входов",
+          "examples": [
+            "COMPLETE"
+          ]
+        }
+      },
+      "required": [
+        "forecastId",
+        "planVersionId",
+        "dataAsOf",
+        "quality"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "eventId",
+    "eventType",
+    "occurredAt",
+    "producer",
+    "schemaVersion",
+    "correlationId",
+    "projectId",
+    "payload"
+  ],
+  "additionalProperties": false
+}

@@ -22,7 +22,7 @@ flowchart LR
   planning -->|"запрос оповещения"| notify["Notification Service"]
   notify -->|"результат доставки"| planning
   planning <-->|"вложения"| storage["Object Storage"]
-  planning -->|"план, прогноз, загрузка"| reporting["Reporting"]
+  planning -->|"план, прогноз, загрузка"| reporting["Reports"]
 ```
 
 Проекты никогда не импортируются из Task Tracker. После публикации Task Tracker

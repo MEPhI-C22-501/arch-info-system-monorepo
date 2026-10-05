@@ -1,0 +1,15 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000001",
+  "eventType": "RemainingForecastChanged",
+  "occurredAt": "2026-10-05T12:00:00Z",
+  "producer": "PlanningSystem",
+  "schemaVersion": "1.0.0",
+  "correlationId": "10000000-0000-4000-8000-000000000001",
+  "projectId": "10000000-0000-4000-8000-000000000001",
+  "payload": {
+    "forecastId": "10000000-0000-4000-8000-000000000001",
+    "planVersionId": "10000000-0000-4000-8000-000000000001",
+    "dataAsOf": "2026-10-05T12:00:00Z",
+    "quality": "COMPLETE"
+  }
+}
