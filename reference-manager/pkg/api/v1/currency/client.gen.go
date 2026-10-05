@@ -4,10 +4,16 @@
 package currencyv1
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
@@ -83,6 +89,722 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// GetV1Currencies List currencies with pagination
+	//
+	// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
+	GetV1Currencies(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateCurrencyWithBody Create new currency record
+	//
+	// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+	CreateCurrencyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateCurrency Create new currency record
+	//
+	// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+	CreateCurrency(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportCurrenciesWithBody Export currencies to Excel file
+	//
+	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+	ExportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportCurrencies Export currencies to Excel file
+	//
+	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+	ExportCurrencies(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportCurrenciesWithBody Import currencies from Excel file
+	//
+	// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
+	ImportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteCurrency Delete currency record
+	//
+	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	//
+	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
+	DeleteCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCurrency Get currency by ID
+	//
+	// Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
+	//
+	// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
+	GetCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateCurrencyWithBody Update currency information
+	//
+	// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+	UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateCurrency Update currency information
+	//
+	// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+	UpdateCurrency(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListCurrencyRevisions List all revisions for a currency
+	//
+	// Retrieve the complete revision history for a specific currency. Returns all revisions in chronological order, showing what changes were made, when they were made, and by whom.
+	//
+	// Corresponds with GET /v1/currencies/{currencyID}/revisions (the `ListCurrencyRevisions` operationId).
+	ListCurrencyRevisions(ctx context.Context, currencyID CurrencyID, params *ListCurrencyRevisionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCurrencyRevision Get specific revision of a currency
+	//
+	// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
+	//
+	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
+	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// GetV1Currencies List currencies with pagination
+//
+// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
+func (c *Client) GetV1Currencies(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetV1CurrenciesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateCurrencyWithBody Create new currency record
+//
+// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+func (c *Client) CreateCurrencyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCurrencyRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateCurrency Create new currency record
+//
+// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+func (c *Client) CreateCurrency(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCurrencyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportCurrenciesWithBody Export currencies to Excel file
+//
+// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+func (c *Client) ExportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportCurrenciesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportCurrencies Export currencies to Excel file
+//
+// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+func (c *Client) ExportCurrencies(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportCurrenciesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportCurrenciesWithBody Import currencies from Excel file
+//
+// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
+func (c *Client) ImportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportCurrenciesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteCurrency Delete currency record
+//
+// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+//
+// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
+func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteCurrencyRequest(c.Server, currencyID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCurrency Get currency by ID
+//
+// Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
+//
+// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
+func (c *Client) GetCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCurrencyRequest(c.Server, currencyID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateCurrencyWithBody Update currency information
+//
+// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+func (c *Client) UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateCurrencyRequestWithBody(c.Server, currencyID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateCurrency Update currency information
+//
+// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+func (c *Client) UpdateCurrency(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateCurrencyRequest(c.Server, currencyID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListCurrencyRevisions List all revisions for a currency
+//
+// Retrieve the complete revision history for a specific currency. Returns all revisions in chronological order, showing what changes were made, when they were made, and by whom.
+//
+// Corresponds with GET /v1/currencies/{currencyID}/revisions (the `ListCurrencyRevisions` operationId).
+func (c *Client) ListCurrencyRevisions(ctx context.Context, currencyID CurrencyID, params *ListCurrencyRevisionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCurrencyRevisionsRequest(c.Server, currencyID, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetCurrencyRevision Get specific revision of a currency
+//
+// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
+//
+// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
+func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewGetV1CurrenciesRequest constructs an http.Request for the GetV1Currencies method
+func NewGetV1CurrenciesRequest(server string, params *GetV1CurrenciesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pageSize", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageToken != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pageToken", *params.PageToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateCurrencyRequest calls the generic CreateCurrency builder with application/json body
+func NewCreateCurrencyRequest(server string, body CreateCurrencyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateCurrencyRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateCurrencyRequestWithBody constructs an http.Request for the CreateCurrency method, with any body, and a specified content type
+func NewCreateCurrencyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExportCurrenciesRequest calls the generic ExportCurrencies builder with application/json body
+func NewExportCurrenciesRequest(server string, body ExportCurrenciesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewExportCurrenciesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewExportCurrenciesRequestWithBody constructs an http.Request for the ExportCurrencies method, with any body, and a specified content type
+func NewExportCurrenciesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportCurrenciesRequestWithBody constructs an http.Request for the ImportCurrencies method, with any body, and a specified content type
+func NewImportCurrenciesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/import")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteCurrencyRequest constructs an http.Request for the DeleteCurrency method
+func NewDeleteCurrencyRequest(server string, currencyID CurrencyID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "currencyID", currencyID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCurrencyRequest constructs an http.Request for the GetCurrency method
+func NewGetCurrencyRequest(server string, currencyID CurrencyID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "currencyID", currencyID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateCurrencyRequest calls the generic UpdateCurrency builder with application/json body
+func NewUpdateCurrencyRequest(server string, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateCurrencyRequestWithBody(server, currencyID, "application/json", bodyReader)
+}
+
+// NewUpdateCurrencyRequestWithBody constructs an http.Request for the UpdateCurrency method, with any body, and a specified content type
+func NewUpdateCurrencyRequestWithBody(server string, currencyID CurrencyID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "currencyID", currencyID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListCurrencyRevisionsRequest constructs an http.Request for the ListCurrencyRevisions method
+func NewListCurrencyRevisionsRequest(server string, currencyID CurrencyID, params *ListCurrencyRevisionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "currencyID", currencyID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/%s/revisions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pageSize", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageToken != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pageToken", *params.PageToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCurrencyRevisionRequest constructs an http.Request for the GetCurrencyRevision method
+func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "currencyID", currencyID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "revisionNumber", revisionNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/currencies/%s/revisions/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
@@ -128,4 +850,1250 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+
+	// GetV1CurrenciesWithResponse List currencies with pagination
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
+	GetV1CurrenciesWithResponse(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*GetV1CurrenciesResponse, error)
+
+	// CreateCurrencyWithBodyWithResponse Create new currency record
+	//
+	// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+	CreateCurrencyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCurrencyResponse, error)
+
+	// CreateCurrencyWithResponse Create new currency record
+	//
+	// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+	CreateCurrencyWithResponse(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCurrencyResponse, error)
+
+	// ExportCurrenciesWithBodyWithResponse Export currencies to Excel file
+	//
+	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+	ExportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
+
+	// ExportCurrenciesWithResponse Export currencies to Excel file
+	//
+	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+	ExportCurrenciesWithResponse(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
+
+	// ImportCurrenciesWithBodyWithResponse Import currencies from Excel file
+	//
+	// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
+	ImportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportCurrenciesResponse, error)
+
+	// DeleteCurrencyWithResponse Delete currency record
+	//
+	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
+	DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error)
+
+	// GetCurrencyWithResponse Get currency by ID
+	//
+	// Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
+	GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error)
+
+	// UpdateCurrencyWithBodyWithResponse Update currency information
+	//
+	// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+	UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
+
+	// UpdateCurrencyWithResponse Update currency information
+	//
+	// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+	UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
+
+	// ListCurrencyRevisionsWithResponse List all revisions for a currency
+	//
+	// Retrieve the complete revision history for a specific currency. Returns all revisions in chronological order, showing what changes were made, when they were made, and by whom.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/currencies/{currencyID}/revisions (the `ListCurrencyRevisions` operationId).
+	ListCurrencyRevisionsWithResponse(ctx context.Context, currencyID CurrencyID, params *ListCurrencyRevisionsParams, reqEditors ...RequestEditorFn) (*ListCurrencyRevisionsResponse, error)
+
+	// GetCurrencyRevisionWithResponse Get specific revision of a currency
+	//
+	// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
+	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
+}
+
+type GetV1CurrenciesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Currencies *[]Currency `json:"currencies,omitempty"`
+
+		// NextPageToken Token to retrieve the next page
+		NextPageToken *string `json:"nextPageToken,omitempty"`
+	}
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetV1CurrenciesResponse) GetJSON200() *struct {
+	Currencies *[]Currency `json:"currencies,omitempty"`
+
+	// NextPageToken Token to retrieve the next page
+	NextPageToken *string `json:"nextPageToken,omitempty"`
+} {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetV1CurrenciesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetV1CurrenciesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetV1CurrenciesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetV1CurrenciesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateCurrencyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CurrencyCreated
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *UnprocessableEntity
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateCurrencyResponse) GetJSON201() *CurrencyCreated {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CreateCurrencyResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r CreateCurrencyResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r CreateCurrencyResponse) GetJSON422() *UnprocessableEntity {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateCurrencyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateCurrencyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateCurrencyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateCurrencyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ExportCurrenciesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *UnprocessableEntity
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON422() *UnprocessableEntity {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportCurrenciesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportCurrenciesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportCurrenciesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportCurrenciesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportCurrenciesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		// Errors List of validation errors for skipped rows
+		Errors *[]ImportError `json:"errors,omitempty"`
+
+		// ImportedCount Number of currencies successfully imported
+		ImportedCount *int `json:"imported_count,omitempty"`
+
+		// SkippedCount Number of currencies skipped (duplicates or invalid)
+		SkippedCount *int `json:"skipped_count,omitempty"`
+	}
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON413 the response for an HTTP 413 `application/json` response
+	JSON413 *Error
+	// JSON415 the response for an HTTP 415 `application/json` response
+	JSON415 *Error
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *UnprocessableEntity
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportCurrenciesResponse) GetJSON200() *struct {
+	// Errors List of validation errors for skipped rows
+	Errors *[]ImportError `json:"errors,omitempty"`
+
+	// ImportedCount Number of currencies successfully imported
+	ImportedCount *int `json:"imported_count,omitempty"`
+
+	// SkippedCount Number of currencies skipped (duplicates or invalid)
+	SkippedCount *int `json:"skipped_count,omitempty"`
+} {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ImportCurrenciesResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON413 returns the response for an HTTP 413 `application/json` response
+func (r ImportCurrenciesResponse) GetJSON413() *Error {
+	return r.JSON413
+}
+
+// GetJSON415 returns the response for an HTTP 415 `application/json` response
+func (r ImportCurrenciesResponse) GetJSON415() *Error {
+	return r.JSON415
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ImportCurrenciesResponse) GetJSON422() *UnprocessableEntity {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportCurrenciesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportCurrenciesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportCurrenciesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportCurrenciesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteCurrencyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteCurrencyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteCurrencyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteCurrencyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteCurrencyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetCurrencyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExpandedCurrency
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCurrencyResponse) GetJSON200() *ExpandedCurrency {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetCurrencyResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetCurrencyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCurrencyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCurrencyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCurrencyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCurrencyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateCurrencyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExpandedCurrency
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *UnprocessableEntity
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON200() *ExpandedCurrency {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON422() *UnprocessableEntity {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateCurrencyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateCurrencyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateCurrencyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateCurrencyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCurrencyRevisionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		// CurrencyId ID of the currency these revisions belong to
+		CurrencyId *int `json:"currency_id,omitempty"`
+
+		// NextPageToken Token to retrieve the next page of revisions
+		NextPageToken *string             `json:"nextPageToken,omitempty"`
+		Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
+
+		// TotalCount Total number of revisions for this currency
+		TotalCount *int `json:"total_count,omitempty"`
+	}
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON200() *struct {
+	// CurrencyId ID of the currency these revisions belong to
+	CurrencyId *int `json:"currency_id,omitempty"`
+
+	// NextPageToken Token to retrieve the next page of revisions
+	NextPageToken *string             `json:"nextPageToken,omitempty"`
+	Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
+
+	// TotalCount Total number of revisions for this currency
+	TotalCount *int `json:"total_count,omitempty"`
+} {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCurrencyRevisionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCurrencyRevisionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCurrencyRevisionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCurrencyRevisionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetCurrencyRevisionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
+		CurrencyState *Currency `json:"currency_state,omitempty"`
+
+		// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
+		Revision *CurrencyRevision `json:"revision,omitempty"`
+	}
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON200() *struct {
+	// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
+	CurrencyState *Currency `json:"currency_state,omitempty"`
+
+	// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
+	Revision *CurrencyRevision `json:"revision,omitempty"`
+} {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetCurrencyRevisionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCurrencyRevisionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCurrencyRevisionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetCurrencyRevisionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetV1CurrenciesWithResponse List currencies with pagination
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
+func (c *ClientWithResponses) GetV1CurrenciesWithResponse(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*GetV1CurrenciesResponse, error) {
+	rsp, err := c.GetV1Currencies(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetV1CurrenciesResponse(rsp)
+}
+
+// CreateCurrencyWithBodyWithResponse Create new currency record
+//
+// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+func (c *ClientWithResponses) CreateCurrencyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCurrencyResponse, error) {
+	rsp, err := c.CreateCurrencyWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCurrencyResponse(rsp)
+}
+
+// CreateCurrencyWithResponse Create new currency record
+//
+// Create a new currency record in accordance with the ISO 4217 standard. The currency will be created with revision number 1 and initial metadata.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
+func (c *ClientWithResponses) CreateCurrencyWithResponse(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCurrencyResponse, error) {
+	rsp, err := c.CreateCurrency(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCurrencyResponse(rsp)
+}
+
+// ExportCurrenciesWithBodyWithResponse Export currencies to Excel file
+//
+// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+func (c *ClientWithResponses) ExportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
+	rsp, err := c.ExportCurrenciesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportCurrenciesResponse(rsp)
+}
+
+// ExportCurrenciesWithResponse Export currencies to Excel file
+//
+// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
+func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
+	rsp, err := c.ExportCurrencies(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportCurrenciesResponse(rsp)
+}
+
+// ImportCurrenciesWithBodyWithResponse Import currencies from Excel file
+//
+// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
+func (c *ClientWithResponses) ImportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportCurrenciesResponse, error) {
+	rsp, err := c.ImportCurrenciesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportCurrenciesResponse(rsp)
+}
+
+// DeleteCurrencyWithResponse Delete currency record
+//
+// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
+func (c *ClientWithResponses) DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error) {
+	rsp, err := c.DeleteCurrency(ctx, currencyID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteCurrencyResponse(rsp)
+}
+
+// GetCurrencyWithResponse Get currency by ID
+//
+// Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
+func (c *ClientWithResponses) GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error) {
+	rsp, err := c.GetCurrency(ctx, currencyID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCurrencyResponse(rsp)
+}
+
+// UpdateCurrencyWithBodyWithResponse Update currency information
+//
+// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+func (c *ClientWithResponses) UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
+	rsp, err := c.UpdateCurrencyWithBody(ctx, currencyID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateCurrencyResponse(rsp)
+}
+
+// UpdateCurrencyWithResponse Update currency information
+//
+// Partially update currency information. Only provided fields will be updated. A new revision will be created with the changes applied.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
+func (c *ClientWithResponses) UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
+	rsp, err := c.UpdateCurrency(ctx, currencyID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateCurrencyResponse(rsp)
+}
+
+// ListCurrencyRevisionsWithResponse List all revisions for a currency
+//
+// Retrieve the complete revision history for a specific currency. Returns all revisions in chronological order, showing what changes were made, when they were made, and by whom.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/currencies/{currencyID}/revisions (the `ListCurrencyRevisions` operationId).
+func (c *ClientWithResponses) ListCurrencyRevisionsWithResponse(ctx context.Context, currencyID CurrencyID, params *ListCurrencyRevisionsParams, reqEditors ...RequestEditorFn) (*ListCurrencyRevisionsResponse, error) {
+	rsp, err := c.ListCurrencyRevisions(ctx, currencyID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCurrencyRevisionsResponse(rsp)
+}
+
+// GetCurrencyRevisionWithResponse Get specific revision of a currency
+//
+// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
+func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
+	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCurrencyRevisionResponse(rsp)
+}
+
+// ParseGetV1CurrenciesResponse parses an HTTP response from a GetV1CurrenciesWithResponse call
+func ParseGetV1CurrenciesResponse(rsp *http.Response) (*GetV1CurrenciesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetV1CurrenciesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Currencies *[]Currency `json:"currencies,omitempty"`
+
+			// NextPageToken Token to retrieve the next page
+			NextPageToken *string `json:"nextPageToken,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateCurrencyResponse parses an HTTP response from a CreateCurrencyWithResponse call
+func ParseCreateCurrencyResponse(rsp *http.Response) (*CreateCurrencyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateCurrencyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CurrencyCreated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportCurrenciesResponse parses an HTTP response from a ExportCurrenciesWithResponse call
+func ParseExportCurrenciesResponse(rsp *http.Response) (*ExportCurrenciesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportCurrenciesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportCurrenciesResponse parses an HTTP response from a ImportCurrenciesWithResponse call
+func ParseImportCurrenciesResponse(rsp *http.Response) (*ImportCurrenciesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportCurrenciesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Errors List of validation errors for skipped rows
+			Errors *[]ImportError `json:"errors,omitempty"`
+
+			// ImportedCount Number of currencies successfully imported
+			ImportedCount *int `json:"imported_count,omitempty"`
+
+			// SkippedCount Number of currencies skipped (duplicates or invalid)
+			SkippedCount *int `json:"skipped_count,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteCurrencyResponse parses an HTTP response from a DeleteCurrencyWithResponse call
+func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteCurrencyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCurrencyResponse parses an HTTP response from a GetCurrencyWithResponse call
+func ParseGetCurrencyResponse(rsp *http.Response) (*GetCurrencyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCurrencyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExpandedCurrency
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateCurrencyResponse parses an HTTP response from a UpdateCurrencyWithResponse call
+func ParseUpdateCurrencyResponse(rsp *http.Response) (*UpdateCurrencyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateCurrencyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExpandedCurrency
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListCurrencyRevisionsResponse parses an HTTP response from a ListCurrencyRevisionsWithResponse call
+func ParseListCurrencyRevisionsResponse(rsp *http.Response) (*ListCurrencyRevisionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCurrencyRevisionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// CurrencyId ID of the currency these revisions belong to
+			CurrencyId *int `json:"currency_id,omitempty"`
+
+			// NextPageToken Token to retrieve the next page of revisions
+			NextPageToken *string             `json:"nextPageToken,omitempty"`
+			Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
+
+			// TotalCount Total number of revisions for this currency
+			TotalCount *int `json:"total_count,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCurrencyRevisionResponse parses an HTTP response from a GetCurrencyRevisionWithResponse call
+func ParseGetCurrencyRevisionResponse(rsp *http.Response) (*GetCurrencyRevisionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCurrencyRevisionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
+			CurrencyState *Currency `json:"currency_state,omitempty"`
+
+			// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
+			Revision *CurrencyRevision `json:"revision,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
 }
