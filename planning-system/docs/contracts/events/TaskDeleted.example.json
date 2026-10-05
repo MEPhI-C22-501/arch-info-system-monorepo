@@ -1,0 +1,20 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000001",
+  "eventType": "TaskDeleted",
+  "occurredAt": "2026-10-05T12:00:00Z",
+  "producer": "TaskTracker",
+  "schemaVersion": "1.0.0",
+  "correlationId": "10000000-0000-4000-8000-000000000001",
+  "projectId": "10000000-0000-4000-8000-000000000001",
+  "payload": {
+    "externalTaskId": "task-1",
+    "sourceRevision": 1,
+    "sourceChangedAt": "2026-10-05T12:00:00Z",
+    "logicalItemId": null,
+    "taskStatus": "InProgress",
+    "actualHours": 8,
+    "sourceRemainingHours": null,
+    "remainingHours": null,
+    "isDeleted": true
+  }
+}

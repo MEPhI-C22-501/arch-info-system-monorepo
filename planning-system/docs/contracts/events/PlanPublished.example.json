@@ -1,0 +1,13 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000001",
+  "eventType": "PlanPublished",
+  "occurredAt": "2026-10-05T12:00:00Z",
+  "producer": "PlanningSystem",
+  "schemaVersion": "1.0.0",
+  "correlationId": "10000000-0000-4000-8000-000000000001",
+  "projectId": null,
+  "payload": {
+    "aggregateId": "10000000-0000-4000-8000-000000000001",
+    "aggregateRevision": 1
+  }
+}

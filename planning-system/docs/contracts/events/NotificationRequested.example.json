@@ -1,0 +1,17 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000001",
+  "eventType": "NotificationRequested",
+  "occurredAt": "2026-10-05T12:00:00Z",
+  "producer": "PlanningSystem",
+  "schemaVersion": "1.0.0",
+  "correlationId": "10000000-0000-4000-8000-000000000001",
+  "projectId": "10000000-0000-4000-8000-000000000001",
+  "payload": {
+    "notificationId": "10000000-0000-4000-8000-000000000001",
+    "causeEventId": "10000000-0000-4000-8000-000000000001",
+    "recipientSubject": "demo-manager",
+    "channel": "in-app",
+    "templateCode": "plan-activated",
+    "planVersionId": null
+  }
+}
