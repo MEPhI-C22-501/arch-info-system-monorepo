@@ -1,7 +1,7 @@
 openapi: 3.1.0
 
 info:
-  title: Reference Manager Healthcheck API
+  title: Reference Manager Currency API
   description: API endpoints for currency lifecycle management according to ISO 4217.
   version: 1.0.0
 
@@ -55,6 +55,36 @@ paths:
                     type: string
                     description: Token to retrieve the next page
                     example: "next_page_token_value"
+
+  /v1/currencies/{currencyID}:
+    get: 
+      operationId: getCurrency
+      summary: Get currency by ID
+      description: >
+        Retrieve detailed information about a specific currency by its unique identifier.
+        Returns the current state of the currency including revision history metadata.
+      parameters:
+        - $ref: '#/components/parameters/CurrencyID'
+      responses:
+        '200':
+          description: Currency found and returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpandedCurrency'
+              example:
+                code: "USD"
+                number: "840"
+                name: "US Dollar"
+                decimals: 2
+                revision: 3
+                last_changer: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                created_at: "2023-01-01T00:00:00Z"
+                updated_at: "2026-10-05T07:54:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
 components:
   schemas:
@@ -266,6 +296,19 @@ components:
           example: "2026-10-05T07:54:00Z"
 
   parameters:
+    CurrencyID:
+      name: currencyID
+      in: path
+      description: >
+        Unique identifier of the currency record.
+        Must be a positive integer.
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 840
+
     ListPageSize:
       name: pageSize
       in: query
@@ -356,3 +399,19 @@ components:
                 error_code: "BUSINESS_LOGIC_ERROR"
                 message: "Invalid currency configuration"
                 details: []
+
+    NotFound:
+      description: Currency not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            currency_not_found:
+              summary: Currency not found
+              value:
+                error_code: "NOT_FOUND"
+                message: "Currency with the specified ID was not found"
+                details:
+                  - field: "currencyID"
+                    message: "No currency exists with ID 999"
