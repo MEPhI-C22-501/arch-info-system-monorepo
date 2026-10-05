@@ -86,6 +86,64 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+    patch:
+      operationId: updateCurrency
+      summary: Update currency information
+      description: >
+        Partially update currency information. Only provided fields will be updated.
+        A new revision will be created with the changes applied.
+      parameters:
+        - $ref: "#/components/parameters/CurrencyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencyUpdate'
+            example:
+              name: "United States Dollar"
+              decimals: 2
+      responses:
+        '200':
+          description: Currency successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpandedCurrency'
+              example:
+                code: "USD"
+                number: "840"
+                name: "United States Dollar"
+                decimals: 2
+                revision: 4
+                last_changer: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                created_at: "2023-01-01T00:00:00Z"
+                updated_at: "2026-10-05T08:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      operationId: deleteCurrency
+      summary: Delete currency record
+      description: >
+        Permanently delete a currency record from the system.
+        This action cannot be undone. All associated revision history will also be removed.
+      parameters:
+        - $ref: "#/components/parameters/CurrencyID"
+      responses:
+        '204':
+          description: Currency successfully deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   schemas:
     Error:
