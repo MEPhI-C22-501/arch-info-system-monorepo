@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA System — прототип</title>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --line:#d9dde3; --text:#1c2430; --muted:#667085; --accent:#2457c5;
+          --ok:#1a7f47; --bad:#b42318; --warn:#b54708; --idle:#667085; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; color:var(--text); background:var(--bg); display:flex; min-height:100vh; }
+  nav { width:220px; background:#1c2430; color:#fff; padding:16px 12px; flex-shrink:0; }
+  nav h1 { font-size:16px; margin:0 0 4px; }
+  nav small { color:#aab4c3; display:block; margin-bottom:16px; }
+  nav button { display:block; width:100%; text-align:left; background:none; border:0; color:#d5dbe5; padding:8px 10px; border-radius:6px; font:inherit; cursor:pointer; }
+  nav button:hover, nav button:focus-visible { background:#2b3646; outline:none; }
+  nav button[aria-current="page"] { background:var(--accent); color:#fff; }
+  nav label { display:block; margin-top:20px; color:#aab4c3; font-size:12px; }
+  nav select { width:100%; margin-top:4px; padding:6px; }
+  main { flex:1; padding:20px 24px; min-width:0; }
+  h2 { margin:0 0 12px; font-size:20px; }
+  h3 { margin:18px 0 8px; font-size:15px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:14px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; color:var(--muted); font-weight:600; }
+  tr.row { cursor:pointer; }
+  tr.row:hover { background:#f0f4ff; }
+  button.btn, select, input, textarea { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button.btn { cursor:pointer; }
+  button.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.btn:disabled { opacity:.5; cursor:not-allowed; }
+  textarea, input[type=text] { width:100%; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; border:1px solid currentColor; white-space:nowrap; }
+  .PASSED, .CLOSED, .ACTUAL, .COMPLETED, .SYNCED, .ACTIVE { color:var(--ok); }
+  .FAILED, .REOPENED, .BLOCKER, .CRITICAL { color:var(--bad); }
+  .BLOCKED, .NEEDS_UPDATE, .IN_PROGRESS, .PENDING, .READY_FOR_TEST, .FIXED, .OPEN, .MAJOR { color:var(--warn); }
+  .NOT_RUN, .DRAFT, .ARCHIVED, .SKIPPED, .CREATED, .NEW, .ABORTED, .CANCELLED, .MINOR, .TRIVIAL { color:var(--idle); }
+  .muted { color:var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .stat b { display:block; font-size:22px; }
+  #toast { position:fixed; right:20px; bottom:20px; background:#1c2430; color:#fff; padding:10px 14px; border-radius:8px; max-width:420px; display:none; }
+  #toast.err { background:var(--bad); }
+  .empty { padding:24px; text-align:center; color:var(--muted); }
+  @media (max-width:760px) { body { flex-direction:column; } nav { width:auto; } }
+</style>
+</head>
+<body>
+<nav aria-label="Разделы">
+  <h1>QA System</h1>
+  <small>Прототип интерфейса · данные в памяти</small>
+  <div id="menu"></div>
+  <label>Роль
+    <select id="role">
+      <option value="lead">QA-лид</option>
+      <option value="tester">Тестировщик</option>
+      <option value="automation">Автоматизатор</option>
+      <option value="viewer">Разработчик / РП</option>
+      <option value="admin">Администратор</option>
+    </select>
+  </label>
+</nav>
+<main id="view" aria-live="polite"></main>
+<div id="toast" role="status"></div>
+
+<script>
+/* domain:start — состояние и правила; не зависит от DOM */
+const TRANSITIONS = { NEW:['OPEN'], OPEN:['IN_PROGRESS'], IN_PROGRESS:['FIXED'], FIXED:['READY_FOR_TEST'],
+  READY_FOR_TEST:['CLOSED','REOPENED'], CLOSED:['REOPENED'], REOPENED:['IN_PROGRESS'] };
+const DEV_STATUSES = ['OPEN','IN_PROGRESS','FIXED'];
+const CASE_TRANSITIONS = { DRAFT:['ACTUAL'], ACTUAL:['NEEDS_UPDATE','ARCHIVED'], NEEDS_UPDATE:['ACTUAL','ARCHIVED'], ARCHIVED:['ACTUAL'] };
+const CAN = {
+  lead:       { editCase:1, plan:1, run:1, result:1, defect:1, devStatus:1, auto:1, admin:0, finishRun:1 },
+  tester:     { editCase:1, plan:0, run:1, result:1, defect:1, devStatus:0, auto:1, admin:0, finishRun:0 },
+  automation: { editCase:1, plan:0, run:1, result:0, defect:1, devStatus:0, auto:1, admin:0, finishRun:0, qaStatus:0 },
+  viewer:     {},
+  admin:      { admin:1 },
+};
+const LABEL = { DRAFT:'Черновик', ACTUAL:'Актуален', NEEDS_UPDATE:'На доработке', ARCHIVED:'В архиве', ACTIVE:'Активен',
+  COMPLETED:'Завершён', CANCELLED:'Отменён', CREATED:'Создан', IN_PROGRESS:'Выполняется', ABORTED:'Прерван',
+  NOT_RUN:'Не выполнен', PASSED:'Пройден', FAILED:'Провален', BLOCKED:'Заблокирован', SKIPPED:'Пропущен' };
+
+function seed() {
+  const mk = (key, title, module, type, severity, automated, steps) => ({ key, module, status:'ACTUAL', copiedFrom:null,
+    versions:[{ version:1, title, type, severity, priority:'HIGH', automated, autotestKey: automated ? module.toLowerCase()+'/test_'+key.toLowerCase().replace(/-/g,'_')+'.py' : '',
+      author:'a.vasilev', at:'2026-09-24', changed:['создание'], steps }] });
+  return {
+    role:'lead', seq:{ run:86, def:44, tc:90 },
+    cases:[
+      mk('TC-RM-01','Проверки работоспособности и готовности','RM','SMOKE','BLOCKER',true,[['GET /v1/health/livez','200'],['GET /v1/health/readyz','200, ready: true']]),
+      mk('TC-RM-02','Создать запись справочника и прочитать её','RM','FUNCTIONAL','CRITICAL',true,[['POST /v1/currencies?currency_id=PLN','201, state ACTIVE'],['GET /v1/currencies/PLN','200, поля совпадают']]),
+      mk('TC-RM-03','Создание записи с занятым идентификатором отклоняется','RM','NEGATIVE','MAJOR',true,[['Создать currencies/PLN','201'],['Удалить запись','200, state DELETED'],['Создать запись с тем же идентификатором','409 ALREADY_EXISTS']]),
+      mk('TC-TT-01','Задача без наименования отклоняется','TT','NEGATIVE','MAJOR',true,[['POST /api/v1/work-items без title','422, поле title']]),
+      mk('TC-TT-02','Перемещение карточки на канбан-доске','TT','FUNCTIONAL','MAJOR',false,[['Перетащить карточку в «На проверке»','Карточка в новой колонке'],['Открыть карточку','Статус совпадает с колонкой']]),
+      mk('TC-INF-01','Служебный токен по client credentials','INF','SMOKE','BLOCKER',true,[['POST …/token','200, access_token'],['Проверить подпись по JWKS','Подпись верна']]),
+    ],
+    plans:[{ key:'TP-12', name:'Итерация 4 — регрессия', scope:'ITERATION', status:'ACTIVE', owner:'QA-лид', iteration:'IT-2026-04', verified:false,
+             start:'2026-10-05', end:'2026-10-16', cases:['TC-RM-01','TC-RM-02','TC-RM-03','TC-TT-01','TC-TT-02','TC-INF-01'] }],
+    suites:[{ name:'Smoke', cases:['TC-RM-01','TC-INF-01'] }],
+    runs:[], defects:[],
+    envs:[{ code:'dev', name:'Общий dev-стенд', active:true }, { code:'local', name:'Локальный Compose', active:true }],
+    outbox:0, simFail:{ 'TC-RM-03':3 }, trackerUp:true,
+  };
+}
+function current(c) { return c.versions[c.versions.length - 1]; }
+function findCase(S, key) { return S.cases.find(c => c.key === key); }
+function saveCase(S, key, patch, author) {
+  const c = findCase(S, key); if (c.status === 'ARCHIVED') throw new Error('CASE_ARCHIVED: кейс в архиве, верните его в работу');
+  const prev = current(c); const changed = Object.keys(patch).filter(k => JSON.stringify(patch[k]) !== JSON.stringify(prev[k]));
+  if (!changed.length) return prev;
+  if ('title' in patch && !patch.title.trim()) throw new Error('VALIDATION_FAILED: название обязательно');
+  const v = { ...prev, ...patch, version: prev.version + 1, author, at:'2026-10-05', changed };
+  c.versions.push(v); return v;
+}
+function copyCase(S, key) {
+  const c = findCase(S, key); const k = 'TC-' + c.module + '-' + (++S.seq.tc);
+  const v = { ...current(c), version:1, changed:['копия ' + key], steps: current(c).steps.map(s => [...s]) };
+  S.cases.push({ key:k, module:c.module, status:'DRAFT', copiedFrom:key, versions:[v] }); return k;
+}
+function setCaseStatus(S, key, to) {
+  const c = findCase(S, key);
+  if (!CASE_TRANSITIONS[c.status].includes(to)) throw new Error('INVALID_TRANSITION: ' + c.status + ' → ' + to);
+  if (to === 'ACTUAL' && (!current(c).title.trim() || !current(c).steps.length)) throw new Error('CASE_NOT_READY: нужны название и хотя бы один шаг');
+  c.status = to;
+}
+function createRun(S, source, env, trigger, onlyKeys) {
+  const keys = (onlyKeys || source.cases).filter(k => findCase(S, k).status !== 'ARCHIVED' && findCase(S, k).status !== 'DRAFT');
+  if (!keys.length) throw new Error('RUN_EMPTY: в составе нет актуальных кейсов');
+  if (source.status && source.status !== 'ACTIVE') throw new Error('PLAN_NOT_ACTIVE: план не активен');
+  const run = { key:'RUN-' + (++S.seq.run), source: source.key || source.name, isSuite: !source.key, env, status:'CREATED', trigger: trigger || 'MANUAL', parent:null,
+    results: keys.map(k => ({ caseKey:k, version: current(findCase(S, k)).version, status:'NOT_RUN', failedStep:null, actual:'', reason:'', defect:null, assignee:'' })) };
+  S.runs.unshift(run); return run;
+}
+function startRun(S, run) {
+  if (run.status !== 'CREATED') throw new Error('INVALID_TRANSITION: прогон уже запущен');
+  if (run.isSuite && S.runs.some(r => r !== run && r.isSuite && r.source === run.source && r.env === run.env && r.status === 'IN_PROGRESS'))
+    throw new Error('SUITE_ALREADY_RUNNING: набор уже выполняется на этом окружении');
+  run.status = 'IN_PROGRESS';
+}
+function versionOf(S, res) { return findCase(S, res.caseKey).versions.find(v => v.version === res.version); }
+function recordResult(S, run, res, status, failedStep, actual, by) {
+  if (run.status !== 'IN_PROGRESS') throw new Error('RUN_FINISHED: результаты изменяются только в выполняющемся прогоне');
+  res.status = status; res.failedStep = status === 'FAILED' ? (failedStep || null) : null; res.actual = actual || '';
+  if (status === 'FAILED') res.defect = autoDefect(S, run, res, by);
+  if (status === 'PASSED') retest(S, run, res, true, by);
+  return res;
+}
+function autoDefect(S, run, res, by) {
+  const open = S.defects.find(d => d.caseKey === res.caseKey && d.origin === 'AUTO' && d.status !== 'CLOSED');
+  if (open) {
+    if (!open.runs.includes(run.key)) open.runs.push(run.key);
+    if (open.status === 'READY_FOR_TEST') moveDefect(S, open, 'REOPENED', by, 'SYSTEM');
+    else open.history.unshift({ at: run.key, by, source:'SYSTEM', field:'прогон', from:'', to: run.key + ': ' + (res.actual || 'провал') });
+    return open.key;
+  }
+  const v = versionOf(S, res); const n = res.failedStep || v.steps.length; const step = v.steps[n - 1];
+  const d = { key:'DEF-' + (++S.seq.def), origin:'AUTO', title:'[' + res.caseKey + '] Шаг ' + n + ': ' + step[0], status:'NEW',
+    severity: v.severity, priority: v.priority, caseKey: res.caseKey, caseVersion: res.version, env: run.env,
+    repro: v.steps.slice(0, n).map((s, i) => (i + 1) + '. ' + s[0]).join('\n'), expected: step[1], actual: res.actual || 'Результат отличается от ожидаемого',
+    runs:[run.key], reopen:0, sync: S.trackerUp ? 'SYNCED' : 'PENDING', tracker: S.trackerUp ? 'TT-' + (500 + S.seq.def) : '',
+    history:[{ at: run.key, by, source:'SYSTEM', field:'статус', from:'', to:'NEW' }] };
+  if (!S.trackerUp) S.outbox++;
+  S.defects.unshift(d); return d.key;
+}
+function retest(S, run, res, passed, by) {
+  const d = S.defects.find(x => x.caseKey === res.caseKey && x.status === 'READY_FOR_TEST');
+  if (d && passed) { if (!d.runs.includes(run.key)) d.runs.push(run.key); moveDefect(S, d, 'CLOSED', by, 'SYSTEM'); }
+}
+function moveDefect(S, d, to, by, source) {
+  if (!TRANSITIONS[d.status].includes(to)) throw new Error('INVALID_TRANSITION: ' + d.status + ' → ' + to + '; допустимо: ' + TRANSITIONS[d.status].join(', '));
+  d.history.unshift({ at:'сейчас', by, source: source || 'QA', field:'статус', from: d.status, to });
+  if (to === 'REOPENED') d.reopen++;
+  d.status = to;
+}
+function allowedMoves(role, d) {
+  return TRANSITIONS[d.status].filter(to => DEV_STATUSES.includes(to) ? CAN[role].devStatus : (CAN[role].defect && CAN[role].qaStatus !== 0));
+}
+function summary(run) {
+  const s = { total: run.results.length, PASSED:0, FAILED:0, BLOCKED:0, NOT_RUN:0, SKIPPED:0 };
+  run.results.forEach(r => s[r.status]++); return s;
+}
+function finishRun(S, run, to) {
+  if (!['CREATED','IN_PROGRESS'].includes(run.status)) throw new Error('INVALID_TRANSITION: прогон уже закрыт');
+  run.status = to;
+}
+function rerun(S, run) {
+  if (!['COMPLETED','ABORTED'].includes(run.status)) throw new Error('INVALID_TRANSITION: повторный прогон создаётся из закрытого');
+  const keys = run.results.filter(r => r.status === 'FAILED' || r.status === 'BLOCKED').map(r => r.caseKey);
+  if (!keys.length) throw new Error('NOTHING_TO_RERUN: упавших и заблокированных кейсов нет');
+  const src = run.isSuite ? S.suites.find(s => s.name === run.source) : { ...S.plans.find(p => p.key === run.source), status:'ACTIVE' };
+  const nr = createRun(S, src, run.env, 'MANUAL', keys); nr.parent = run.key; return nr;
+}
+function executeAutotests(S, run, by) {
+  let n = 0;
+  run.results.forEach(res => {
+    const v = versionOf(S, res); if (!v.automated || res.status !== 'NOT_RUN') return;
+    const failAt = S.simFail[res.caseKey];
+    recordResult(S, run, res, failAt ? 'FAILED' : 'PASSED', failAt, failAt ? 'Автотест: ожидалось «' + v.steps[failAt - 1][1] + '», получено 201 Created' : '', by || 'qa-executor');
+    n++;
+  });
+  if (run.results.every(r => r.status !== 'NOT_RUN')) run.status = 'COMPLETED';
+  return n;
+}
+function flushOutbox(S) { S.defects.forEach(d => { if (d.sync === 'PENDING') { d.sync = 'SYNCED'; d.tracker = 'TT-' + (500 + Number(d.key.slice(4))); } }); S.outbox = 0; }
+/* domain:end */
+
+if (typeof document !== 'undefined') {
+const S = seed();
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const tag = v => '<span class="tag ' + v + '">' + esc(LABEL[v] || v) + '</span>';
+const can = k => !!CAN[S.role][k];
+let route = { screen:'cases' };
+const SCREENS = [['cases','Тест-кейсы'],['plans','Планы и наборы'],['runs','Прогоны'],['defects','Дефекты'],['overview','Состояние тестирования'],['admin','Администрирование']];
+
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 4500); }
+function act(fn, ok) { try { const r = fn(); if (ok) toast(typeof ok === 'function' ? ok(r) : ok); render(); return r; } catch (e) { toast(e.message, true); } }
+function go(screen, id) { route = { screen, id }; render(); $('#view').focus && window.scrollTo(0, 0); }
+
+function render() {
+  $('#menu').innerHTML = SCREENS.filter(s => s[0] !== 'admin' || can('admin') || S.role === 'lead')
+    .map(s => '<button data-go="' + s[0] + '"' + (route.screen.startsWith(s[0].slice(0, 3)) ? ' aria-current="page"' : '') + '>' + s[1] + '</button>').join('');
+  $('#view').innerHTML = (VIEWS[route.screen] || VIEWS.cases)(route.id);
+}
+
+const VIEWS = {
+  cases() {
+    const f = route.filter || {}; const rows = S.cases.filter(c => (!f.module || c.module === f.module) && (!f.status || c.status === f.status));
+    const mods = [...new Set(S.cases.map(c => c.module))];
+    return '<h2>Тест-кейсы</h2><div class="bar">' +
+      '<select data-filter="module"><option value="">Все модули</option>' + mods.map(m => '<option' + (f.module === m ? ' selected' : '') + '>' + m + '</option>').join('') + '</select>' +
+      '<select data-filter="status"><option value="">Все статусы</option>' + Object.keys(CASE_TRANSITIONS).map(s => '<option value="' + s + '"' + (f.status === s ? ' selected' : '') + '>' + LABEL[s] + '</option>').join('') + '</select>' +
+      (can('editCase') ? '<button class="btn primary" data-act="newCase">Создать кейс</button>' : '') +
+      '<button class="btn" data-act="export">Экспорт .xlsx</button></div><div class="panel">' +
+      (rows.length ? '<table><tr><th>Ключ</th><th>Название</th><th>Тип</th><th>Серьёзность</th><th>Вид</th><th>Версия</th><th>Статус</th></tr>' +
+        rows.map(c => { const v = current(c); return '<tr class="row" tabindex="0" data-open="case:' + c.key + '"><td>' + c.key + '</td><td>' + esc(v.title) + '</td><td>' + v.type + '</td><td>' + tag(v.severity) + '</td><td>' + (v.automated ? 'Авто' : 'Ручной') + '</td><td>' + v.version + '</td><td>' + tag(c.status) + '</td></tr>'; }).join('') + '</table>'
+        : '<div class="empty">По фильтру кейсов нет</div>') + '</div>';
+  },
+  case(key) {
+    const c = findCase(S, key), v = current(c), ed = can('editCase') && c.status !== 'ARCHIVED';
+    return '<div class="bar"><button class="btn" data-go="cases">← К списку</button></div><h2>' + c.key + ' · ' + esc(v.title) + ' ' + tag(c.status) + '</h2>' +
+      '<div class="bar">' + (can('editCase') ? CASE_TRANSITIONS[c.status].map(s => '<button class="btn" data-act="caseStatus" data-arg="' + s + '">→ ' + LABEL[s] + '</button>').join('') + '<button class="btn" data-act="copyCase">Копировать</button>' : '') + '</div>' +
+      '<div class="panel"><p class="muted">Модуль ' + c.module + ' · тип ' + v.type + ' · серьёзность ' + v.severity + ' · ' + (v.automated ? 'автотест <code>' + esc(v.autotestKey) + '</code>' : 'ручной') + (c.copiedFrom ? ' · копия ' + c.copiedFrom : '') + '</p>' +
+      '<label>Название<input type="text" id="cTitle" value="' + esc(v.title) + '"' + (ed ? '' : ' disabled') + '></label>' +
+      '<h3>Шаги версии ' + v.version + '</h3><table><tr><th>№</th><th>Действие</th><th>Ожидаемый результат</th></tr>' + v.steps.map((s, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(s[0]) + '</td><td>' + esc(s[1]) + '</td></tr>').join('') + '</table>' +
+      (ed ? '<div class="bar" style="margin-top:10px"><input type="text" id="sAct" placeholder="Новый шаг: действие" style="flex:1;width:auto"><input type="text" id="sExp" placeholder="Ожидаемый результат" style="flex:1;width:auto"><button class="btn primary" data-act="saveCase">Сохранить версию</button></div>' : '') + '</div>' +
+      '<div class="panel"><h3 style="margin-top:0">История версий</h3><table><tr><th>Версия</th><th>Автор</th><th>Дата</th><th>Изменено</th></tr>' + [...c.versions].reverse().map(x => '<tr><td>' + x.version + '</td><td>' + x.author + '</td><td>' + x.at + '</td><td>' + esc(x.changed.join(', ')) + '</td></tr>').join('') + '</table></div>';
+  },
+  plans() {
+    return '<h2>Планы и наборы</h2><div class="panel"><table><tr><th>Ключ</th><th>План</th><th>Область</th><th>Итерация</th><th>Сроки</th><th>Кейсов</th><th>Статус</th><th></th></tr>' +
+      S.plans.map(p => '<tr><td>' + p.key + '</td><td>' + esc(p.name) + '</td><td>' + p.scope + '</td><td>' + p.iteration + (p.verified ? '' : ' <span class="muted">(не проверена)</span>') + '</td><td>' + p.start + ' — ' + p.end + '</td><td>' + p.cases.length + '</td><td>' + tag(p.status) + '</td><td>' +
+        (can('run') && p.status === 'ACTIVE' ? '<button class="btn primary" data-act="runPlan" data-arg="' + p.key + '">Создать прогон</button> ' : '') +
+        (can('plan') && p.status === 'ACTIVE' ? '<button class="btn" data-act="planDone" data-arg="' + p.key + '">Завершить</button>' : '') + '</td></tr>').join('') + '</table></div>' +
+      '<div class="panel"><h3 style="margin-top:0">Наборы</h3><table><tr><th>Набор</th><th>Кейсы</th><th></th></tr>' +
+      S.suites.map(s => '<tr><td>' + esc(s.name) + '</td><td>' + s.cases.join(', ') + '</td><td>' + (can('auto') ? '<button class="btn primary" data-act="runSuite" data-arg="' + esc(s.name) + '">Запустить автотесты</button>' : '') + '</td></tr>').join('') + '</table></div>';
+  },
+  runs() {
+    return '<h2>Прогоны</h2><div class="panel">' + (S.runs.length ? '<table><tr><th>Ключ</th><th>Источник</th><th>Окружение</th><th>Запуск</th><th>Пройдено</th><th>Провалено</th><th>Осталось</th><th>Статус</th></tr>' +
+      S.runs.map(r => { const s = summary(r); return '<tr class="row" tabindex="0" data-open="run:' + r.key + '"><td>' + r.key + (r.parent ? ' <span class="muted">↻ ' + r.parent + '</span>' : '') + '</td><td>' + esc(r.source) + '</td><td>' + r.env + '</td><td>' + r.trigger + '</td><td>' + s.PASSED + '</td><td>' + s.FAILED + '</td><td>' + s.NOT_RUN + '</td><td>' + tag(r.status) + '</td></tr>'; }).join('') + '</table>'
+      : '<div class="empty">Прогонов пока нет. Создайте прогон из плана или запустите набор.</div>') + '</div>';
+  },
+  run(key) {
+    const r = S.runs.find(x => x.key === key), s = summary(r), live = r.status === 'IN_PROGRESS';
+    return '<div class="bar"><button class="btn" data-go="runs">← К списку</button></div><h2>' + r.key + ' · ' + esc(r.source) + ' · ' + r.env + ' ' + tag(r.status) + '</h2>' +
+      '<div class="grid">' + ['PASSED','FAILED','BLOCKED','NOT_RUN','SKIPPED'].map(k => '<div class="stat"><b class="' + k + '">' + s[k] + '</b>' + LABEL[k] + '</div>').join('') + '</div><div class="bar" style="margin-top:12px">' +
+      (r.status === 'CREATED' && can('run') ? '<button class="btn primary" data-act="startRun">Запустить</button>' : '') +
+      (live && can('auto') ? '<button class="btn primary" data-act="autotests">Запустить автотесты</button>' : '') +
+      (live && can('result') ? '<select id="bulkStatus">' + ['PASSED','FAILED','BLOCKED','SKIPPED'].map(k => '<option value="' + k + '">' + LABEL[k] + '</option>').join('') + '</select><button class="btn" data-act="bulk">Применить к выбранным</button>' : '') +
+      (live && can('finishRun') ? '<button class="btn" data-act="completeRun">Завершить</button><button class="btn" data-act="abortRun">Прервать</button>' : '') +
+      (['COMPLETED','ABORTED'].includes(r.status) && can('run') ? '<button class="btn primary" data-act="rerun">Повторить упавшие</button>' : '') + '</div>' +
+      '<div class="panel"><table><tr><th></th><th>Кейс</th><th>Версия</th><th>Вид</th><th>Результат</th><th>Фактический результат</th><th>Дефект</th><th></th></tr>' +
+      r.results.map((x, i) => { const v = versionOf(S, x); return '<tr><td><input type="checkbox" data-pick="' + i + '" aria-label="Выбрать ' + x.caseKey + '"' + (live && can('result') ? '' : ' disabled') + '></td><td>' + x.caseKey + '<br><span class="muted">' + esc(v.title) + '</span></td><td>' + x.version + '</td><td>' + (v.automated ? 'Авто' : 'Ручной') + '</td><td>' + tag(x.status) + (x.failedStep ? '<br><span class="muted">шаг ' + x.failedStep + '</span>' : '') + '</td><td>' + esc(x.actual) + '</td><td>' + (x.defect ? '<a href="#" data-open="defect:' + x.defect + '">' + x.defect + '</a>' : '') + '</td><td>' +
+        (live && can('result') ? '<button class="btn" data-act="pass" data-arg="' + i + '">Пройден</button> <button class="btn" data-act="fail" data-arg="' + i + '">Провален…</button>' : '') + '</td></tr>'; }).join('') + '</table></div>';
+  },
+  defects() {
+    const f = route.filter || {}; const rows = S.defects.filter(d => (!f.dstatus || d.status === f.dstatus) && (!f.severity || d.severity === f.severity));
+    return '<h2>Дефекты</h2><div class="bar"><select data-filter="dstatus"><option value="">Все статусы</option>' + Object.keys(TRANSITIONS).map(s => '<option' + (f.dstatus === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select>' +
+      '<select data-filter="severity"><option value="">Любая серьёзность</option>' + ['BLOCKER','CRITICAL','MAJOR','MINOR','TRIVIAL'].map(s => '<option' + (f.severity === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div><div class="panel">' +
+      (rows.length ? '<table><tr><th>Ключ</th><th>Заголовок</th><th>Серьёзность</th><th>Кейс</th><th>Прогоны</th><th>Task Tracker</th><th>Статус</th></tr>' +
+        rows.map(d => '<tr class="row" tabindex="0" data-open="defect:' + d.key + '"><td>' + d.key + '</td><td>' + esc(d.title) + '</td><td>' + tag(d.severity) + '</td><td>' + d.caseKey + '</td><td>' + d.runs.join(', ') + '</td><td>' + (d.tracker || tag(d.sync)) + '</td><td>' + tag(d.status) + '</td></tr>').join('') + '</table>'
+        : '<div class="empty">Дефектов нет. Они появятся после первого провала в прогоне.</div>') + '</div>';
+  },
+  defect(key) {
+    const d = S.defects.find(x => x.key === key), moves = allowedMoves(S.role, d);
+    return '<div class="bar"><button class="btn" data-go="defects">← К списку</button></div><h2>' + d.key + ' ' + tag(d.status) + ' ' + tag(d.severity) + '</h2><p>' + esc(d.title) + '</p>' +
+      '<div class="bar">' + (moves.length ? moves.map(m => '<button class="btn primary" data-act="moveDefect" data-arg="' + m + '">→ ' + m + '</button>').join('') : '<span class="muted">Для вашей роли переходов из этого статуса нет</span>') +
+      (can('defect') ? '<button class="btn" data-act="badMove">Попробовать → CLOSED</button>' : '') + '</div>' +
+      '<div class="panel"><table><tr><th>Кейс</th><td><a href="#" data-open="case:' + d.caseKey + '">' + d.caseKey + '</a>, версия ' + d.caseVersion + '</td></tr><tr><th>Окружение</th><td>' + d.env + '</td></tr><tr><th>Шаги воспроизведения</th><td><pre style="margin:0;white-space:pre-wrap">' + esc(d.repro) + '</pre></td></tr>' +
+      '<tr><th>Ожидаемый результат</th><td>' + esc(d.expected) + '</td></tr><tr><th>Фактический результат</th><td>' + esc(d.actual) + '</td></tr><tr><th>Прогоны</th><td>' + d.runs.join(', ') + '</td></tr>' +
+      '<tr><th>Task Tracker</th><td>' + (d.tracker ? 'Ошибка ' + d.tracker + ' ' : '') + tag(d.sync) + '</td></tr><tr><th>Переоткрытий</th><td>' + d.reopen + '</td></tr></table></div>' +
+      '<div class="panel"><h3 style="margin-top:0">История</h3><table><tr><th>Когда</th><th>Кто</th><th>Источник</th><th>Поле</th><th>Было</th><th>Стало</th></tr>' + d.history.map(h => '<tr><td>' + h.at + '</td><td>' + h.by + '</td><td>' + h.source + '</td><td>' + h.field + '</td><td>' + esc(h.from) + '</td><td>' + esc(h.to) + '</td></tr>').join('') + '</table></div>';
+  },
+  overview() {
+    const p = S.plans[0], last = {}; [...S.runs].reverse().filter(r => r.source === p.key).forEach(r => r.results.forEach(x => { if (x.status !== 'NOT_RUN' || !last[x.caseKey]) last[x.caseKey] = x.status; }));
+    const open = S.defects.filter(d => d.status !== 'CLOSED');
+    if (!Object.keys(last).length) return '<h2>Состояние тестирования</h2><div class="panel"><div class="empty">По плану ' + p.key + ' ещё нет прогонов.</div></div>';
+    const cnt = k => Object.values(last).filter(v => v === k).length;
+    return '<h2>Состояние тестирования · ' + p.iteration + '</h2><p class="muted">План ' + p.key + ' «' + esc(p.name) + '» ' + tag(p.status) + ' · по каждому кейсу показан последний результат</p>' +
+      '<div class="grid">' + ['PASSED','FAILED','BLOCKED','NOT_RUN'].map(k => '<div class="stat"><b class="' + k + '">' + cnt(k) + '</b>' + LABEL[k] + '</div>').join('') + '<div class="stat"><b>' + open.length + '</b>Открытых дефектов</div></div>' +
+      '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Открытые дефекты</h3>' + (open.length ? '<table><tr><th>Ключ</th><th>Серьёзность</th><th>Статус</th><th>Задача</th></tr>' + open.map(d => '<tr class="row" tabindex="0" data-open="defect:' + d.key + '"><td>' + d.key + '</td><td>' + tag(d.severity) + '</td><td>' + tag(d.status) + '</td><td>' + (d.tracker || '—') + '</td></tr>').join('') + '</table>' : '<div class="empty">Открытых дефектов нет</div>') + '</div>';
+  },
+  admin() {
+    return '<h2>Администрирование</h2><div class="panel"><h3 style="margin-top:0">Состояние интеграций</h3><table>' +
+      '<tr><th>Task Tracker</th><td>' + (S.trackerUp ? tag('SYNCED') + ' доступен' : tag('FAILED') + ' недоступен (симуляция)') + '</td><td><button class="btn" data-act="toggleTracker">' + (S.trackerUp ? 'Симулировать недоступность' : 'Восстановить и дослать') + '</button></td></tr>' +
+      '<tr><th>Неотправленных сообщений</th><td>' + S.outbox + '</td><td></td></tr><tr><th>Кэш Reference Manager</th><td>синхронизирован 2026-10-05 09:00</td><td>' + (can('admin') ? '<button class="btn" data-act="refresh">Обновить</button>' : '') + '</td></tr></table></div>' +
+      '<div class="panel"><h3 style="margin-top:0">Окружения</h3><table><tr><th>Код</th><th>Название</th><th>Активно</th></tr>' + S.envs.map(e => '<tr><td>' + e.code + '</td><td>' + esc(e.name) + '</td><td>' + (e.active ? 'да' : 'нет') + '</td></tr>').join('') + '</table></div>' +
+      '<div class="panel"><h3 style="margin-top:0">Симуляция автотестов</h3><p class="muted">Кейсы, которые автотест «роняет» в прототипе: ' + (Object.keys(S.simFail).join(', ') || 'нет') + '</p><button class="btn" data-act="fixBug">' + (S.simFail['TC-RM-03'] ? 'Считать дефект TC-RM-03 исправленным на стенде' : 'Снова ломать TC-RM-03') + '</button></div>';
+  },
+};
+
+const picked = () => [...document.querySelectorAll('[data-pick]:checked')].map(c => Number(c.dataset.pick));
+const curRun = () => S.runs.find(x => x.key === route.id);
+const ACTIONS = {
+  newCase() { const title = prompt('Название нового кейса'); if (title == null) return; act(() => { if (!title.trim()) throw new Error('VALIDATION_FAILED: название обязательно'); const k = 'TC-RM-' + (++S.seq.tc);
+    S.cases.push({ key:k, module:'RM', status:'DRAFT', copiedFrom:null, versions:[{ version:1, title, type:'FUNCTIONAL', severity:'MINOR', priority:'MEDIUM', automated:false, autotestKey:'', author:S.role, at:'2026-10-05', changed:['создание'], steps:[] }] }); route = { screen:'case', id:k }; }, 'Кейс создан в статусе «Черновик»'); },
+  export() { toast('Прототип: файл .xlsx с ' + S.cases.length + ' кейсами был бы сформирован'); },
+  saveCase() { const c = findCase(S, route.id), v = current(c), patch = { title: $('#cTitle').value }; if ($('#sAct').value.trim()) patch.steps = [...v.steps, [$('#sAct').value, $('#sExp').value]];
+    act(() => { if (patch.steps && !$('#sExp').value.trim()) throw new Error('VALIDATION_FAILED: у шага нужен ожидаемый результат'); return saveCase(S, c.key, patch, S.role); }, r => r === v ? 'Изменений нет — версия не создана' : 'Создана версия ' + r.version); },
+  caseStatus(a) { act(() => setCaseStatus(S, route.id, a), 'Статус изменён'); },
+  copyCase() { act(() => { const k = copyCase(S, route.id); route = { screen:'case', id:k }; return k; }, k => 'Создана копия ' + k); },
+  runPlan(a) { act(() => { const r = createRun(S, S.plans.find(p => p.key === a), 'dev'); route = { screen:'run', id:r.key }; }, 'Прогон создан, версии кейсов зафиксированы'); },
+  planDone(a) { act(() => { const p = S.plans.find(x => x.key === a); const open = S.runs.filter(r => r.source === a && ['CREATED','IN_PROGRESS'].includes(r.status)); if (open.length) throw new Error('RUNS_NOT_FINISHED: ' + open.map(r => r.key).join(', ')); p.status = 'COMPLETED'; }, 'План завершён'); },
+  runSuite(a) { act(() => { const r = createRun(S, S.suites.find(s => s.name === a), 'dev', 'MANUAL'); try { startRun(S, r); } catch (e) { S.runs.shift(); S.seq.run--; throw e; } route = { screen:'run', id:r.key }; }, 'Прогон запущен, задание в очереди исполнителя'); },
+  startRun() { act(() => startRun(S, curRun()), 'Прогон запущен'); },
+  autotests() { const r = curRun(); toast('Исполнитель взял задание…'); setTimeout(() => act(() => executeAutotests(S, r), n => n ? 'Исполнитель записал результатов: ' + n : 'Невыполненных автоматизированных кейсов нет'), 700); },
+  pass(a) { act(() => recordResult(S, curRun(), curRun().results[a], 'PASSED', null, '', S.role), 'Результат записан'); },
+  fail(a) { const r = curRun(), x = r.results[a], n = versionOf(S, x).steps.length; const step = prompt('Номер упавшего шага (1–' + n + ')', String(n)); if (step == null) return; const actual = prompt('Фактический результат', '') || '';
+    act(() => { const k = Number(step); if (!(k >= 1 && k <= n)) throw new Error('VALIDATION_FAILED: шаг от 1 до ' + n); const before = S.defects.length; recordResult(S, r, x, 'FAILED', k, actual, S.role); return S.defects.length > before; }, created => created ? 'Провал записан, дефект заведён автоматически' : 'Провал записан, связан существующий дефект'); },
+  bulk() { const ids = picked(), st = $('#bulkStatus').value; if (!ids.length) return toast('Выберите кейсы', true);
+    act(() => ids.forEach(i => { const x = curRun().results[i]; if (curRun().status !== 'IN_PROGRESS') throw new Error('RUN_FINISHED'); x.status = st; x.failedStep = null; }), 'Статус «' + LABEL[st] + '» применён к ' + ids.length + (st === 'FAILED' ? '; дефекты заводятся по одному' : '')); },
+  completeRun() { act(() => finishRun(S, curRun(), 'COMPLETED'), 'Прогон завершён, результаты больше не изменяются'); },
+  abortRun() { if (confirm('Прервать прогон? Невыполненные кейсы останутся «Не выполнен».')) act(() => finishRun(S, curRun(), 'ABORTED'), 'Прогон прерван'); },
+  rerun() { act(() => { const r = rerun(S, curRun()); route = { screen:'run', id:r.key }; return r; }, r => 'Создан повторный прогон ' + r.key + ': ' + r.results.length + ' кейсов'); },
+  moveDefect(a) { act(() => moveDefect(S, S.defects.find(d => d.key === route.id), a, S.role, 'QA'), 'Статус изменён, запись добавлена в историю'); },
+  badMove() { act(() => moveDefect(S, S.defects.find(d => d.key === route.id), 'CLOSED', S.role, 'QA'), 'Дефект закрыт'); },
+  toggleTracker() { S.trackerUp = !S.trackerUp; if (S.trackerUp) flushOutbox(S); toast(S.trackerUp ? 'Task Tracker доступен, отложенные «Ошибки» отправлены' : 'Task Tracker недоступен: новые дефекты получат PENDING'); render(); },
+  refresh() { toast('Кэш сотрудников и подразделений обновлён'); },
+  fixBug() { if (S.simFail['TC-RM-03']) delete S.simFail['TC-RM-03']; else S.simFail['TC-RM-03'] = 3; render(); },
+};
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go],[data-open],[data-act]'); if (!t) return;
+  if (t.dataset.go) return go(t.dataset.go);
+  if (t.dataset.open) { e.preventDefault(); const [s, id] = t.dataset.open.split(/:(.+)/); return go(s, id); }
+  ACTIONS[t.dataset.act](t.dataset.arg);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click(); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'role') { S.role = e.target.value; if (route.screen === 'admin' && !can('admin') && S.role !== 'lead') route = { screen:'cases' }; render(); }
+  if (e.target.dataset.filter) { route.filter = { ...(route.filter || {}), [e.target.dataset.filter]: e.target.value }; render(); }
+});
+render();
+window.__qa = { S, VIEWS, ACTIONS, go };
+}
+if (typeof module !== 'undefined') module.exports = { seed, createRun, startRun, recordResult, executeAutotests, moveDefect, allowedMoves, finishRun, rerun, saveCase, copyCase, setCaseStatus, summary, flushOutbox, findCase, current };
+</script>
+</body>
+</html>
