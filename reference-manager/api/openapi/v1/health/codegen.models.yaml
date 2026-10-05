@@ -1,0 +1,9 @@
+package: healthv1
+
+generate:
+  models: true
+  
+output-options:
+  skip-prune: false
+  
+output: pkg/api/v1/health/models.gen.go

@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http"
+	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"

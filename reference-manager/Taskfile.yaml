@@ -2,10 +2,22 @@ version: '3'
 
 tasks:
   generate:
-    desc: Generate all artifacts
+    desc: Generate all artifacts (server, models, client)
     cmds:
-      - go tool oapi-codegen -config api/openapi/v1/codegen.server.yaml api/openapi/v1/openapi.yaml
-      - go tool oapi-codegen -config api/openapi/v1/codegen.models.yaml api/openapi/v1/openapi.yaml
+      - |
+        find api/openapi -name "openapi.yaml" -type f | while read file; do
+          dir=$(dirname "$file")
+          
+          configs=("codegen.server.yaml" "codegen.models.yaml" "codegen.client.yaml")
+          
+          for config_name in "${configs[@]}"; do
+            config="$dir/$config_name"
+            if [ -f "$config" ]; then
+              echo "Generating from $file with config $config_name"
+              go tool oapi-codegen -config "$config" "$file"
+            fi
+          done
+        done
 
   lint:
     desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
@@ -37,3 +49,28 @@ tasks:
     desc: Stop the local environment and remove associated volumes
     cmds:
       - docker compose -f deployments/docker-compose.yaml down -v
+
+  swagger:
+    desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
+    vars:
+      OPENAPI_FILES:
+        sh: find api/openapi -name "openapi.yaml"
+    cmds:
+      - |
+        URLS_JSON="["
+        for file in {{.OPENAPI_FILES}}; do
+          rel_path=${file#api/openapi/}
+          name=$(dirname "$rel_path")
+          URLS_JSON="${URLS_JSON}{\"url\":\"api/${rel_path}\",\"name\":\"${name}\"},"
+        done
+        URLS_JSON="${URLS_JSON%,}]"
+
+        echo -e "Swagger UI is running at: http://localhost:8080 \n"
+
+        docker run --rm \
+          -p 8080:8080 \
+          -v "$(pwd)/api/openapi:/usr/share/nginx/html/api" \
+          -e URLS_PRE_FILTER="true" \
+          -e URLS="$URLS_JSON" \
+          --name swagger_ui \
+          swaggerapi/swagger-ui

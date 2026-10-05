@@ -1,6 +1,0 @@
-package: apiv1
-
-generate:
-  models: true
-
-output: pkg/api/v1/models.gen.go
