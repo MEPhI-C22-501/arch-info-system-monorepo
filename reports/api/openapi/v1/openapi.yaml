@@ -1,0 +1,1273 @@
+openapi: 3.0.3
+info:
+  title: Reports API
+  version: 0.1.0-draft
+  description: >-
+    API подсистемы отчётности Reports. Контракт описан в reports/docs/130.api-contracts.md.
+    Статус draft снимается после согласования Q-REP-04 и Q-REP-05.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: reports
+  - name: views
+  - name: exports
+  - name: subscriptions
+  - name: notifications
+  - name: freshness
+  - name: etl
+  - name: embed
+  - name: health
+paths:
+  /reports:
+    get:
+      tags: [reports]
+      operationId: listReports
+      summary: Каталог отчётов, доступных пользователю
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Каталог
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportSummary'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /reports/{reportId}:
+    get:
+      tags: [reports]
+      operationId: getReport
+      summary: Описание отчёта
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Описание отчёта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /reports/{reportId}/query:
+    post:
+      tags: [reports]
+      operationId: queryReport
+      summary: Сформировать отчёт
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportQuery'
+      responses:
+        '200':
+          description: Результат отчёта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResult'
+        '400':
+          $ref: '#/components/responses/Malformed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          $ref: '#/components/responses/SourceNotLoaded'
+  /reports/{reportId}/drilldown:
+    post:
+      tags: [reports]
+      operationId: drilldownReport
+      summary: Следующий уровень детализации или исходные записи
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DrilldownQuery'
+      responses:
+        '200':
+          description: Уровень детализации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /views:
+    get:
+      tags: [views]
+      operationId: listViews
+      summary: Представления пользователя
+      parameters:
+        - name: reportId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReportIdValue'
+      responses:
+        '200':
+          description: Список представлений
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/View'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [views]
+      operationId: createView
+      summary: Сохранить представление
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ViewInput'
+      responses:
+        '201':
+          description: Представление создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/View'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /views/{viewId}:
+    parameters:
+      - $ref: '#/components/parameters/ViewId'
+    get:
+      tags: [views]
+      operationId: getView
+      summary: Одно представление
+      responses:
+        '200':
+          description: Представление
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/View'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [views]
+      operationId: updateView
+      summary: Изменить представление
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ViewInput'
+      responses:
+        '200':
+          description: Представление изменено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/View'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [views]
+      operationId: deleteView
+      summary: Удалить представление
+      responses:
+        '204':
+          description: Удалено
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /exports:
+    get:
+      tags: [exports]
+      operationId: listExports
+      summary: Задания выгрузки пользователя
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Список заданий
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExportJob'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [exports]
+      operationId: createExport
+      summary: Выгрузить отчёт или срез куба
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '201':
+          description: Файл сформирован синхронно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '202':
+          description: Задание поставлено в очередь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /exports/{exportId}:
+    get:
+      tags: [exports]
+      operationId: getExport
+      summary: Статус задания выгрузки
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Задание
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /exports/{exportId}/file:
+    get:
+      tags: [exports]
+      operationId: downloadExport
+      summary: Скачать файл выгрузки
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Файл
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+  /subscriptions:
+    get:
+      tags: [subscriptions]
+      operationId: listSubscriptions
+      summary: Подписки пользователя
+      responses:
+        '200':
+          description: Список подписок
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subscription'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [subscriptions]
+      operationId: createSubscription
+      summary: Создать регламентный отчёт
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionInput'
+      responses:
+        '201':
+          description: Подписка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /subscriptions/{subscriptionId}:
+    parameters:
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      tags: [subscriptions]
+      operationId: getSubscription
+      summary: Одна подписка
+      responses:
+        '200':
+          description: Подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [subscriptions]
+      operationId: updateSubscription
+      summary: Изменить подписку или её статус
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          description: Версия подписки для защиты от потерянного обновления
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionPatch'
+      responses:
+        '200':
+          description: Подписка изменена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [subscriptions]
+      operationId: deleteSubscription
+      summary: Завершить подписку
+      responses:
+        '204':
+          description: Подписка завершена, история сохранена
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /subscriptions/{subscriptionId}/deliveries:
+    get:
+      tags: [subscriptions]
+      operationId: listDeliveries
+      summary: Журнал доставок
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Доставки
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Delivery'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: Уведомления пользователя
+      parameters:
+        - name: unreadOnly
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Уведомления
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /notifications/{notificationId}:
+    patch:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Отметить уведомление прочитанным
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [read]
+              properties:
+                read:
+                  type: boolean
+      responses:
+        '200':
+          description: Уведомление изменено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /freshness:
+    get:
+      tags: [freshness]
+      operationId: getFreshness
+      summary: Актуальность данных по потокам
+      responses:
+        '200':
+          description: Состояние потоков
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Freshness'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /etl/batches:
+    get:
+      tags: [etl]
+      operationId: listBatches
+      summary: Журнал пакетов загрузки
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Source'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/BatchStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Пакеты
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Batch'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /etl/loads:
+    post:
+      tags: [etl]
+      operationId: startLoad
+      summary: Запустить загрузку потока вручную
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, stream]
+              properties:
+                source:
+                  $ref: '#/components/schemas/Source'
+                stream:
+                  type: string
+                  example: work-items
+                kind:
+                  type: string
+                  enum: [INCREMENTAL, FULL, RECONCILIATION]
+                  default: INCREMENTAL
+      responses:
+        '202':
+          description: Пакет создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /etl/reconciliations:
+    get:
+      tags: [etl]
+      operationId: listReconciliations
+      summary: Журнал сверок
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Source'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Сверки
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reconciliation'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /embed/iterations/{iterationId}:
+    get:
+      tags: [embed]
+      operationId: getEmbeddedIteration
+      summary: Карточка показателей итерации для встраивания в Task Tracker
+      parameters:
+        - name: iterationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Показатели итерации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IterationCard'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /health/livez:
+    get:
+      tags: [health]
+      operationId: livez
+      summary: Процесс жив
+      security: []
+      responses:
+        '200':
+          description: Жив
+  /health/readyz:
+    get:
+      tags: [health]
+      operationId: readyz
+      summary: Готов принимать запросы
+      security: []
+      responses:
+        '200':
+          description: Готов
+        '503':
+          description: Не готов, например БД недоступна
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ReportIdValue'
+    ViewId:
+      name: viewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ExportId:
+      name: exportId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+  responses:
+    Malformed:
+      description: Тело запроса не разбирается
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthenticated:
+      description: Нет токена или токен недействителен
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Нет роли или объект вне области данных
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Объект не найден или принадлежит другому пользователю
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Конфликт состояния
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Gone:
+      description: Срок хранения файла истёк
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unprocessable:
+      description: Недопустимый параметр или слишком большой результат
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tooLarge:
+              value:
+                type: https://reports.arch.local/errors/result-too-large
+                title: Результат слишком большой
+                status: 422
+                code: RESULT_TOO_LARGE
+                detail: 'Отчёт содержит 48 210 строк при пределе 10 000. Сформируйте выгрузку: POST /api/v1/exports'
+                correlationId: 0a9d7c1e-55b2-4c18-8d0e-7b6a5f4e3d21
+    SourceNotLoaded:
+      description: Источник отчёта ни разу не загружался
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    ReportIdValue:
+      type: string
+      pattern: '^R-(0[1-9]|1[01])$'
+      example: R-01
+    Source:
+      type: string
+      enum: [task-tracker, planning-system, reference-manager, qa-system]
+    BatchStatus:
+      type: string
+      enum: [STARTED, EXTRACTED, VALIDATED, LOADED, REJECTED, FAILED]
+    Problem:
+      type: object
+      required: [type, title, status, code, correlationId]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          enum: [MALFORMED_REQUEST, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, GONE, INVALID_PARAMETER, RESULT_TOO_LARGE, SOURCE_NOT_LOADED]
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        correlationId:
+          type: string
+    ReportSummary:
+      type: object
+      required: [reportId, name, question, contour, sources]
+      properties:
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        name:
+          type: string
+        question:
+          type: string
+        contour:
+          type: string
+          enum: [OPERATIONAL, ANALYTICAL, BOTH]
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+    ReportDefinition:
+      allOf:
+        - $ref: '#/components/schemas/ReportSummary'
+        - type: object
+          required: [version, parameters, slices, measures]
+          properties:
+            version:
+              type: integer
+            parameters:
+              type: array
+              items:
+                type: object
+                required: [key, title, type, required]
+                properties:
+                  key:
+                    type: string
+                  title:
+                    type: string
+                  type:
+                    type: string
+                    enum: [date, dateRange, projectIds, iterationIds, employeeIds, epicIds, enum]
+                  required:
+                    type: boolean
+            slices:
+              type: array
+              items:
+                type: string
+              example: [employee, project, iteration, epic, week]
+            measures:
+              type: array
+              items:
+                $ref: '#/components/schemas/Measure'
+    Measure:
+      type: object
+      required: [key, title, formula]
+      properties:
+        key:
+          type: string
+          pattern: '^M-[0-9]{2}$'
+        title:
+          type: string
+        formula:
+          type: string
+        unit:
+          type: string
+    ReportQuery:
+      type: object
+      required: [params]
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+          example:
+            periodFrom: '2026-09-29'
+            periodTo: '2026-10-03'
+        slice:
+          type: array
+          items:
+            type: string
+        compareWithPrevious:
+          type: boolean
+          default: false
+        viewId:
+          type: string
+          format: uuid
+    DrilldownQuery:
+      allOf:
+        - $ref: '#/components/schemas/ReportQuery'
+        - type: object
+          required: [path]
+          properties:
+            path:
+              type: array
+              description: Значения разрезов от верхнего уровня до текущего
+              items:
+                type: object
+                required: [slice, id]
+                properties:
+                  slice:
+                    type: string
+                  id:
+                    type: string
+                    nullable: true
+    ReportResult:
+      type: object
+      required: [reportId, reportVersion, generatedAt, freshness, columns, rows]
+      properties:
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        reportVersion:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+        freshness:
+          type: array
+          items:
+            $ref: '#/components/schemas/Freshness'
+        columns:
+          type: array
+          items:
+            type: object
+            required: [key, title, type]
+            properties:
+              key:
+                type: string
+              title:
+                type: string
+              type:
+                type: string
+                enum: [dimension, measure]
+              formula:
+                type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        totals:
+          type: object
+          additionalProperties: true
+        comparison:
+          type: object
+          nullable: true
+          additionalProperties: true
+        notes:
+          type: array
+          items:
+            type: string
+    View:
+      allOf:
+        - $ref: '#/components/schemas/ViewInput'
+        - type: object
+          required: [viewId, createdAt]
+          properties:
+            viewId:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
+    ViewInput:
+      type: object
+      required: [reportId, name, query]
+      properties:
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        name:
+          type: string
+          maxLength: 120
+        query:
+          $ref: '#/components/schemas/ReportQuery'
+    ExportRequest:
+      type: object
+      required: [format]
+      properties:
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        query:
+          $ref: '#/components/schemas/ReportQuery'
+        cube:
+          type: object
+          description: Срез куба вместо отчёта
+          properties:
+            cubeName:
+              type: string
+            measures:
+              type: array
+              items:
+                type: string
+            dimensions:
+              type: array
+              items:
+                type: string
+            filters:
+              type: object
+              additionalProperties: true
+        format:
+          type: string
+          enum: [xlsx, csv]
+    ExportJob:
+      type: object
+      required: [exportId, status, format, createdAt]
+      properties:
+        exportId:
+          type: string
+          format: uuid
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        status:
+          type: string
+          enum: [CREATED, QUEUED, RUNNING, COMPLETED, FAILED, DELIVERED, EXPIRED]
+        format:
+          type: string
+          enum: [xlsx, csv]
+        rowCount:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+    SubscriptionInput:
+      type: object
+      required: [reportId, query, schedule, format, recipients]
+      properties:
+        reportId:
+          $ref: '#/components/schemas/ReportIdValue'
+        query:
+          $ref: '#/components/schemas/ReportQuery'
+        schedule:
+          type: string
+          description: Cron-выражение в часовом поясе стенда
+          example: '0 9 * * 1'
+        format:
+          type: string
+          enum: [xlsx, csv]
+        recipients:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            description: sub получателя
+        validUntil:
+          type: string
+          format: date
+          nullable: true
+    SubscriptionPatch:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, COMPLETED]
+        schedule:
+          type: string
+        recipients:
+          type: array
+          items:
+            type: string
+        validUntil:
+          type: string
+          format: date
+          nullable: true
+    Subscription:
+      allOf:
+        - $ref: '#/components/schemas/SubscriptionInput'
+        - type: object
+          required: [subscriptionId, status, version]
+          properties:
+            subscriptionId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [ACTIVE, PAUSED, COMPLETED]
+            nextRunAt:
+              type: string
+              format: date-time
+              nullable: true
+            version:
+              type: string
+    Delivery:
+      type: object
+      required: [runAt, status]
+      properties:
+        runAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [DELIVERED, FAILED]
+        snapshotId:
+          type: string
+          format: uuid
+          nullable: true
+        delivered:
+          type: array
+          items:
+            type: string
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [recipient, reason]
+            properties:
+              recipient:
+                type: string
+              reason:
+                type: string
+    Notification:
+      type: object
+      required: [notificationId, kind, createdAt]
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [EXPORT_READY, SCHEDULED_REPORT_READY, RECIPIENT_SKIPPED, SUBSCRIPTION_PAUSED]
+        exportId:
+          type: string
+          format: uuid
+          nullable: true
+        snapshotId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+    Freshness:
+      type: object
+      required: [source, stream, state]
+      properties:
+        source:
+          $ref: '#/components/schemas/Source'
+        stream:
+          type: string
+        dataAsOf:
+          type: string
+          format: date-time
+          nullable: true
+        lagSeconds:
+          type: integer
+          nullable: true
+        thresholdSeconds:
+          type: integer
+        state:
+          type: string
+          enum: [UNKNOWN, FRESH, STALE]
+    Batch:
+      type: object
+      required: [batchId, source, stream, kind, status, startedAt]
+      properties:
+        batchId:
+          type: integer
+        source:
+          $ref: '#/components/schemas/Source'
+        stream:
+          type: string
+        kind:
+          type: string
+          enum: [INCREMENTAL, FULL, RECONCILIATION]
+        status:
+          $ref: '#/components/schemas/BatchStatus'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rowsExtracted:
+          type: integer
+        rowsLoaded:
+          type: integer
+        error:
+          type: string
+          nullable: true
+    Reconciliation:
+      type: object
+      required: [reconciliationId, source, stream, status]
+      properties:
+        reconciliationId:
+          type: integer
+        source:
+          $ref: '#/components/schemas/Source'
+        stream:
+          type: string
+        sourceCount:
+          type: integer
+        dwhCount:
+          type: integer
+        missing:
+          type: integer
+        extra:
+          type: integer
+        fixed:
+          type: integer
+        status:
+          type: string
+          enum: [STARTED, COMPLETED, FAILED]
+    IterationCard:
+      type: object
+      required: [iterationId, freshness]
+      properties:
+        iterationId:
+          type: string
+        completedShare:
+          type: number
+          nullable: true
+          description: M-06, доля
+        passRate:
+          type: number
+          nullable: true
+          description: M-14, доля
+        defectDensity:
+          type: number
+          nullable: true
+          description: M-16, дефектов на 10 завершённых задач
+        reopenedRate:
+          type: number
+          nullable: true
+          description: M-17, доля
+        freshness:
+          type: array
+          items:
+            $ref: '#/components/schemas/Freshness'

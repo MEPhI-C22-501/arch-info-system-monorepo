@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports — прототип</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --text: #1d2330; --muted: #5f6b7a; --line: #dde1e7;
+    --accent: #2f5bd3; --ok: #1f7a4d; --warn: #9a6400; --warn-bg: #fff6df; --bad: #b42318; --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  header { background: #1d2330; color: #fff; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  header b { margin-right: 8px; }
+  header nav { display: flex; flex-wrap: wrap; gap: 4px; }
+  header nav button { background: none; border: 0; color: #cfd6e4; padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+  header nav button[aria-current="page"], header nav button:hover { background: #343c4f; color: #fff; }
+  header .tools { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  header select { font: inherit; padding: 4px 6px; border-radius: 6px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 6px; border-radius: 10px; background: #eef1f6; color: var(--muted); margin-right: 4px; }
+  .layout { display: grid; grid-template-columns: 240px 1fr; gap: 12px; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 2px; }
+  input, select.f { width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; font: inherit; }
+  .btn.sec { background: #eef1f6; color: var(--text); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  .fresh { font-size: 13px; color: var(--muted); }
+  .banner { padding: 8px 12px; border-radius: 6px; margin: 8px 0; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .banner.bad { background: var(--bad-bg); color: var(--bad); }
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: var(--panel); }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; white-space: nowrap; }
+  th { font-weight: 600; background: #fafbfc; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 600; background: #fafbfc; }
+  .unset { font-style: italic; color: var(--muted); }
+  .over { color: var(--bad); }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); margin-bottom: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .tile .v { font-size: 22px; font-weight: 600; }
+  .tile .l { color: var(--muted); font-size: 12px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .bars div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
+  .bars span { display: block; width: 100%; border-radius: 3px 3px 0 0; }
+  .skeleton { background: linear-gradient(90deg, #eceff3, #f6f7f9, #eceff3); height: 14px; border-radius: 4px; margin: 8px 0; }
+  .drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 12px; }
+  .crumbs button { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+  .muted { color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <b>Reports</b>
+  <nav id="nav" aria-label="Разделы"></nav>
+  <div class="tools">
+    <label for="role" style="color:#cfd6e4;margin:0">Роль</label>
+    <select id="role">
+      <option value="RL-01">RL-01 Руководитель проекта</option>
+      <option value="RL-02">RL-02 Тимлид</option>
+      <option value="RL-03">RL-03 QA-лид</option>
+      <option value="RL-04">RL-04 Участник</option>
+      <option value="RL-05">RL-05 Аналитик</option>
+      <option value="RL-06">RL-06 Администратор</option>
+    </select>
+    <label for="state" style="color:#cfd6e4;margin:0">Состояние</label>
+    <select id="state">
+      <option value="ok">Данные актуальны</option>
+      <option value="stale">Данные устарели</option>
+      <option value="loading">Загрузка</option>
+      <option value="empty">Нет данных</option>
+      <option value="error">Ошибка</option>
+    </select>
+  </div>
+</header>
+<main id="app"></main>
+
+<script>
+/* Синтетические данные прототипа. Значения согласованы с примерами историй 080. */
+const REPORTS = [
+  { id: "R-01", name: "Трудозатраты", q: "Кто, когда и сколько времени потратил", group: "Время и ресурсы", contour: "аналитический", roles: ["RL-01","RL-02","RL-04","RL-05"] },
+  { id: "R-02", name: "Потребность в сотрудниках", q: "Кого и сколько не хватает", group: "Время и ресурсы", contour: "аналитический", roles: ["RL-01","RL-02","RL-05"] },
+  { id: "R-03", name: "Назначенные задачи", q: "Что и на кого назначено", group: "Задачи и сроки", contour: "оперативный", roles: ["RL-01","RL-02","RL-03","RL-04","RL-05"] },
+  { id: "R-04", name: "Календарные сроки", q: "Что просрочено и что под риском", group: "Задачи и сроки", contour: "оперативный", roles: ["RL-01","RL-02","RL-03","RL-04","RL-05"] },
+  { id: "R-05", name: "Динамика дефектов", q: "Открытые и закрытые за период", group: "Качество", contour: "аналитический", roles: ["RL-01","RL-02","RL-03","RL-05"] },
+  { id: "R-06", name: "План-факт и бюджет", q: "Успеем ли и уложимся ли", group: "Время и ресурсы", contour: "аналитический", roles: ["RL-01","RL-02","RL-05"] },
+  { id: "R-07", name: "Выполнение тест-плана", q: "Пройдено, провалено, заблокировано", group: "Качество", contour: "оперативный", roles: ["RL-01","RL-02","RL-03","RL-05"] },
+  { id: "R-08", name: "Дефекты", q: "Распределение по статусам и серьёзности", group: "Качество", contour: "оперативный", roles: ["RL-01","RL-02","RL-03","RL-04","RL-05"] },
+  { id: "R-09", name: "Качество итерации", q: "Pass rate, defect density, reopened rate", group: "Качество", contour: "аналитический", roles: ["RL-01","RL-02","RL-03","RL-05"] },
+  { id: "R-10", name: "Здоровье процесса", q: "Где задачи застревают", group: "Задачи и сроки", contour: "аналитический", roles: ["RL-01","RL-02","RL-05"] },
+  { id: "R-11", name: "Точность оценок", q: "Насколько можно доверять оценкам", group: "Время и ресурсы", contour: "аналитический", roles: ["RL-01","RL-02","RL-04","RL-05"] }
+];
+const TIME = [
+  { emp: "Иванова А.", unit: "Backend", role: "Backend-разработчик", days: [8, 7.5, 8, 6, 8] },
+  { emp: "Петров Б.", unit: "Backend", role: "Backend-разработчик", days: [6, 0, 8, 8, 4] },
+  { emp: "Сидорова В.", unit: "QA", role: "Тестировщик", days: [8, 8, 8, 8, 8] },
+  { emp: null, unit: "—", role: "—", days: [0, 2, 0, 0, 0] }
+];
+const NAV = [
+  ["catalog", "Каталог"], ["ops", "Оперативный дашборд"], ["planfact", "План-факт"], ["quality", "Качество"],
+  ["cube", "Куб"], ["exports", "Выгрузки"], ["subs", "Подписки"], ["fresh", "Актуальность"], ["notes", "Уведомления (2)"]
+];
+const ACCESS = {
+  catalog: ["RL-01","RL-02","RL-03","RL-04","RL-05"], ops: ["RL-01","RL-02","RL-03","RL-04","RL-05"],
+  planfact: ["RL-01","RL-02","RL-05"], quality: ["RL-01","RL-02","RL-03","RL-05"], cube: ["RL-01","RL-05"],
+  exports: ["RL-01","RL-02","RL-03","RL-04","RL-05"], subs: ["RL-01","RL-02","RL-03","RL-05","RL-06"],
+  fresh: ["RL-01","RL-02","RL-03","RL-04","RL-05","RL-06"], notes: ["RL-01","RL-02","RL-03","RL-04","RL-05","RL-06"]
+};
+/* Данные отчётов R-02…R-11: столбцы, строки, итог, график. «null» в строке — «не задано». */
+const DATA = {
+  "R-02": { cols: ["Проектная роль", "Потребность, ч", "Назначено, ч", "Дефицит, ч", "Чел.-нед."],
+    rows: [["Backend-разработчик", 160, 120, 40, 1], ["Тестировщик", 80, 80, 0, 0], ["Аналитик", 40, 16, 24, 0.6]],
+    total: ["Итого", 280, 216, 64, 1.6], chart: { labels: ["Backend", "QA", "Аналитик"], a: [160, 80, 40], b: [120, 80, 16], la: "потребность", lb: "назначено" } },
+  "R-03": { cols: ["Исполнитель", "Бэклог", "В работе", "На проверке", "Завершена", "План, ч"],
+    rows: [["Иванова А.", 1, 3, 1, 5, 64], ["Петров Б.", 2, 3, 1, 4, 58], ["Сидорова В.", 0, 2, 1, 5, 40], [null, 2, 0, 0, 0, 56]],
+    total: ["Итого", 5, 8, 3, 14, 218], chart: { labels: ["Иванова", "Петров", "Сидорова", "не задано"], a: [10, 10, 8, 2], b: [5, 4, 5, 0], la: "всего задач", lb: "завершено" } },
+  "R-04": { cols: ["Задача", "Исполнитель", "Срок", "Завершена", "Отклонение, дн."],
+    rows: [["TT-412 Экспорт итерации", "Петров Б.", "04.10.2026", "—", "+1"], ["TT-398 Фильтр по эпику", null, "02.10.2026", "—", "+3"], ["TT-377 Карточка задачи", "Иванова А.", "30.09.2026", "29.09.2026", "−1"], ["TT-420 Импорт Excel", "Сидорова В.", null, "—", "срок не задан"]],
+    chart: { labels: ["В срок", "Просрочено", "Без срока"], a: [24, 3, 3], b: [0, 0, 0], la: "задач", lb: "" } },
+  "R-05": { cols: ["Неделя", "Открыто", "Закрыто", "Остаток на конец"],
+    rows: [["Нед. 37", 12, 9, 21], ["Нед. 38", 8, 10, 19], ["Нед. 39", 5, 9, 15], ["Нед. 40", 4, 6, 13]],
+    total: ["Итого", 29, 34, 13], chart: { labels: ["Нед. 37", "Нед. 38", "Нед. 39", "Нед. 40"], a: [12, 8, 5, 4], b: [9, 10, 9, 6], la: "открыто", lb: "закрыто" } },
+  "R-06": { cols: ["Сотрудник", "План, ч", "Факт, ч", "Остаток, ч", "Загрузка"],
+    rows: [["Иванова А.", 160, 152.5, 12, "95%"], ["Петров Б.", 160, 118, 46, "74%"], ["Сидорова В.", 120, 128, -8, "107%"]],
+    total: ["Итого", 440, 398.5, 50, "91%"], chart: { labels: ["Нед. 37", "Нед. 38", "Нед. 39", "Нед. 40"], a: [120, 130, 125, 130], b: [110, 128, 140, 96], la: "план", lb: "факт" } },
+  "R-07": { cols: ["Результат", "Кейсов", "Доля"],
+    rows: [["PASSED", 40, "80%"], ["FAILED", 5, "10%"], ["BLOCKED", 3, "6%"], ["SKIPPED", 0, "0%"], ["NOT_RUN", 2, "4%"]],
+    total: ["Итого · pass rate 88,89% · выполнение 96%", 50, "100%"], chart: { labels: ["PASSED", "FAILED", "BLOCKED", "NOT_RUN"], a: [40, 5, 3, 2], b: [0, 0, 0, 0], la: "кейсов", lb: "" } },
+  "R-08": { cols: ["Серьёзность", "NEW", "OPEN", "IN_PROGRESS", "READY_FOR_TEST", "REOPENED", "Всего открыто"],
+    rows: [["Blocker", 0, 1, 0, 0, 0, 1], ["Critical", 1, 0, 1, 1, 1, 4], ["Major", 2, 1, 2, 0, 0, 5], ["Minor", 1, 0, 1, 1, 0, 3]],
+    total: ["Итого", 4, 2, 4, 2, 1, 13], chart: { labels: ["Blocker", "Critical", "Major", "Minor"], a: [1, 4, 5, 3], b: [0, 0, 0, 0], la: "открыто", lb: "" } },
+  "R-09": { cols: ["Итерация", "Pass rate", "Defect density", "Reopened rate", "Доля завершённых"],
+    rows: [["Итерация 5", "81,00%", "2,8", "15%", "78%"], ["Итерация 6", "84,00%", "2,4", "13%", "83%"], ["Итерация 7", "88,89%", "2,1", "11%", "87%"]],
+    chart: { labels: ["Итер. 5", "Итер. 6", "Итер. 7"], a: [81, 84, 89], b: [78, 83, 87], la: "pass rate, %", lb: "завершено, %" },
+    note: "Разрез «релиз» недоступен: понятие релиза не согласовано (Q-REP-08)." },
+  "R-10": { cols: ["Статус", "Медиана, дн.", "85-й перцентиль, дн.", "Возвратов"],
+    rows: [["Бэклог", 4.0, 11.0, 0], ["В работе", 2.5, 6.0, 3], ["На проверке", 1.5, 5.0, 4]],
+    total: ["Cycle time", 4.5, 10.0, 7], chart: { labels: ["Нед. 37", "Нед. 38", "Нед. 39", "Нед. 40"], a: [9, 11, 8, 12], b: [6, 7, 7, 8], la: "throughput", lb: "WIP" },
+    note: "Без движения дольше 5 дней: TT-398 (6 дн., «На проверке»)." },
+  "R-11": { cols: ["Вид задачи", "Задач", "Медиана отклонения", "Перерасход > 20%", "Коэффициент"],
+    rows: [["Задача", 14, "+12%", "4 из 14", 1.12], ["Ошибка", 6, "+35%", "3 из 6", 1.35]],
+    total: ["Итого", 20, "+18%", "7 из 20", 1.18], chart: { labels: ["Задача", "Ошибка"], a: [112, 135], b: [100, 100], la: "факт к плану, %", lb: "план" },
+    note: "Без оценки — 3 задачи, в расчёт не входят." }
+};
+let screen = "catalog", report = "R-01", slice = "emp", drill = [], viewMode = "table", compare = false;
+
+const $ = (s) => document.querySelector(s);
+const role = () => $("#role").value;
+const state = () => $("#state").value;
+const h = (n) => n.toFixed(2).replace(".", ",");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function freshness() {
+  if (state() === "stale") return '<div class="banner warn" role="status">Данные устарели: Task Tracker актуален на 05.10.2026 10:00, задержка 2 ч. Отчёт сформирован по последним загруженным данным.</div>';
+  return '<p class="fresh">Сформировано 05.10.2026 12:04 · Task Tracker на 12:00 · Planning System на 11:00 · Reference Manager на 11:30 · QA System на 12:03</p>';
+}
+function guard(body) {
+  if (state() === "loading") return '<div class="card" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></div>';
+  if (state() === "empty") return '<div class="card">По заданным параметрам данных нет. Параметры: период 29.09–03.10.2026, проект «Трекер задач».</div>';
+  if (state() === "error") return '<div class="banner bad" role="alert">Отчёт не сформирован: сервис недоступен. <button class="btn sec" onclick="render()">Повторить</button></div>';
+  return freshness() + body;
+}
+function denied() { return '<div class="banner bad" role="alert">Нет доступа: этот раздел закрыт для вашей роли. Сервер вернул 403.</div>'; }
+
+function renderNav() {
+  $("#nav").innerHTML = NAV.filter(([k]) => ACCESS[k].includes(role()))
+    .map(([k, t]) => `<button data-k="${k}" ${k === screen ? 'aria-current="page"' : ""}>${t}</button>`).join("");
+  $("#nav").querySelectorAll("button").forEach((b) => b.onclick = () => { screen = b.dataset.k; drill = []; render(); });
+}
+
+const SCREENS = {
+  catalog() {
+    const list = REPORTS.filter((r) => r.roles.includes(role()));
+    if (!list.length) return '<h1>Каталог отчётов</h1><div class="card">Вам не назначены отчёты, обратитесь к администратору.</div>';
+    const groups = [...new Set(list.map((r) => r.group))];
+    return '<h1>Каталог отчётов</h1><p class="sub">SCR-01 · отчёты, доступные роли ' + role() + '</p>' +
+      groups.map((g) => `<h3>${g}</h3><div class="grid">` + list.filter((r) => r.group === g).map((r) =>
+        `<div class="card"><h3><button class="link" onclick="openReport('${r.id}')">${r.id} ${r.name}</button></h3>
+         <div class="muted">${r.q}</div><div style="margin-top:6px"><span class="tag">${r.contour}</span></div></div>`).join("") + "</div>").join("") +
+      '<h3>Мои представления</h3><div class="card"><button class="link" onclick="openReport(\'R-01\')">Мои часы за текущую неделю</button> <span class="tag">R-01</span></div>';
+  },
+  report() {
+    const r = REPORTS.find((x) => x.id === report);
+    if (!r.roles.includes(role())) return denied();
+    return `<h1>${r.id} ${r.name}</h1><p class="sub">SCR-02 · ${r.q} · контур: ${r.contour}</p>
+      <div class="layout">${paramsPanel()}<div>${guard(modeSwitch() + (report === "R-01" ? r01Body() : genericBody(DATA[report])))}</div></div>`;
+  },
+  ops() {
+    return '<h1>Оперативный дашборд итерации</h1><p class="sub">SCR-04 · читается из read-replica · обновление раз в минуту</p>' + guard(
+      `<div class="tiles">${tile("30", "задач в итерации")}${tile("11", "в работе")}${tile("14", "завершено")}${tile('<span class="over">3</span>', "просрочено")}${tile("86,50 ч", "остаток")}</div>
+      <div class="tbl"><table><thead><tr><th>Статус</th><th class="n">Задач</th><th class="n">План, ч</th></tr></thead><tbody>
+      <tr><td>Бэклог</td><td class="n">5</td><td class="n">40,00</td></tr><tr><td>В работе</td><td class="n">8</td><td class="n">64,00</td></tr>
+      <tr><td>На проверке</td><td class="n">3</td><td class="n">18,00</td></tr><tr><td>Завершена</td><td class="n">14</td><td class="n">96,00</td></tr>
+      <tr class="total"><td>Итого</td><td class="n">30</td><td class="n">218,00</td></tr></tbody></table></div>
+      <h3>Просроченные</h3><div class="tbl"><table><thead><tr><th>Задача</th><th>Исполнитель</th><th>Срок</th><th class="n">Отклонение</th></tr></thead><tbody>
+      <tr><td>TT-412 Экспорт итерации</td><td>Петров Б.</td><td>04.10.2026</td><td class="n over">+1 дн.</td></tr>
+      <tr><td>TT-398 Фильтр по эпику</td><td><span class="unset">не задано</span></td><td>02.10.2026</td><td class="n over">+3 дн.</td></tr></tbody></table></div>`);
+  },
+  planfact() {
+    const money = role() !== "RL-02";
+    return '<h1>План-факт: Трекер задач</h1><p class="sub">SCR-05 · R-06 · прогноз — Planning System, сверочный прогноз — Reports</p>' + guard(
+      `<div class="tiles">${tile("1 240,00 ч", "план")}${tile("812,50 ч", "факт")}${tile("427,50 ч", "остаток")}${tile("66%", "выполнено")}
+      ${tile('14.11.2026 <span class="tag">PARTIAL</span>', "прогноз Planning System")}${tile("21.11.2026", "сверочный прогноз по темпу 4 нед.")}
+      ${money ? tile('<span class="over">+6%</span>', "отклонение бюджета") : tile('<span class="over">+74,00 ч</span>', "отклонение бюджета, часы")}</div>
+      <div class="banner warn">Прогноз Planning System неполный: нет нормы рабочего времени для 2 сотрудников.</div>
+      <h3>План и факт по неделям, ч</h3>` + bars([[120,110],[130,128],[125,140],[130,96]], ["Нед. 37","Нед. 38","Нед. 39","Нед. 40"]));
+  },
+  quality() {
+    return '<h1>Качество итерации 7</h1><p class="sub">SCR-06 · R-07, R-05, R-09 · данные QA System</p>' + guard(
+      `<div class="tiles">${tile("88,89%", "pass rate (было 84,00%)")}${tile("96%", "выполнение плана")}${tile("2,1", "дефектов на 10 задач")}${tile("11%", "reopened rate")}</div>
+      <div class="tbl"><table><thead><tr><th>Результат</th><th class="n">Кейсов</th></tr></thead><tbody>
+      <tr><td>PASSED</td><td class="n">40</td></tr><tr><td>FAILED</td><td class="n">5</td></tr><tr><td>BLOCKED</td><td class="n">3</td></tr>
+      <tr><td>NOT_RUN</td><td class="n">2</td></tr><tr class="total"><td>Итого</td><td class="n">50</td></tr></tbody></table></div>
+      <h3>Дефекты по неделям: открыто и закрыто</h3>` + bars([[12,9],[8,10],[5,9],[4,6]], ["Нед. 37","Нед. 38","Нед. 39","Нед. 40"]) +
+      '<p class="muted">Разрез «релиз» недоступен: понятие релиза не согласовано (Q-REP-08).</p>');
+  },
+  cube() {
+    return '<h1>Куб трудозатрат</h1><p class="sub">SCR-07 · в рабочей версии — Apache Superset поверх Cube</p>' + guard(
+      `<div class="row"><span class="tag">Мера: факт, ч</span><span class="tag">Строки: проект</span><span class="tag">Столбцы: месяц</span></div>
+      <div class="tbl"><table><thead><tr><th>Проект</th><th class="n">Август</th><th class="n">Сентябрь</th><th class="n">Октябрь</th></tr></thead><tbody>
+      <tr><td>Трекер задач</td><td class="n">1 920,00</td><td class="n">2 104,50</td><td class="n">412,00</td></tr>
+      <tr><td>Справочники</td><td class="n">640,00</td><td class="n">702,00</td><td class="n">96,00</td></tr></tbody></table></div>
+      <div class="row"><button class="btn" onclick="screen='exports';render()">Выгрузить срез</button></div>`);
+  },
+  exports() {
+    return '<h1>Выгрузки</h1><p class="sub">SCR-08 · файлы хранятся 3 дня, скачивание — через API Reports с проверкой прав</p>' + guard(
+      `<div class="tbl"><table><thead><tr><th>Отчёт</th><th>Формат</th><th>Статус</th><th>Создано</th><th>Истекает</th><th></th></tr></thead><tbody>
+      <tr><td>R-01, сентябрь</td><td>xlsx</td><td>DELIVERED</td><td>05.10 11:40</td><td>08.10 11:40</td><td><button class="btn sec">Скачать</button></td></tr>
+      <tr><td>Куб, проекты × месяц</td><td>csv</td><td>RUNNING</td><td>05.10 12:01</td><td>—</td><td class="muted">формируется…</td></tr>
+      <tr><td>R-05, квартал</td><td>xlsx</td><td><span class="over">FAILED</span></td><td>04.10 18:00</td><td>—</td><td><button class="btn sec">Повторить</button></td></tr>
+      <tr><td>R-06, август</td><td>xlsx</td><td class="muted">EXPIRED</td><td>01.10 09:00</td><td>04.10 09:00</td><td class="muted">срок истёк</td></tr></tbody></table></div>`);
+  },
+  subs() {
+    if (role() === "RL-06") return '<h1>Подписки</h1><p class="sub">Администратор видит статусы подписок</p><div class="card">Активных подписок: 7, приостановленных: 1.</div>';
+    return '<h1>Подписки</h1><p class="sub">SCR-09 · права получателей проверяются при каждой доставке</p>' + guard(
+      `<div class="layout"><div class="card"><label for="s1">Отчёт</label><select class="f" id="s1"><option>R-06 План-факт</option></select>
+      <label for="s2">Расписание</label><select class="f" id="s2"><option>Еженедельно, понедельник 09:00</option></select>
+      <label for="s3">Получатели</label><input id="s3" value="я, Смирнов Д. (тимлид)">
+      <div class="row"><button class="btn" onclick="alert('Подписка ACTIVE')">Сохранить</button></div></div>
+      <div class="tbl"><table><thead><tr><th>Доставка</th><th>Результат</th></tr></thead><tbody>
+      <tr><td>29.09 09:00</td><td>Доставлено 2 получателям</td></tr>
+      <tr><td>06.10 09:00</td><td class="over">Смирнов Д. пропущен: нет доступа к проекту</td></tr></tbody></table></div></div>`);
+  },
+  fresh() {
+    const admin = role() === "RL-06";
+    const st = state() === "stale";
+    return '<h1>Актуальность данных</h1><p class="sub">SCR-10</p>' +
+      `<div class="tbl"><table><thead><tr><th>Источник</th><th>Поток</th><th>Актуален на</th><th class="n">Лаг</th><th class="n">Порог</th><th>Состояние</th>${admin ? "<th></th>" : ""}</tr></thead><tbody>
+      ${frow("Task Tracker", "задачи, REST", st ? "10:00" : "12:00", st ? "2 ч 04 мин" : "4 мин", "15 мин", st, admin)}
+      ${frow("QA System", "прогоны, Kafka", "12:03", "1 мин", "2 мин", false, admin)}
+      ${frow("Planning System", "партия экспорта", "11:00", "1 ч 04 мин", "1 ч", false, admin)}
+      ${frow("Reference Manager", "сотрудники", "11:30", "34 мин", "1 ч", false, admin)}</tbody></table></div>` +
+      (admin ? '<h3>Журнал пакетов</h3><div class="tbl"><table><thead><tr><th>Пакет</th><th>Статус</th><th class="n">Строк</th><th>Причина</th></tr></thead><tbody><tr><td>tt-2026-10-05-11</td><td class="over">FAILED</td><td class="n">1 500</td><td>503 на странице 4 после 3 повторов</td></tr><tr><td>rm-2026-10-05-11</td><td>LOADED</td><td class="n">312</td><td>—</td></tr></tbody></table></div>' : "");
+  },
+  notes() {
+    return '<h1>Уведомления</h1><p class="sub">SCR-11</p><div class="card">Выгрузка «R-01, сентябрь» готова · 05.10 11:41 <button class="btn sec" onclick="screen=\'exports\';render()">Открыть</button></div>' +
+      '<div class="card" style="margin-top:8px">Регламентный отчёт R-06: получатель Смирнов Д. пропущен · 06.10 09:00</div>';
+  }
+};
+
+function paramsPanel() {
+  const canCompare = ["R-05", "R-09", "R-10", "R-11"].includes(report);
+  return `<div class="card"><label for="p1">Период</label><select class="f" id="p1"><option>Текущая неделя</option><option>Прошлая неделя</option><option>Последние 30 дней</option></select>
+    <label for="p2">Проект</label><select class="f" id="p2"><option>Трекер задач</option><option>Все доступные</option></select>
+    <label for="p3">Итерация</label><select class="f" id="p3"><option>Итерация 7</option><option>Итерация 6</option></select>
+    <div class="row"><button class="btn" onclick="render()">Сформировать</button></div>
+    <div class="row"><button class="btn sec" onclick="alert('Представление сохранено')">Сохранить представление</button>
+    <button class="btn sec" onclick="screen='exports';render()">Выгрузить</button>
+    ${role() !== "RL-04" ? '<button class="btn sec" onclick="screen=\'subs\';render()">Подписаться</button>' : ""}
+    ${canCompare ? `<button class="btn sec" aria-pressed="${compare}" onclick="compare=!compare;render()">${compare ? "Убрать сравнение" : "Сравнить с прошлым периодом"}</button>` : ""}</div></div>`;
+}
+function modeSwitch() {
+  return `<div class="row" role="group" aria-label="Представление результата">
+    <button class="btn ${viewMode === "table" ? "" : "sec"}" aria-pressed="${viewMode === "table"}" onclick="viewMode='table';render()">Таблица</button>
+    <button class="btn ${viewMode === "chart" ? "" : "sec"}" aria-pressed="${viewMode === "chart"}" onclick="viewMode='chart';render()">График</button></div>`;
+}
+function cell(v) {
+  if (v === null) return '<td class="unset">не задано</td>';
+  if (typeof v === "number") return `<td class="n${v < 0 ? " over" : ""}">${Number.isInteger(v) ? v : h(v)}</td>`;
+  const bad = /^\+\d/.test(v) && !/%/.test(v);
+  return `<td${bad ? ' class="n over"' : ""}>${esc(v)}</td>`;
+}
+function genericBody(d) {
+  const cmp = compare ? '<div class="banner warn">Сравнение с прошлым периодом той же длины: изменения показаны в подсказке строки. В прототипе данные прошлого периода не загружены.</div>' : "";
+  const note = d.note ? `<p class="muted">${d.note}</p>` : "";
+  if (viewMode === "chart") {
+    const c = d.chart;
+    return cmp + bars(c.a.map((v, i) => [v, c.b[i]]), c.labels) +
+      `<p class="muted">Светлый столбец — ${c.la}${c.lb ? ", тёмный — " + c.lb : ""}. Те же значения — в таблице.</p>` + note;
+  }
+  return cmp + `<div class="tbl"><table><thead><tr>${d.cols.map((c, i) => `<th${i ? ' class="n"' : ""}>${c}</th>`).join("")}</tr></thead><tbody>` +
+    d.rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("") +
+    (d.total ? `<tr class="total">${d.total.map(cell).join("")}</tr>` : "") + "</tbody></table></div>" + note;
+}
+function r01Body() {
+  let rows = TIME;
+  if (role() === "RL-04") rows = TIME.filter((t) => t.emp === "Иванова А.");
+  const key = slice;
+  const agg = {};
+  rows.forEach((t) => { const k = t[key] ?? null; agg[k] = (agg[k] || 0) + t.days.reduce((a, b) => a + b, 0); });
+  const total = Object.values(agg).reduce((a, b) => a + b, 0);
+  const slices = `<div class="row"><span class="muted">Разрез:</span>
+    <button class="btn ${slice === "emp" ? "" : "sec"}" onclick="slice='emp';drill=[];render()">сотрудник</button>
+    <button class="btn ${slice === "unit" ? "" : "sec"}" onclick="slice='unit';drill=[];render()">подразделение</button>
+    <button class="btn ${slice === "role" ? "" : "sec"}" onclick="slice='role';drill=[];render()">роль</button></div>`;
+  if (viewMode === "chart") {
+    const days = ["Пн", "Вт", "Ср", "Чт", "Пт"];
+    const byDay = days.map((_, i) => rows.reduce((s, t) => s + t.days[i], 0));
+    return slices + bars(byDay.map((v) => [v, 0]), days) + '<p class="muted">Фактические часы по дням недели. Те же значения — в таблице.</p>';
+  }
+  return slices + `<div class="tbl"><table><thead><tr><th>${{ emp: "Сотрудник", unit: "Подразделение", role: "Проектная роль" }[slice]}</th>
+    <th class="n" title="M-01: сумма часов записей трудозатрат за период">Факт, ч</th><th class="n">Доля</th></tr></thead><tbody>` +
+    Object.entries(agg).map(([k, v]) => `<tr><td>${k === "null" ? '<span class="unset">не задано</span>' :
+      `<button class="link" style="background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit" onclick="drillTo('${esc(k)}')">${esc(k)}</button>`}</td>
+      <td class="n">${h(v)}</td><td class="n">${total ? Math.round(v / total * 100) : 0}%</td></tr>`).join("") +
+    `<tr class="total"><td>Итого</td><td class="n">${h(total)}</td><td class="n">100%</td></tr></tbody></table></div>` + drillPanel();
+}
+function tile(v, l) { return `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
+function bars(pairs, labels) {
+  const max = Math.max(...pairs.flat());
+  return '<div class="bars" role="img" aria-label="График; значения продублированы в таблице отчёта">' + pairs.map(([a, b], i) =>
+    `<div><span style="height:${a / max * 100}px;background:#9db3ea"></span><span style="height:${b / max * 100}px;background:var(--accent)"></span>${labels[i]}</div>`).join("") + "</div>";
+}
+function frow(src, stream, at, lag, thr, stale, admin) {
+  return `<tr><td>${src}</td><td>${stream}</td><td>${at}</td><td class="n">${lag}</td><td class="n">${thr}</td>
+    <td>${stale ? '<span class="over">STALE</span>' : "FRESH"}</td>${admin ? '<td><button class="btn sec">Загрузить сейчас</button></td>' : ""}</tr>`;
+}
+function drillPanel() {
+  if (!drill.length) return "";
+  if (role() === "RL-03") return '<div class="drawer">Детализация до сотрудника недоступна для вашей роли.</div>';
+  const t = TIME.find((x) => x.emp === drill[0] || x.unit === drill[0] || x.role === drill[0]);
+  const days = ["Пн 29.09", "Вт 30.09", "Ср 01.10", "Чт 02.10", "Пт 03.10"];
+  return `<div class="drawer"><div class="crumbs">SCR-03 · <button onclick="drill=[];render()">Итог</button> › ${esc(drill[0])}</div>
+    <div class="tbl"><table><thead><tr><th>День</th><th class="n">Факт, ч</th><th>Задачи</th></tr></thead><tbody>` +
+    days.map((d, i) => `<tr><td>${d}</td><td class="n">${h(t.days[i])}</td><td class="muted">TT-412, TT-398</td></tr>`).join("") + "</tbody></table></div></div>";
+}
+function openReport(id) { report = id; screen = "report"; drill = []; viewMode = "table"; compare = false; render(); }
+function drillTo(k) { drill = [k]; render(); }
+
+function render() {
+  if (screen !== "report" && !ACCESS[screen].includes(role())) screen = ACCESS.catalog.includes(role()) ? "catalog" : "fresh";
+  renderNav();
+  $("#app").innerHTML = SCREENS[screen]();
+}
+$("#role").onchange = () => { drill = []; render(); };
+$("#state").onchange = render;
+render();
+</script>
+</body>
+</html>
