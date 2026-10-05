@@ -5,10 +5,86 @@ info:
   description: API endpoints for currency lifecycle management according to ISO 4217.
   version: 1.0.0
 
-paths: {}
+paths:
+  /v1/currencies/:
+    post:
+      operationId: createCurrency 
+      summary: Create new currency record
+      description: >
+        Create a new currency record in accordance with the ISO 4217 standard.
+        The currency will be created with revision number 1 and initial metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Currency'
+            example:
+              code: "USD"
+              number: "840"
+              name: "US Dollar"
+              decimals: 2
+      responses:
+        '201':
+          $ref: '#/components/responses/CurrencyCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
 components:
   schemas:
+    Error:
+      type: object
+      description: Standardized error response format for all API errors.
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: >
+            Machine-readable error code that identifies the type of error.
+            Uses UPPER_SNAKE_CASE format for consistency.
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message describing what went wrong.
+          example: "Validation failed"
+        details:
+          type: array
+          description: >
+            Optional array of detailed error information.
+            Can include field-specific validation errors or additional context.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+          example:
+            - field: "code"
+              message: "Must be exactly 3 uppercase letters"
+
+    ErrorDetail:
+      type: object
+      description: Detailed information about a specific error or validation issue.
+      properties:
+        field:
+          type: string
+          description: The field name that caused the error (if applicable).
+          example: "code"
+        message:
+          type: string
+          description: Specific error message for this field or detail.
+          example: "Must be exactly 3 uppercase letters"
+        value:
+          type: string
+          description: The invalid value that was provided (if applicable).
+          example: "usd"
+        constraint:
+          type: string
+          description: The validation constraint that was violated (if applicable).
+          example: "pattern"
+
     Currency:
       type: object
       description: >
@@ -166,3 +242,68 @@ components:
           format: date-time
           description: The date and time when the currency record was last updated.
           example: "2026-10-05T07:54:00Z"
+
+  responses:
+    CurrencyCreated:
+      description: Currency successfully created
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExpandedCurrency'
+          example:
+            code: "USD"
+            number: "840"
+            name: "US Dollar"
+            decimals: 2
+            revision: 1
+            last_changer: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            created_at: "2026-10-05T07:54:00Z"
+            updated_at: "2026-10-05T07:54:00Z"
+
+    BadRequest:
+      description: Invalid request data (validation error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validation_error:
+              summary: Validation error
+              value:
+                error_code: "VALIDATION_ERROR"
+                message: "Validation failed"
+                details:
+                  - field: "code"
+                    message: "Must be exactly 3 uppercase letters"
+                  - field: "number"
+                    message: "Must be exactly 3 digits"
+
+    Conflict:
+      description: Currency already exists (conflict on code or number)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            duplicate_currency:
+              summary: Duplicate currency
+              value:
+                error_code: "DUPLICATE_CURRENCY"
+                message: "Currency with this code already exists"
+                details:
+                  - field: "code"
+                    message: "Currency code 'USD' is already in use"
+
+    UnprocessableEntity:
+      description: Unprocessable entity (business logic validation failed)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            business_logic_error:
+              summary: Business logic error
+              value:
+                error_code: "BUSINESS_LOGIC_ERROR"
+                message: "Invalid currency configuration"
+                details: []
