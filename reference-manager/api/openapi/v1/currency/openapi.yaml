@@ -1,0 +1,168 @@
+openapi: 3.1.0
+
+info:
+  title: Reference Manager Healthcheck API
+  description: API endpoints for currency lifecycle management according to ISO 4217.
+  version: 1.0.0
+
+paths: {}
+
+components:
+  schemas:
+    Currency:
+      type: object
+      description: >
+        Currency information in accordance with the ISO 4217 standard.
+        Includes alphabetic and numeric codes, the name, and rounding precision.
+      required:
+        - code
+        - number
+        - name
+        - decimals
+      properties:
+        code:
+          type: string
+          description: >
+            Three-letter international currency code (alphabetic code).
+            Always consists of three uppercase Latin letters.
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+          example: "USD"
+        number:
+          type: string
+          description: >
+            Three-digit numeric currency code. 
+            Passed as a string to preserve leading zeros (e.g., '840' for USD).
+          minLength: 3
+          maxLength: 3
+          pattern: '^\d{3}$'
+          example: "840"
+        name:
+          type: string
+          description: Official name of the currency in Russian or English.
+          example: "US Dollar"
+        decimals:
+          type: integer
+          description: >
+            The number of decimal places (minor units) for fractional parts (cents, kopecks).
+            Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
+          minimum: 0
+          maximum: 4
+          example: 2
+
+    CurrencyRevision:
+      type: object
+      description: Currency revision record reflecting changes made to currency data. This model is read-only.
+      required:
+        - id
+        - currency_id
+        - revision_number
+        - change
+        - changed_by
+        - changed_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the revision record.
+          readOnly: true
+          example: 1024
+        currency_id:
+          type: integer
+          format: int64
+          description: Identifier of the currency this revision belongs to (references ISO 4217 standard currency data).
+          readOnly: true
+          example: 840
+        revision_number:
+          type: integer
+          description: The sequential number of the revision, starting from 1.
+          readOnly: true
+          example: 3
+        change:
+          type: array
+          description: Changes applied in this revision relative to the previous one, formatted as a JSON Patch (RFC 6902).
+          readOnly: true
+          items:
+            type: object
+          example:
+            - op: "replace"
+              path: "/name"
+              value: "US Dollar"
+        changed_by:
+          type: string
+          format: uuid
+          description: UUID of the user or system component that performed the change.
+          readOnly: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        changed_at:
+          type: string
+          format: date-time
+          description: The date and time when the change was applied.
+          readOnly: true
+          example: "2026-10-05T07:54:00Z"
+
+    ExpandedCurrency:
+      type: object
+      description: >
+        Currency information in accordance with the ISO 4217 standard.
+        Includes alphabetic and numeric codes, the name, and rounding precision.
+      required:
+        - code
+        - number
+        - name
+        - decimals
+        - revision
+        - last_changer
+        - created_at
+        - updated_at
+      properties:
+        code:
+          type: string
+          description: >
+            Three-letter international currency code (alphabetic code).
+            Always consists of three uppercase Latin letters.
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+          example: "USD"
+        number:
+          type: string
+          description: >
+            Three-digit numeric currency code. 
+            Passed as a string to preserve leading zeros (e.g., '840' for USD).
+          minLength: 3
+          maxLength: 3
+          pattern: '^\d{3}$'
+          example: "840"
+        name:
+          type: string
+          description: Official name of the currency in Russian or English.
+          example: "US Dollar"
+        decimals:
+          type: integer
+          description: >
+            The number of decimal places (minor units) for fractional parts (cents, kopecks).
+            Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
+          minimum: 0
+          maximum: 4
+          example: 2
+        revision:
+          type: integer
+          description: The sequential number of the latest revision applied to this currency.
+          example: 3
+        last_changer:
+          type: string
+          format: uuid
+          description: UUID of the user or system component that performed the latest change.
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time when the currency record was initially created.
+          example: "2023-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: The date and time when the currency record was last updated.
+          example: "2026-10-05T07:54:00Z"
