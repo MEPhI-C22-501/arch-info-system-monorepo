@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: task_tracker
+      POSTGRES_USER: task_tracker
+      POSTGRES_PASSWORD: task_tracker_dev
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: ["task_tracker_db:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_tracker -d task_tracker"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: task-tracker-dev
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME: http://localhost:8081
+    ports: ["127.0.0.1:8081:8080"]
+    volumes: ["./dev/keycloak-realm.json:/opt/keycloak/data/import/task-tracker-realm.json:ro"]
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/task_tracker
+      DATABASE_USER: task_tracker
+      DATABASE_PASSWORD: task_tracker_dev
+      OIDC_ISSUER_URI: http://localhost:8081/realms/arch-info-system
+      OIDC_JWKS_URI: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      DEV_DIRECTORY: "true"
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_started }
+  frontend:
+    build: ./frontend
+    ports: ["127.0.0.1:3000:80"]
+    depends_on: [backend]
+volumes:
+  task_tracker_db:

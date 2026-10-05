@@ -1,0 +1,32 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/task_tracker}
+    username: ${DATABASE_USER:task_tracker}
+    password: ${DATABASE_PASSWORD:task_tracker}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8081/realms/arch-info-system}
+app:
+  audience: ${OIDC_AUDIENCE:task-tracker}
+  jwks-uri: ${OIDC_JWKS_URI:}
+  bootstrap-admin-subject: ${BOOTSTRAP_ADMIN_SUBJECT:}
+  directory-url: ${DIRECTORY_URL:}
+  directory-token: ${DIRECTORY_TOKEN:}
+  directory-cron: ${DIRECTORY_CRON:0 0 */2 * * *}
+  attachment-max-bytes: ${ATTACHMENT_MAX_BYTES:10485760}
+  dev-directory: ${DEV_DIRECTORY:false}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
