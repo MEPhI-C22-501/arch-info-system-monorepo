@@ -34,6 +34,28 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+    get:
+      summary: List currencies with pagination
+      parameters:
+        - $ref: '#/components/parameters/ListPageSize'
+        - $ref: '#/components/parameters/ListPageToken'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currencies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Currency'
+                  nextPageToken:
+                    type: string
+                    description: Token to retrieve the next page
+                    example: "next_page_token_value"
+
 components:
   schemas:
     Error:
@@ -243,6 +265,33 @@ components:
           description: The date and time when the currency record was last updated.
           example: "2026-10-05T07:54:00Z"
 
+  parameters:
+    ListPageSize:
+      name: pageSize
+      in: query
+      description: Number of elements per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 50
+
+    ListPageToken:
+      name: pageToken
+      in: query
+      description: > 
+        Pagination token for retrieving the next page of results.
+        Use the token from the previous response to get the next page.
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1024
+        pattern: "^[a-zA-Z0-9_-]+$"
+        example: "eyJwYWdlIjoyLCJsaW1pdCI6NTB9"
+  
   responses:
     CurrencyCreated:
       description: Currency successfully created
