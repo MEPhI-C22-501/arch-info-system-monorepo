@@ -1,3 +1,7 @@
 # Keycloak
 
-Используется готовый Keycloak со штатными интерфейсами и Admin REST API. Развёртывание и интеграция со справочниками описаны в [едином vision инфраструктуры](../infra/vision.md).
+Готовый Keycloak, без своего auth-сервиса. Желаемое состояние realm — [realm/desired.json](realm/desired.json). Его применяет `infra/scripts/keycloak_converge.py`: существующие пользователи не удаляются и не получают новый пароль.
+
+Браузерный issuer локального стенда: `http://localhost:8081/realms/arch-info-system`. Из контейнера JWKS читается по `http://keycloak:8080/.../certs`. Общий TLS-адрес не задан.
+
+Служебный клиент `reference-manager-provisioner` имеет роли `manage-users`, `view-users`, `query-users`, `view-realm` и не является администратором сервера.

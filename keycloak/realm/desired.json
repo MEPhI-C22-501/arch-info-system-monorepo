@@ -1,0 +1,181 @@
+{
+  "realm": "arch-info-system",
+  "clients": [
+    {
+      "clientId": "task-tracker",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:5173/*", "http://arch.local/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:5173", "http://arch.local"],
+      "pkce": "S256",
+      "audiences": ["task-tracker"],
+      "roles": ["testing-service", "reports-service"]
+    },
+    {
+      "clientId": "planning-system",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3001/*", "http://arch.local/*"],
+      "webOrigins": ["http://localhost:3001", "http://arch.local"],
+      "pkce": "S256",
+      "audiences": ["planning-system"],
+      "roles": []
+    },
+    {
+      "clientId": "reference-manager",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:8082/*", "http://arch.local/*"],
+      "webOrigins": ["http://localhost:8082", "http://arch.local"],
+      "pkce": "S256",
+      "audiences": ["reference-manager"],
+      "roles": ["reference-hr-reader"]
+    },
+    {
+      "clientId": "reports",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3002/*", "http://arch.local/*"],
+      "webOrigins": ["http://localhost:3002", "http://arch.local"],
+      "pkce": "S256",
+      "audiences": ["reports"],
+      "roles": []
+    },
+    {
+      "clientId": "qa-system",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3003/*", "http://arch.local/*"],
+      "webOrigins": ["http://localhost:3003", "http://arch.local"],
+      "pkce": "S256",
+      "audiences": ["qa-system"],
+      "roles": []
+    },
+    {
+      "clientId": "example-api",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "secretEnv": "KC_EXAMPLE_API_SECRET",
+      "redirectUris": [],
+      "webOrigins": [],
+      "audiences": ["example-api"],
+      "roles": []
+    },
+    {
+      "clientId": "reference-manager-provisioner",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_PROVISIONER_SECRET",
+      "realmManagementRoles": ["manage-users", "view-users", "query-users", "view-realm"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "audiences": [],
+      "roles": []
+    },
+    {
+      "clientId": "testing-client",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_TESTING_CLIENT_SECRET",
+      "clientRoles": {"task-tracker": ["testing-service"]},
+      "audiences": ["task-tracker"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "reports-client",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_REPORTS_CLIENT_SECRET",
+      "clientRoles": {"task-tracker": ["reports-service"]},
+      "audiences": ["task-tracker", "reports"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "planning-service",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_PLANNING_SERVICE_SECRET",
+      "audiences": ["planning-system", "reference-manager"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "qa-ci",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_QA_CI_SECRET",
+      "audiences": ["qa-system"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "qa-executor",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_QA_EXECUTOR_SECRET",
+      "audiences": ["qa-system"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "example-caller",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_EXAMPLE_CALLER_SECRET",
+      "audiences": ["example-api"],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    },
+    {
+      "clientId": "example-stranger",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secretEnv": "KC_EXAMPLE_STRANGER_SECRET",
+      "audiences": [],
+      "redirectUris": [],
+      "webOrigins": [],
+      "roles": []
+    }
+  ],
+  "users": [
+    {"username": "member", "id": "11111111-1111-1111-1111-111111111111", "passwordEnv": "DEMO_USER_PASSWORD"},
+    {"username": "lead", "id": "22222222-2222-2222-2222-222222222222", "passwordEnv": "DEMO_USER_PASSWORD"},
+    {"username": "admin", "id": "33333333-3333-3333-3333-333333333333", "passwordEnv": "DEMO_USER_PASSWORD"}
+  ]
+}
