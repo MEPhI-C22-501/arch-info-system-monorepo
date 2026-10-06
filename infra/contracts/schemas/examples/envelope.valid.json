@@ -1,0 +1,7 @@
+{
+  "eventId": "11111111-1111-4111-8111-111111111111",
+  "eventType": "ExampleObserved",
+  "occurredAt": "2026-10-06T09:00:00Z",
+  "schemaVersion": "1.0.0",
+  "payload": {"mode": "ok"}
+}

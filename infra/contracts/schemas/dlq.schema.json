@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arch-info.local/schemas/dlq.schema.json",
+  "title": "Consumer DLQ record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceTopic", "sourcePartition", "sourceOffset", "eventId", "reason", "attempts", "original"],
+  "properties": {
+    "sourceTopic": {"type": "string", "minLength": 1},
+    "sourcePartition": {"type": "integer", "minimum": 0},
+    "sourceOffset": {"type": "integer", "minimum": 0},
+    "eventId": {"type": ["string", "null"]},
+    "reason": {"type": "string"},
+    "attempts": {"type": "integer", "minimum": 1},
+    "original": {"type": "object"}
+  }
+}
