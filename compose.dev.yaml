@@ -1,3 +1,18 @@
-# Дополнения для локальной разработки: сборка, порты и подключение исходников.
-# Подключается явно: docker compose -f compose.yaml -f compose.dev.yaml up --build
-services: {}
+services:
+  keycloak:
+    ports:
+      - "127.0.0.1:8081:8080"
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+  kafka:
+    ports:
+      - "127.0.0.1:29092:29092"
+  otel-collector:
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+  reports-db-replica:
+    ports:
+      - "127.0.0.1:5435:5432"

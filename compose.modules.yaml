@@ -1,0 +1,58 @@
+services:
+  task-tracker-db:
+    profiles: ["modules"]
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: task_tracker
+      POSTGRES_USER: task_tracker
+      POSTGRES_PASSWORD: task_tracker_dev
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: [task-tracker-db:/var/lib/postgresql]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_tracker -d task_tracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  task-tracker-backend:
+    profiles: ["modules"]
+    build: ./task-tracker/backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://task-tracker-db:5432/task_tracker
+      DATABASE_USER: task_tracker
+      DATABASE_PASSWORD: task_tracker_dev
+      OIDC_ISSUER_URI: http://localhost:8081/realms/arch-info-system
+      OIDC_JWKS_URI: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      DEV_DIRECTORY: "true"
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      task-tracker-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [edge, data]
+  task-tracker-frontend:
+    profiles: ["modules"]
+    build: ./task-tracker/frontend
+    ports: ["127.0.0.1:3000:80"]
+    depends_on: [task-tracker-backend]
+    networks: [edge]
+  reference-manager-db:
+    profiles: ["modules"]
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: reference_manager
+      POSTGRES_USER: reference_manager
+      POSTGRES_PASSWORD: reference_manager
+    ports: ["127.0.0.1:5436:5432"]
+    volumes: [reference-manager-db:/var/lib/postgresql]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reference_manager -d reference_manager"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  task-tracker-db:
+  reference-manager-db:

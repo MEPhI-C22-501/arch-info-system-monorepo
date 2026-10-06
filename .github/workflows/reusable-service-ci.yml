@@ -1,0 +1,58 @@
+name: Reusable service CI
+
+on:
+  workflow_call:
+    inputs:
+      module_path:
+        description: Каталог модуля
+        required: true
+        type: string
+      test_command:
+        description: Команда проверок модуля
+        required: true
+        type: string
+      go_version_file:
+        description: go.mod, если модуль на Go
+        required: false
+        type: string
+        default: ""
+      dockerfile:
+        description: Dockerfile относительно build_context
+        required: false
+        type: string
+        default: ""
+      build_context:
+        description: Контекст сборки
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.module_path }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Go
+        if: inputs.go_version_file != ''
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: ${{ inputs.go_version_file }}
+      - name: Module checks
+        run: ${{ inputs.test_command }}
+
+  build:
+    needs: test
+    if: inputs.dockerfile != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build image
+        run: docker build -f "${{ inputs.dockerfile }}" "${{ inputs.build_context }}"

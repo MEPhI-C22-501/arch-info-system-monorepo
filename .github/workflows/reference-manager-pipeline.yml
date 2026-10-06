@@ -1,0 +1,24 @@
+name: Reference Manager pipeline template
+
+# Не заменяет reference-manager-checks.yaml. Показывает общий workflow_call на существующем модуле.
+on:
+  pull_request:
+    paths:
+      - reference-manager/**
+      - .github/workflows/reusable-service-ci.yml
+      - .github/workflows/reference-manager-pipeline.yml
+
+permissions:
+  contents: read
+
+jobs:
+  module:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      module_path: reference-manager
+      go_version_file: reference-manager/go.mod
+      test_command: |
+        go install github.com/go-task/task/v3/cmd/task@v3.44.1
+        task tests
+      dockerfile: deployments/docker/reference-manager.dockerfile
+      build_context: reference-manager

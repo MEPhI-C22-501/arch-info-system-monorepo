@@ -1,0 +1,27 @@
+services:
+  checks:
+    image: arch-info-tools:2026.10.06
+    user: "0:0"
+    working_dir: /work
+    entrypoint: ["bash", "/work/infra/scripts/run-examples.sh"]
+    environment:
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+      OIDC_JWKS_URI: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_CA: /certs/kafka.crt
+      KAFKA_EXAMPLE_PASSWORD: ${KAFKA_EXAMPLE_PASSWORD:-localdemokafkaex}
+      KAFKA_QA_PASSWORD: ${KAFKA_QA_PASSWORD:-localdemokafkaqa}
+      S3_ENDPOINT: http://minio:9000
+      S3_EXAMPLE_WRITER_SECRET: ${S3_EXAMPLE_WRITER_SECRET:-localdemos3writer}
+      S3_EXAMPLE_READER_SECRET: ${S3_EXAMPLE_READER_SECRET:-localdemos3reader}
+      S3_EXAMPLE_STRANGER_SECRET: ${S3_EXAMPLE_STRANGER_SECRET:-localdemos3stranger}
+      KC_EXAMPLE_CALLER_SECRET: ${KC_EXAMPLE_CALLER_SECRET:-localdemoexamplecaller}
+      KC_EXAMPLE_STRANGER_SECRET: ${KC_EXAMPLE_STRANGER_SECRET:-localdemoexamplestranger}
+      API_STORE: /tmp/operations.json
+    volumes:
+      - .:/work:ro
+      - kafka-certs:/certs:ro
+      - otel-data:/var/lib/otel:ro
+    networks: [edge, data]
+    restart: "no"
