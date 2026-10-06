@@ -21,42 +21,39 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// GetV1Currencies List currencies with pagination
+	// ListCurrencies List currencies with pagination
 	// (GET /v1/currencies/)
-	GetV1Currencies(w http.ResponseWriter, r *http.Request, params GetV1CurrenciesParams)
+	ListCurrencies(w http.ResponseWriter, r *http.Request, params ListCurrenciesParams)
 	// CreateCurrency Create new currency record
 	// (POST /v1/currencies/)
 	CreateCurrency(w http.ResponseWriter, r *http.Request)
-	// ExportCurrencies Export currencies to Excel file
+	// ExportCurrencies Export currencies in Excel format
 	// (POST /v1/currencies/export)
 	ExportCurrencies(w http.ResponseWriter, r *http.Request)
-	// ImportCurrencies Import currencies from Excel file
-	// (POST /v1/currencies/import)
-	ImportCurrencies(w http.ResponseWriter, r *http.Request)
 	// DeleteCurrency Delete currency record
 	// (DELETE /v1/currencies/{currencyID})
-	DeleteCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID)
+	DeleteCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params DeleteCurrencyParams)
 	// GetCurrency Get currency by ID
 	// (GET /v1/currencies/{currencyID})
-	GetCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID)
+	GetCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params GetCurrencyParams)
 	// UpdateCurrency Update currency information
 	// (PATCH /v1/currencies/{currencyID})
-	UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID)
+	UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params UpdateCurrencyParams)
 	// ListCurrencyRevisions List all revisions for a currency
 	// (GET /v1/currencies/{currencyID}/revisions)
 	ListCurrencyRevisions(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params ListCurrencyRevisionsParams)
 	// GetCurrencyRevision Get specific revision of a currency
 	// (GET /v1/currencies/{currencyID}/revisions/{revisionNumber})
-	GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, revisionNumber int)
+	GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, revisionNumber RevisionNumber)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
 
-// GetV1Currencies List currencies with pagination
+// ListCurrencies List currencies with pagination
 // (GET /v1/currencies/)
-func (_ Unimplemented) GetV1Currencies(w http.ResponseWriter, r *http.Request, params GetV1CurrenciesParams) {
+func (_ Unimplemented) ListCurrencies(w http.ResponseWriter, r *http.Request, params ListCurrenciesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -66,33 +63,27 @@ func (_ Unimplemented) CreateCurrency(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ExportCurrencies Export currencies to Excel file
+// ExportCurrencies Export currencies in Excel format
 // (POST /v1/currencies/export)
 func (_ Unimplemented) ExportCurrencies(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ImportCurrencies Import currencies from Excel file
-// (POST /v1/currencies/import)
-func (_ Unimplemented) ImportCurrencies(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // DeleteCurrency Delete currency record
 // (DELETE /v1/currencies/{currencyID})
-func (_ Unimplemented) DeleteCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID) {
+func (_ Unimplemented) DeleteCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params DeleteCurrencyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // GetCurrency Get currency by ID
 // (GET /v1/currencies/{currencyID})
-func (_ Unimplemented) GetCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID) {
+func (_ Unimplemented) GetCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params GetCurrencyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // UpdateCurrency Update currency information
 // (PATCH /v1/currencies/{currencyID})
-func (_ Unimplemented) UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID) {
+func (_ Unimplemented) UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, params UpdateCurrencyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -104,7 +95,7 @@ func (_ Unimplemented) ListCurrencyRevisions(w http.ResponseWriter, r *http.Requ
 
 // GetCurrencyRevision Get specific revision of a currency
 // (GET /v1/currencies/{currencyID}/revisions/{revisionNumber})
-func (_ Unimplemented) GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, revisionNumber int) {
+func (_ Unimplemented) GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID CurrencyID, revisionNumber RevisionNumber) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -117,14 +108,14 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// GetV1Currencies operation middleware
-func (siw *ServerInterfaceWrapper) GetV1Currencies(w http.ResponseWriter, r *http.Request) {
+// ListCurrencies operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrencies(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetV1CurrenciesParams
+	var params ListCurrenciesParams
 
 	// ------------- Optional query parameter "pageSize" -------------
 
@@ -152,8 +143,47 @@ func (siw *ServerInterfaceWrapper) GetV1Currencies(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// ------------- Optional query parameter "filter" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "filter", r.URL.Query(), &params.Filter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "filter"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "order_by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order_by", r.URL.Query(), &params.OrderBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "order_by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order_by", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "allowDeleted" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "allowDeleted", r.URL.Query(), &params.AllowDeleted, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "allowDeleted"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "allowDeleted", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV1Currencies(w, r, params)
+		siw.Handler.ListCurrencies(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -191,20 +221,6 @@ func (siw *ServerInterfaceWrapper) ExportCurrencies(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// ImportCurrencies operation middleware
-func (siw *ServerInterfaceWrapper) ImportCurrencies(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ImportCurrencies(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // DeleteCurrency operation middleware
 func (siw *ServerInterfaceWrapper) DeleteCurrency(w http.ResponseWriter, r *http.Request) {
 
@@ -220,8 +236,24 @@ func (siw *ServerInterfaceWrapper) DeleteCurrency(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteCurrencyParams
+
+	// ------------- Optional query parameter "force" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "force", r.URL.Query(), &params.Force, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "force"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "force", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteCurrency(w, r, currencyID)
+		siw.Handler.DeleteCurrency(w, r, currencyID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -246,8 +278,24 @@ func (siw *ServerInterfaceWrapper) GetCurrency(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrencyParams
+
+	// ------------- Optional query parameter "allowDeleted" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "allowDeleted", r.URL.Query(), &params.AllowDeleted, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "allowDeleted"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "allowDeleted", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetCurrency(w, r, currencyID)
+		siw.Handler.GetCurrency(w, r, currencyID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -272,8 +320,24 @@ func (siw *ServerInterfaceWrapper) UpdateCurrency(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateCurrencyParams
+
+	// ------------- Optional query parameter "updateMask" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "updateMask", r.URL.Query(), &params.UpdateMask, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "updateMask"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "updateMask", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateCurrency(w, r, currencyID)
+		siw.Handler.UpdateCurrency(w, r, currencyID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -327,6 +391,45 @@ func (siw *ServerInterfaceWrapper) ListCurrencyRevisions(w http.ResponseWriter, 
 		return
 	}
 
+	// ------------- Optional query parameter "filter" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "filter", r.URL.Query(), &params.Filter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "filter"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "order_by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order_by", r.URL.Query(), &params.OrderBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "order_by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order_by", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "allowDeleted" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "allowDeleted", r.URL.Query(), &params.AllowDeleted, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "allowDeleted"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "allowDeleted", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListCurrencyRevisions(w, r, currencyID, params)
 	}))
@@ -354,9 +457,9 @@ func (siw *ServerInterfaceWrapper) GetCurrencyRevision(w http.ResponseWriter, r 
 	}
 
 	// ------------- Path parameter "revisionNumber" -------------
-	var revisionNumber int
+	var revisionNumber RevisionNumber
 
-	err = runtime.BindStyledParameterWithOptions("simple", "revisionNumber", chi.URLParam(r, "revisionNumber"), &revisionNumber, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionNumber", chi.URLParam(r, "revisionNumber"), &revisionNumber, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "revisionNumber", Err: err})
 		return
@@ -487,10 +590,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/currencies/", wrapper.GetV1Currencies)
+		r.Get(options.BaseURL+"/v1/currencies/", wrapper.ListCurrencies)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/currencies/", wrapper.CreateCurrency)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/currencies/export", wrapper.ExportCurrencies)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/currencies/{currencyID}", wrapper.DeleteCurrency)
@@ -500,12 +606,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/v1/currencies/{currencyID}", wrapper.UpdateCurrency)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/v1/currencies/import", wrapper.ImportCurrencies)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/v1/currencies/export", wrapper.ExportCurrencies)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/currencies/{currencyID}/revisions", wrapper.ListCurrencyRevisions)
@@ -522,81 +622,70 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -90,10 +90,10 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
-	// GetV1Currencies List currencies with pagination
+	// ListCurrencies List currencies with pagination
 	//
-	// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
-	GetV1Currencies(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// Corresponds with GET /v1/currencies/ (the `ListCurrencies` operationId).
+	ListCurrencies(ctx context.Context, params *ListCurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateCurrencyWithBody Create new currency record
 	//
@@ -113,46 +113,26 @@ type ClientInterface interface {
 	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
 	CreateCurrency(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ExportCurrenciesWithBody Export currencies to Excel file
+	// ExportCurrencies Export currencies in Excel format
 	//
-	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-	//
-	// Takes any type of body and a specified content type.
+	// Generates and returns an Excel file containing the list of currencies.
 	//
 	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ExportCurrencies Export currencies to Excel file
-	//
-	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrencies(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ImportCurrenciesWithBody Import currencies from Excel file
-	//
-	// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
-	ImportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportCurrencies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteCurrency Delete currency record
 	//
 	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
 	//
 	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
-	DeleteCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCurrency Get currency by ID
 	//
 	// Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
 	//
 	// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
-	GetCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetCurrency(ctx context.Context, currencyID CurrencyID, params *GetCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCurrencyWithBody Update currency information
 	//
@@ -161,7 +141,7 @@ type ClientInterface interface {
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-	UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCurrency Update currency information
 	//
@@ -170,7 +150,7 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-	UpdateCurrency(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateCurrency(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCurrencyRevisions List all revisions for a currency
 	//
@@ -184,14 +164,14 @@ type ClientInterface interface {
 	// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-// GetV1Currencies List currencies with pagination
+// ListCurrencies List currencies with pagination
 //
-// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
-func (c *Client) GetV1Currencies(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetV1CurrenciesRequest(c.Server, params)
+// Corresponds with GET /v1/currencies/ (the `ListCurrencies` operationId).
+func (c *Client) ListCurrencies(ctx context.Context, params *ListCurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCurrenciesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -240,53 +220,13 @@ func (c *Client) CreateCurrency(ctx context.Context, body CreateCurrencyJSONRequ
 	return c.Client.Do(req)
 }
 
-// ExportCurrenciesWithBody Export currencies to Excel file
+// ExportCurrencies Export currencies in Excel format
 //
-// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-//
-// Takes any type of body and a specified content type.
+// Generates and returns an Excel file containing the list of currencies.
 //
 // Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *Client) ExportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportCurrenciesRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ExportCurrencies Export currencies to Excel file
-//
-// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *Client) ExportCurrencies(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportCurrenciesRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ImportCurrenciesWithBody Import currencies from Excel file
-//
-// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
-func (c *Client) ImportCurrenciesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewImportCurrenciesRequestWithBody(c.Server, contentType, body)
+func (c *Client) ExportCurrencies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportCurrenciesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -302,8 +242,8 @@ func (c *Client) ImportCurrenciesWithBody(ctx context.Context, contentType strin
 // Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
 //
 // Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
-func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteCurrencyRequest(c.Server, currencyID)
+func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteCurrencyRequest(c.Server, currencyID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -319,8 +259,8 @@ func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, reqE
 // Retrieve detailed information about a specific currency by its unique identifier. Returns the current state of the currency including revision history metadata.
 //
 // Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
-func (c *Client) GetCurrency(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCurrencyRequest(c.Server, currencyID)
+func (c *Client) GetCurrency(ctx context.Context, currencyID CurrencyID, params *GetCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCurrencyRequest(c.Server, currencyID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +278,8 @@ func (c *Client) GetCurrency(ctx context.Context, currencyID CurrencyID, reqEdit
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-func (c *Client) UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCurrencyRequestWithBody(c.Server, currencyID, contentType, body)
+func (c *Client) UpdateCurrencyWithBody(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateCurrencyRequestWithBody(c.Server, currencyID, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -357,8 +297,8 @@ func (c *Client) UpdateCurrencyWithBody(ctx context.Context, currencyID Currency
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-func (c *Client) UpdateCurrency(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCurrencyRequest(c.Server, currencyID, body)
+func (c *Client) UpdateCurrency(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateCurrencyRequest(c.Server, currencyID, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +331,7 @@ func (c *Client) ListCurrencyRevisions(ctx context.Context, currencyID CurrencyI
 // Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber)
 	if err != nil {
 		return nil, err
@@ -403,8 +343,8 @@ func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID,
 	return c.Client.Do(req)
 }
 
-// NewGetV1CurrenciesRequest constructs an http.Request for the GetV1Currencies method
-func NewGetV1CurrenciesRequest(server string, params *GetV1CurrenciesParams) (*http.Request, error) {
+// NewListCurrenciesRequest constructs an http.Request for the ListCurrencies method
+func NewListCurrenciesRequest(server string, params *ListCurrenciesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -446,6 +386,42 @@ func NewGetV1CurrenciesRequest(server string, params *GetV1CurrenciesParams) (*h
 		if params.PageToken != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "pageToken", *params.PageToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AllowDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "allowDeleted", *params.AllowDeleted, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -509,19 +485,8 @@ func NewCreateCurrencyRequestWithBody(server string, contentType string, body io
 	return req, nil
 }
 
-// NewExportCurrenciesRequest calls the generic ExportCurrencies builder with application/json body
-func NewExportCurrenciesRequest(server string, body ExportCurrenciesJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewExportCurrenciesRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewExportCurrenciesRequestWithBody constructs an http.Request for the ExportCurrencies method, with any body, and a specified content type
-func NewExportCurrenciesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewExportCurrenciesRequest constructs an http.Request for the ExportCurrencies method
+func NewExportCurrenciesRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -539,47 +504,16 @@ func NewExportCurrenciesRequestWithBody(server string, contentType string, body 
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewImportCurrenciesRequestWithBody constructs an http.Request for the ImportCurrencies method, with any body, and a specified content type
-func NewImportCurrenciesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/currencies/import")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
 
 // NewDeleteCurrencyRequest constructs an http.Request for the DeleteCurrency method
-func NewDeleteCurrencyRequest(server string, currencyID CurrencyID) (*http.Request, error) {
+func NewDeleteCurrencyRequest(server string, currencyID CurrencyID, params *DeleteCurrencyParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -602,6 +536,33 @@ func NewDeleteCurrencyRequest(server string, currencyID CurrencyID) (*http.Reque
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Force != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "force", *params.Force, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
@@ -613,7 +574,7 @@ func NewDeleteCurrencyRequest(server string, currencyID CurrencyID) (*http.Reque
 }
 
 // NewGetCurrencyRequest constructs an http.Request for the GetCurrency method
-func NewGetCurrencyRequest(server string, currencyID CurrencyID) (*http.Request, error) {
+func NewGetCurrencyRequest(server string, currencyID CurrencyID, params *GetCurrencyParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -636,6 +597,33 @@ func NewGetCurrencyRequest(server string, currencyID CurrencyID) (*http.Request,
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.AllowDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "allowDeleted", *params.AllowDeleted, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -647,18 +635,18 @@ func NewGetCurrencyRequest(server string, currencyID CurrencyID) (*http.Request,
 }
 
 // NewUpdateCurrencyRequest calls the generic UpdateCurrency builder with application/json body
-func NewUpdateCurrencyRequest(server string, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody) (*http.Request, error) {
+func NewUpdateCurrencyRequest(server string, currencyID CurrencyID, params *UpdateCurrencyParams, body UpdateCurrencyJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateCurrencyRequestWithBody(server, currencyID, "application/json", bodyReader)
+	return NewUpdateCurrencyRequestWithBody(server, currencyID, params, "application/json", bodyReader)
 }
 
 // NewUpdateCurrencyRequestWithBody constructs an http.Request for the UpdateCurrency method, with any body, and a specified content type
-func NewUpdateCurrencyRequestWithBody(server string, currencyID CurrencyID, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateCurrencyRequestWithBody(server string, currencyID CurrencyID, params *UpdateCurrencyParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -681,6 +669,33 @@ func NewUpdateCurrencyRequestWithBody(server string, currencyID CurrencyID, cont
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.UpdateMask != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "updateMask", *params.UpdateMask, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
@@ -752,6 +767,42 @@ func NewListCurrencyRevisionsRequest(server string, currencyID CurrencyID, param
 
 		}
 
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AllowDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "allowDeleted", *params.AllowDeleted, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -767,7 +818,7 @@ func NewListCurrencyRevisionsRequest(server string, currencyID CurrencyID, param
 }
 
 // NewGetCurrencyRevisionRequest constructs an http.Request for the GetCurrencyRevision method
-func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber int) (*http.Request, error) {
+func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber RevisionNumber) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -779,7 +830,7 @@ func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisio
 
 	var pathParam1 string
 
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "revisionNumber", revisionNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "revisionNumber", revisionNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
 	if err != nil {
 		return nil, err
 	}
@@ -851,12 +902,12 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
-	// GetV1CurrenciesWithResponse List currencies with pagination
+	// ListCurrenciesWithResponse List currencies with pagination
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
-	// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
-	GetV1CurrenciesWithResponse(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*GetV1CurrenciesResponse, error)
+	// Corresponds with GET /v1/currencies/ (the `ListCurrencies` operationId).
+	ListCurrenciesWithResponse(ctx context.Context, params *ListCurrenciesParams, reqEditors ...RequestEditorFn) (*ListCurrenciesResponse, error)
 
 	// CreateCurrencyWithBodyWithResponse Create new currency record
 	//
@@ -876,32 +927,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /v1/currencies/ (the `CreateCurrency` operationId).
 	CreateCurrencyWithResponse(ctx context.Context, body CreateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCurrencyResponse, error)
 
-	// ExportCurrenciesWithBodyWithResponse Export currencies to Excel file
+	// ExportCurrenciesWithResponse Export currencies in Excel format
 	//
-	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+	// Generates and returns an Excel file containing the list of currencies.
 	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
-
-	// ExportCurrenciesWithResponse Export currencies to Excel file
-	//
-	// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrenciesWithResponse(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
-
-	// ImportCurrenciesWithBodyWithResponse Import currencies from Excel file
-	//
-	// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
-	ImportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportCurrenciesResponse, error)
+	ExportCurrenciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
 
 	// DeleteCurrencyWithResponse Delete currency record
 	//
@@ -910,7 +943,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
-	DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error)
+	DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error)
 
 	// GetCurrencyWithResponse Get currency by ID
 	//
@@ -919,7 +952,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
-	GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error)
+	GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *GetCurrencyParams, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error)
 
 	// UpdateCurrencyWithBodyWithResponse Update currency information
 	//
@@ -928,7 +961,7 @@ type ClientWithResponsesInterface interface {
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-	UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
+	UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
 
 	// UpdateCurrencyWithResponse Update currency information
 	//
@@ -937,7 +970,7 @@ type ClientWithResponsesInterface interface {
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-	UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
+	UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error)
 
 	// ListCurrencyRevisionsWithResponse List all revisions for a currency
 	//
@@ -955,38 +988,70 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
+	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
 }
 
-type GetV1CurrenciesResponse struct {
+type ListCurrenciesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		Currencies *[]Currency `json:"currencies,omitempty"`
-
-		// NextPageToken Token to retrieve the next page
-		NextPageToken *string `json:"nextPageToken,omitempty"`
-	}
+	JSON200 *SuccessWithExpandedCurrencies
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetV1CurrenciesResponse) GetJSON200() *struct {
-	Currencies *[]Currency `json:"currencies,omitempty"`
-
-	// NextPageToken Token to retrieve the next page
-	NextPageToken *string `json:"nextPageToken,omitempty"`
-} {
+func (r ListCurrenciesResponse) GetJSON200() *SuccessWithExpandedCurrencies {
 	return r.JSON200
 }
 
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ListCurrenciesResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCurrenciesResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListCurrenciesResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListCurrenciesResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListCurrenciesResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r ListCurrenciesResponse) GetJSON504() *Error {
+	return r.JSON504
+}
+
 // GetBody returns the raw response body bytes
-func (r GetV1CurrenciesResponse) GetBody() []byte {
+func (r ListCurrenciesResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r GetV1CurrenciesResponse) Status() string {
+func (r ListCurrenciesResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -994,7 +1059,7 @@ func (r GetV1CurrenciesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetV1CurrenciesResponse) StatusCode() int {
+func (r ListCurrenciesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1002,7 +1067,7 @@ func (r GetV1CurrenciesResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetV1CurrenciesResponse) ContentType() string {
+func (r ListCurrenciesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1013,33 +1078,61 @@ type CreateCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *CurrencyCreated
+	JSON201 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON409 the response for an HTTP 409 `application/json` response
-	JSON409 *Conflict
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *UnprocessableEntity
+	JSON409 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateCurrencyResponse) GetJSON201() *CurrencyCreated {
+func (r CreateCurrencyResponse) GetJSON201() *SuccessWithExpandedCurrency {
 	return r.JSON201
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r CreateCurrencyResponse) GetJSON400() *BadRequest {
+func (r CreateCurrencyResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateCurrencyResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateCurrencyResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
-func (r CreateCurrencyResponse) GetJSON409() *Conflict {
+func (r CreateCurrencyResponse) GetJSON409() *Error {
 	return r.JSON409
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateCurrencyResponse) GetJSON422() *UnprocessableEntity {
-	return r.JSON422
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r CreateCurrencyResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r CreateCurrencyResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r CreateCurrencyResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1071,23 +1164,58 @@ func (r CreateCurrencyResponse) ContentType() string {
 	return ""
 }
 
+// ExportCurrenciesResponse200Headers the declared response headers of an HTTP 200 response for ExportCurrencies
+type ExportCurrenciesResponse200Headers struct {
+	ContentDisposition *string
+}
+
 type ExportCurrenciesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *UnprocessableEntity
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ExportCurrenciesResponse200Headers
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r ExportCurrenciesResponse) GetJSON400() *BadRequest {
+func (r ExportCurrenciesResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ExportCurrenciesResponse) GetJSON422() *UnprocessableEntity {
-	return r.JSON422
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r ExportCurrenciesResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1119,110 +1247,65 @@ func (r ExportCurrenciesResponse) ContentType() string {
 	return ""
 }
 
-type ImportCurrenciesResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// Errors List of validation errors for skipped rows
-		Errors *[]ImportError `json:"errors,omitempty"`
-
-		// ImportedCount Number of currencies successfully imported
-		ImportedCount *int `json:"imported_count,omitempty"`
-
-		// SkippedCount Number of currencies skipped (duplicates or invalid)
-		SkippedCount *int `json:"skipped_count,omitempty"`
-	}
-	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
-	// JSON413 the response for an HTTP 413 `application/json` response
-	JSON413 *Error
-	// JSON415 the response for an HTTP 415 `application/json` response
-	JSON415 *Error
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *UnprocessableEntity
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ImportCurrenciesResponse) GetJSON200() *struct {
-	// Errors List of validation errors for skipped rows
-	Errors *[]ImportError `json:"errors,omitempty"`
-
-	// ImportedCount Number of currencies successfully imported
-	ImportedCount *int `json:"imported_count,omitempty"`
-
-	// SkippedCount Number of currencies skipped (duplicates or invalid)
-	SkippedCount *int `json:"skipped_count,omitempty"`
-} {
-	return r.JSON200
-}
-
-// GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r ImportCurrenciesResponse) GetJSON400() *BadRequest {
-	return r.JSON400
-}
-
-// GetJSON413 returns the response for an HTTP 413 `application/json` response
-func (r ImportCurrenciesResponse) GetJSON413() *Error {
-	return r.JSON413
-}
-
-// GetJSON415 returns the response for an HTTP 415 `application/json` response
-func (r ImportCurrenciesResponse) GetJSON415() *Error {
-	return r.JSON415
-}
-
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ImportCurrenciesResponse) GetJSON422() *UnprocessableEntity {
-	return r.JSON422
-}
-
-// GetBody returns the raw response body bytes
-func (r ImportCurrenciesResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ImportCurrenciesResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ImportCurrenciesResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ImportCurrenciesResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type DeleteCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON204 the response for an HTTP 204 `application/json` response
+	JSON204 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
+}
+
+// GetJSON204 returns the response for an HTTP 204 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON204() *SuccessWithExpandedCurrency {
+	return r.JSON204
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r DeleteCurrencyResponse) GetJSON400() *BadRequest {
+func (r DeleteCurrencyResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r DeleteCurrencyResponse) GetJSON404() *NotFound {
+func (r DeleteCurrencyResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1258,26 +1341,61 @@ type GetCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ExpandedCurrency
+	JSON200 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetCurrencyResponse) GetJSON200() *ExpandedCurrency {
+func (r GetCurrencyResponse) GetJSON200() *SuccessWithExpandedCurrency {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetCurrencyResponse) GetJSON400() *BadRequest {
+func (r GetCurrencyResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCurrencyResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCurrencyResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r GetCurrencyResponse) GetJSON404() *NotFound {
+func (r GetCurrencyResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetCurrencyResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetCurrencyResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r GetCurrencyResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1313,40 +1431,68 @@ type UpdateCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ExpandedCurrency
+	JSON200 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
+	JSON404 *Error
 	// JSON409 the response for an HTTP 409 `application/json` response
-	JSON409 *Conflict
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *UnprocessableEntity
+	JSON409 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateCurrencyResponse) GetJSON200() *ExpandedCurrency {
+func (r UpdateCurrencyResponse) GetJSON200() *SuccessWithExpandedCurrency {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r UpdateCurrencyResponse) GetJSON400() *BadRequest {
+func (r UpdateCurrencyResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r UpdateCurrencyResponse) GetJSON404() *NotFound {
+func (r UpdateCurrencyResponse) GetJSON404() *Error {
 	return r.JSON404
 }
 
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
-func (r UpdateCurrencyResponse) GetJSON409() *Conflict {
+func (r UpdateCurrencyResponse) GetJSON409() *Error {
 	return r.JSON409
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UpdateCurrencyResponse) GetJSON422() *UnprocessableEntity {
-	return r.JSON422
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r UpdateCurrencyResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1382,46 +1528,61 @@ type ListCurrencyRevisionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// CurrencyId ID of the currency these revisions belong to
-		CurrencyId *int `json:"currency_id,omitempty"`
-
-		// NextPageToken Token to retrieve the next page of revisions
-		NextPageToken *string             `json:"nextPageToken,omitempty"`
-		Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
-
-		// TotalCount Total number of revisions for this currency
-		TotalCount *int `json:"total_count,omitempty"`
-	}
+	JSON200 *SuccessWithCurrencyRevisionList
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListCurrencyRevisionsResponse) GetJSON200() *struct {
-	// CurrencyId ID of the currency these revisions belong to
-	CurrencyId *int `json:"currency_id,omitempty"`
-
-	// NextPageToken Token to retrieve the next page of revisions
-	NextPageToken *string             `json:"nextPageToken,omitempty"`
-	Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
-
-	// TotalCount Total number of revisions for this currency
-	TotalCount *int `json:"total_count,omitempty"`
-} {
+func (r ListCurrencyRevisionsResponse) GetJSON200() *SuccessWithCurrencyRevisionList {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r ListCurrencyRevisionsResponse) GetJSON400() *BadRequest {
+func (r ListCurrencyRevisionsResponse) GetJSON400() *Error {
 	return r.JSON400
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r ListCurrencyRevisionsResponse) GetJSON404() *NotFound {
+func (r ListCurrencyRevisionsResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r ListCurrencyRevisionsResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1457,38 +1618,61 @@ type GetCurrencyRevisionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
-		CurrencyState *Currency `json:"currency_state,omitempty"`
-
-		// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
-		Revision *CurrencyRevision `json:"revision,omitempty"`
-	}
+	JSON200 *SuccessWithCurrencyRevisionList
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *BadRequest
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// JSON504 the response for an HTTP 504 `application/json` response
+	JSON504 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetCurrencyRevisionResponse) GetJSON200() *struct {
-	// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
-	CurrencyState *Currency `json:"currency_state,omitempty"`
-
-	// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
-	Revision *CurrencyRevision `json:"revision,omitempty"`
-} {
+func (r GetCurrencyRevisionResponse) GetJSON200() *SuccessWithCurrencyRevisionList {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetCurrencyRevisionResponse) GetJSON400() *BadRequest {
+func (r GetCurrencyRevisionResponse) GetJSON400() *Error {
 	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON403() *Error {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GetCurrencyRevisionResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetJSON504 returns the response for an HTTP 504 `application/json` response
+func (r GetCurrencyRevisionResponse) GetJSON504() *Error {
+	return r.JSON504
 }
 
 // GetBody returns the raw response body bytes
@@ -1520,17 +1704,17 @@ func (r GetCurrencyRevisionResponse) ContentType() string {
 	return ""
 }
 
-// GetV1CurrenciesWithResponse List currencies with pagination
+// ListCurrenciesWithResponse List currencies with pagination
 //
 // Returns a wrapper object for the known response body format(s).
 //
-// Corresponds with GET /v1/currencies/ (the `GetV1Currencies` operationId).
-func (c *ClientWithResponses) GetV1CurrenciesWithResponse(ctx context.Context, params *GetV1CurrenciesParams, reqEditors ...RequestEditorFn) (*GetV1CurrenciesResponse, error) {
-	rsp, err := c.GetV1Currencies(ctx, params, reqEditors...)
+// Corresponds with GET /v1/currencies/ (the `ListCurrencies` operationId).
+func (c *ClientWithResponses) ListCurrenciesWithResponse(ctx context.Context, params *ListCurrenciesParams, reqEditors ...RequestEditorFn) (*ListCurrenciesResponse, error) {
+	rsp, err := c.ListCurrencies(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetV1CurrenciesResponse(rsp)
+	return ParseListCurrenciesResponse(rsp)
 }
 
 // CreateCurrencyWithBodyWithResponse Create new currency record
@@ -1563,49 +1747,19 @@ func (c *ClientWithResponses) CreateCurrencyWithResponse(ctx context.Context, bo
 	return ParseCreateCurrencyResponse(rsp)
 }
 
-// ExportCurrenciesWithBodyWithResponse Export currencies to Excel file
+// ExportCurrenciesWithResponse Export currencies in Excel format
 //
-// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
+// Generates and returns an Excel file containing the list of currencies.
 //
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+// Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *ClientWithResponses) ExportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
-	rsp, err := c.ExportCurrenciesWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
+	rsp, err := c.ExportCurrencies(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseExportCurrenciesResponse(rsp)
-}
-
-// ExportCurrenciesWithResponse Export currencies to Excel file
-//
-// Export currency records to an Excel file. Supports filtering by various criteria and selecting specific fields. Returns the file as a downloadable attachment.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, body ExportCurrenciesJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
-	rsp, err := c.ExportCurrencies(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseExportCurrenciesResponse(rsp)
-}
-
-// ImportCurrenciesWithBodyWithResponse Import currencies from Excel file
-//
-// Bulk import currency records from an Excel file. The file should contain columns matching the Currency schema fields. Each row will be validated and imported as a new currency record. If any validation errors occur, the entire import will be rejected.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/currencies/import (the `ImportCurrencies` operationId).
-func (c *ClientWithResponses) ImportCurrenciesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportCurrenciesResponse, error) {
-	rsp, err := c.ImportCurrenciesWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseImportCurrenciesResponse(rsp)
 }
 
 // DeleteCurrencyWithResponse Delete currency record
@@ -1615,8 +1769,8 @@ func (c *ClientWithResponses) ImportCurrenciesWithBodyWithResponse(ctx context.C
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
-func (c *ClientWithResponses) DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error) {
-	rsp, err := c.DeleteCurrency(ctx, currencyID, reqEditors...)
+func (c *ClientWithResponses) DeleteCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*DeleteCurrencyResponse, error) {
+	rsp, err := c.DeleteCurrency(ctx, currencyID, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1630,8 +1784,8 @@ func (c *ClientWithResponses) DeleteCurrencyWithResponse(ctx context.Context, cu
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /v1/currencies/{currencyID} (the `GetCurrency` operationId).
-func (c *ClientWithResponses) GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error) {
-	rsp, err := c.GetCurrency(ctx, currencyID, reqEditors...)
+func (c *ClientWithResponses) GetCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *GetCurrencyParams, reqEditors ...RequestEditorFn) (*GetCurrencyResponse, error) {
+	rsp, err := c.GetCurrency(ctx, currencyID, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1645,8 +1799,8 @@ func (c *ClientWithResponses) GetCurrencyWithResponse(ctx context.Context, curre
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-func (c *ClientWithResponses) UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
-	rsp, err := c.UpdateCurrencyWithBody(ctx, currencyID, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateCurrencyWithBodyWithResponse(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
+	rsp, err := c.UpdateCurrencyWithBody(ctx, currencyID, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1660,8 +1814,8 @@ func (c *ClientWithResponses) UpdateCurrencyWithBodyWithResponse(ctx context.Con
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /v1/currencies/{currencyID} (the `UpdateCurrency` operationId).
-func (c *ClientWithResponses) UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
-	rsp, err := c.UpdateCurrency(ctx, currencyID, body, reqEditors...)
+func (c *ClientWithResponses) UpdateCurrencyWithResponse(ctx context.Context, currencyID CurrencyID, params *UpdateCurrencyParams, body UpdateCurrencyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCurrencyResponse, error) {
+	rsp, err := c.UpdateCurrency(ctx, currencyID, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1690,7 +1844,7 @@ func (c *ClientWithResponses) ListCurrencyRevisionsWithResponse(ctx context.Cont
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber int, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
+func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
 	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -1698,31 +1852,68 @@ func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Contex
 	return ParseGetCurrencyRevisionResponse(rsp)
 }
 
-// ParseGetV1CurrenciesResponse parses an HTTP response from a GetV1CurrenciesWithResponse call
-func ParseGetV1CurrenciesResponse(rsp *http.Response) (*GetV1CurrenciesResponse, error) {
+// ParseListCurrenciesResponse parses an HTTP response from a ListCurrenciesWithResponse call
+func ParseListCurrenciesResponse(rsp *http.Response) (*ListCurrenciesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetV1CurrenciesResponse{
+	response := &ListCurrenciesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Currencies *[]Currency `json:"currencies,omitempty"`
-
-			// NextPageToken Token to retrieve the next page
-			NextPageToken *string `json:"nextPageToken,omitempty"`
-		}
+		var dest SuccessWithExpandedCurrencies
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -1744,32 +1935,60 @@ func ParseCreateCurrencyResponse(rsp *http.Response) (*CreateCurrencyResponse, e
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest CurrencyCreated
+		var dest SuccessWithExpandedCurrency
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -1791,82 +2010,60 @@ func ParseExportCurrenciesResponse(rsp *http.Response) (*ExportCurrenciesRespons
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON401 = &dest
 
-	}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
-	return response, nil
-}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
-// ParseImportCurrenciesResponse parses an HTTP response from a ImportCurrenciesWithResponse call
-func ParseImportCurrenciesResponse(rsp *http.Response) (*ImportCurrenciesResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
-	response := &ImportCurrenciesResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
+
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// Errors List of validation errors for skipped rows
-			Errors *[]ImportError `json:"errors,omitempty"`
-
-			// ImportedCount Number of currencies successfully imported
-			ImportedCount *int `json:"imported_count,omitempty"`
-
-			// SkippedCount Number of currencies skipped (duplicates or invalid)
-			SkippedCount *int `json:"skipped_count,omitempty"`
+	case rsp.StatusCode == 200:
+		var headers ExportCurrenciesResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
 		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON413 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON415 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON422 = &dest
-
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -1886,22 +2083,61 @@ func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, e
 	}
 
 	switch {
-	case rsp.StatusCode == 204:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 204:
+		var dest SuccessWithExpandedCurrency
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON204 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -1923,25 +2159,60 @@ func ParseGetCurrencyResponse(rsp *http.Response) (*GetCurrencyResponse, error) 
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ExpandedCurrency
+		var dest SuccessWithExpandedCurrency
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -1963,39 +2234,67 @@ func ParseUpdateCurrencyResponse(rsp *http.Response) (*UpdateCurrencyResponse, e
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ExpandedCurrency
+		var dest SuccessWithExpandedCurrency
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -2017,35 +2316,60 @@ func ParseListCurrencyRevisionsResponse(rsp *http.Response) (*ListCurrencyRevisi
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// CurrencyId ID of the currency these revisions belong to
-			CurrencyId *int `json:"currency_id,omitempty"`
-
-			// NextPageToken Token to retrieve the next page of revisions
-			NextPageToken *string             `json:"nextPageToken,omitempty"`
-			Revisions     *[]CurrencyRevision `json:"revisions,omitempty"`
-
-			// TotalCount Total number of revisions for this currency
-			TotalCount *int `json:"total_count,omitempty"`
-		}
+		var dest SuccessWithCurrencyRevisionList
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -2067,24 +2391,32 @@ func ParseGetCurrencyRevisionResponse(rsp *http.Response) (*GetCurrencyRevisionR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// CurrencyState The state of the currency at this revision point. Shows what the currency looked like after this revision was applied.
-			CurrencyState *Currency `json:"currency_state,omitempty"`
-
-			// Revision Currency revision record reflecting changes made to currency data. This model is read-only.
-			Revision *CurrencyRevision `json:"revision,omitempty"`
-		}
+		var dest SuccessWithCurrencyRevisionList
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
@@ -2092,6 +2424,27 @@ func ParseGetCurrencyRevisionResponse(rsp *http.Response) (*GetCurrencyRevisionR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 

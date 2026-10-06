@@ -5,6 +5,9 @@ info:
   description: API endpoints for currency lifecycle management according to ISO 4217.
   version: 1.0.0
 
+security:
+  - KeycloakOAuth2: [currencies:read]
+
 paths:
   /v1/currencies/:
     post:
@@ -13,6 +16,8 @@ paths:
       description: >
         Create a new currency record in accordance with the ISO 4217 standard.
         The currency will be created with revision number 1 and initial metadata.
+      security:
+        - KeycloakOAuth2: [currencies:write]
       requestBody:
         required: true
         content:
@@ -26,35 +31,88 @@ paths:
               decimals: 2
       responses:
         '201':
-          $ref: '#/components/responses/CurrencyCreated'
+          $ref: '#/components/responses/SuccessWithExpandedCurrency'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid input data, validation errors, or malformed request body.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to create a currency.
+          $ref: '#/components/responses/Error'
         '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Conflict. A currency with the provided code or number already exists.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
     get:
+      operationId: listCurrencies
       summary: List currencies with pagination
       parameters:
         - $ref: '#/components/parameters/ListPageSize'
         - $ref: '#/components/parameters/ListPageToken'
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/AllowDeleted'
       responses:
         '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  currencies:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Currency'
-                  nextPageToken:
-                    type: string
-                    description: Token to retrieve the next page
-                    example: "next_page_token_value"
+          $ref: '#/components/responses/SuccessWithExpandedCurrencies'
+        '400':
+          description: Bad Request. Invalid input data, validation errors, or malformed request body.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to create a currency.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'     
+
+  /v1/currencies/export:
+    post:
+      operationId: exportCurrencies
+      summary: Export currencies in Excel format
+      description: Generates and returns an Excel file containing the list of currencies
+      security:
+        - KeycloakOAuth2: [currencies:export]
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessWithExcelFile'
+        '400':
+          description: Bad Request. Invalid input data, validation errors, or malformed request body.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to create a currency.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
   /v1/currencies/{currencyID}:
     get: 
@@ -65,26 +123,31 @@ paths:
         Returns the current state of the currency including revision history metadata.
       parameters:
         - $ref: '#/components/parameters/CurrencyID'
+        - $ref: '#/components/parameters/AllowDeleted'
       responses:
         '200':
-          description: Currency found and returned successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpandedCurrency'
-              example:
-                code: "USD"
-                number: "840"
-                name: "US Dollar"
-                decimals: 2
-                revision: 3
-                last_changer: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                created_at: "2023-01-01T00:00:00Z"
-                updated_at: "2026-10-05T07:54:00Z"
+          $ref: '#/components/responses/SuccessWithExpandedCurrency'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid currency ID format or malformed query parameters.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to view this currency.
+          $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Not Found. The requested currency does not exist or has been permanently deleted.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'   
 
     patch:
       operationId: updateCurrency
@@ -94,39 +157,42 @@ paths:
         A new revision will be created with the changes applied.
       parameters:
         - $ref: "#/components/parameters/CurrencyID"
+        - $ref: '#/components/parameters/UpdateMask'
+      security:
+        - KeycloakOAuth2: [currencies:write]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CurrencyUpdate'
-            example:
-              name: "United States Dollar"
-              decimals: 2
+              $ref: '#/components/schemas/Currency'
       responses:
         '200':
-          description: Currency successfully updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpandedCurrency'
-              example:
-                code: "USD"
-                number: "840"
-                name: "United States Dollar"
-                decimals: 2
-                revision: 4
-                last_changer: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                created_at: "2023-01-01T00:00:00Z"
-                updated_at: "2026-10-05T08:30:00Z"
+          $ref: '#/components/responses/SuccessWithExpandedCurrency'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid input data, validation errors, or malformed update mask.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to update this currency.
+          $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Not Found. The requested currency does not exist or has been permanently deleted.
+          $ref: '#/components/responses/Error'
         '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Conflict. Optimistic concurrency failure (e.g., the currency was modified by another process since the last read).
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
     delete:
       operationId: deleteCurrency
@@ -136,173 +202,33 @@ paths:
         This action cannot be undone. All associated revision history will also be removed.
       parameters:
         - $ref: "#/components/parameters/CurrencyID"
+        - $ref: '#/components/parameters/Force'
+      security:
+        -  KeycloakOAuth2: [currencies:delete]
       responses:
         '204':
-          description: Currency successfully deleted
+          $ref: '#/components/responses/SuccessWithExpandedCurrency'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid currency ID format or malformed query parameters.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to delete this currency.
+          $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/NotFound'
-
-  /v1/currencies/import:
-    post:
-      operationId: importCurrencies
-      summary: Import currencies from Excel file
-      description: >
-        Bulk import currency records from an Excel file.
-        The file should contain columns matching the Currency schema fields.
-        Each row will be validated and imported as a new currency record.
-        If any validation errors occur, the entire import will be rejected.
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - file
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: Excel file (.xlsx or .xls) containing currency data
-                validateOnly:
-                  type: boolean
-                  default: false
-                  description: >
-                    If true, only validate the file without importing.
-                    Returns validation results without creating records.
-            examples:
-              import_file:
-                summary: Import currencies from Excel
-                value:
-                  file: "currencies.xlsx"
-                  validateOnly: false
-      responses:
-        '200':
-          description: Currencies successfully imported
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  imported_count:
-                    type: integer
-                    description: Number of currencies successfully imported
-                    example: 150
-                  skipped_count:
-                    type: integer
-                    description: Number of currencies skipped (duplicates or invalid)
-                    example: 5
-                  errors:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ImportError'
-                    description: List of validation errors for skipped rows
-              example:
-                imported_count: 148
-                skipped_count: 2
-                errors:
-                  - row: 3
-                    field: "code"
-                    message: "Invalid currency code format"
-                    value: "usd"
-                  - row: 7
-                    field: "number"
-                    message: "Currency number already exists"
-                    value: "840"
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '413':
-          description: File too large
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error_code: "FILE_TOO_LARGE"
-                message: "File size exceeds maximum limit of 10MB"
-        '415':
-          description: Unsupported file format
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error_code: "UNSUPPORTED_FORMAT"
-                message: "Only .xlsx and .xls files are supported"
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-
-  /v1/currencies/export:
-    post:
-      operationId: exportCurrencies
-      summary: Export currencies to Excel file
-      description: >
-        Export currency records to an Excel file.
-        Supports filtering by various criteria and selecting specific fields.
-        Returns the file as a downloadable attachment.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                filters:
-                  type: object
-                  properties:
-                    codes:
-                      type: array
-                      items:
-                        type: string
-                      description: Filter by specific currency codes
-                      example: ["USD", "EUR", "RUB"]
-                    created_after:
-                      type: string
-                      format: date-time
-                      description: Filter currencies created after this date
-                      example: "2023-01-01T00:00:00Z"
-                    updated_after:
-                      type: string
-                      format: date-time
-                      description: Filter currencies updated after this date
-                      example: "2026-09-01T00:00:00Z"
-                fields:
-                  type: array
-                  items:
-                    type: string
-                    enum: ["code", "number", "name", "decimals", "revision", "created_at", "updated_at"]
-                  description: >
-                    Fields to include in the export.
-                    If not specified, all fields will be included.
-                  example: ["code", "number", "name", "decimals"]
-                format:
-                  type: string
-                  enum: ["xlsx", "csv"]
-                  default: "xlsx"
-                  description: Output file format
-            example:
-              filters:
-                codes: ["USD", "EUR"]
-              fields: ["code", "number", "name", "decimals"]
-              format: "xlsx"
-      responses:
-        '200':
-          description: Export file generated successfully
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-            text/csv:
-              schema:
-                type: string
-                format: binary
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Not Found. The requested currency does not exist or has already been permanently deleted.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
   /v1/currencies/{currencyID}/revisions:
     get:
@@ -314,77 +240,35 @@ paths:
         when they were made, and by whom.
       parameters:
         - $ref: '#/components/parameters/CurrencyID'
-        - name: pageSize
-          in: query
-          description: Number of revisions per page
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-            example: 10
-        - name: pageToken
-          in: query
-          description: Pagination token for retrieving the next page
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/ListPageSize'
+        - $ref: '#/components/parameters/ListPageToken'
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/AllowDeleted'
       responses:
         '200':
-          description: Revisions retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  currency_id:
-                    type: integer
-                    description: ID of the currency these revisions belong to
-                    example: 840
-                  revisions:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/CurrencyRevision'
-                  total_count:
-                    type: integer
-                    description: Total number of revisions for this currency
-                    example: 5
-                  nextPageToken:
-                    type: string
-                    description: Token to retrieve the next page of revisions
-              example:
-                currency_id: 840
-                revisions:
-                  - id: 1001
-                    currency_id: 840
-                    revision_number: 1
-                    change: []
-                    changed_by: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                    changed_at: "2023-01-01T00:00:00Z"
-                  - id: 1002
-                    currency_id: 840
-                    revision_number: 2
-                    change:
-                      - op: "replace"
-                        path: "/name"
-                        value: "United States Dollar"
-                    changed_by: "4fb96g75-6828-5673-c4gd-3d074g77bgb7"
-                    changed_at: "2024-06-15T10:30:00Z"
-                  - id: 1003
-                    currency_id: 840
-                    revision_number: 3
-                    change:
-                      - op: "replace"
-                        path: "/name"
-                        value: "US Dollar"
-                    changed_by: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                    changed_at: "2026-10-05T07:54:00Z"
-                total_count: 3
+          $ref: '#/components/responses/SuccessWithCurrencyRevisionList'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid query parameters, pagination errors, or malformed filters.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to view revision history.
+          $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Not Found. The requested currency does not exist.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
   /v1/currencies/{currencyID}/revisions/{revisionNumber}:
     get:
@@ -395,83 +279,63 @@ paths:
         Shows the exact state of the currency at that revision point and the changes applied.
       parameters:
         - $ref: '#/components/parameters/CurrencyID'
-        - name: revisionNumber
-          in: path
-          description: The sequential revision number to retrieve
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-            example: 3
+        - $ref: '#/components/parameters/RevisionNumber'
       responses:
         '200':
-          description: Revision retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  revision:
-                    $ref: '#/components/schemas/CurrencyRevision'
-                  currency_state:
-                    $ref: '#/components/schemas/Currency'
-                    description: >
-                      The state of the currency at this revision point.
-                      Shows what the currency looked like after this revision was applied.
-              example:
-                revision:
-                  id: 1003
-                  currency_id: 840
-                  revision_number: 3
-                  change:
-                    - op: "replace"
-                      path: "/name"
-                      value: "US Dollar"
-                  changed_by: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                  changed_at: "2026-10-05T07:54:00Z"
-                currency_state:
-                  code: "USD"
-                  number: "840"
-                  name: "US Dollar"
-                  decimals: 2
+          $ref: '#/components/responses/SuccessWithCurrencyRevisionList'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad Request. Invalid currency ID or revision number format.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client is authenticated but lacks the necessary permissions to view this revision.
+          $ref: '#/components/responses/Error'
         '404':
-          description: Currency or revision not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                currency_not_found:
-                  summary: Currency not found
-                  value:
-                    error_code: "NOT_FOUND"
-                    message: "Currency with the specified ID was not found"
-                revision_not_found:
-                  summary: Revision not found
-                  value:
-                    error_code: "REVISION_NOT_FOUND"
-                    message: "Revision 5 does not exist for currency 840"
-                    details:
-                      - field: "revisionNumber"
-                        message: "Requested revision is out of range"
+          description: Not Found. The requested currency or the specific revision number does not exist.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error. An unexpected error occurred on the server while processing the request.
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Service Unavailable. The server is temporarily unable to handle the request due to maintenance or overload.
+          $ref: '#/components/responses/Error'
+        '504':
+          description: Gateway Timeout. The server did not receive a timely response from an upstream service.
+          $ref: '#/components/responses/Error'
 
 components:
+  securitySchemes:
+    KeycloakOAuth2:
+      type: oauth2
+      description: >
+        Authentication via Keycloak (OAuth 2.0 / OpenID Connect). 
+        Pass the JWT access token in the Authorization header (Bearer <token>).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/auth
+          tokenUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/token
+          scopes:
+            currencies:read: Read currency data and revision history
+            currencies:write: Create and update currency records
+            currencies:delete: Permanently delete currency records
+            currencies:export: Export currencies to Excel format
+        clientCredentials:
+          tokenUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/token
+          scopes:
+            currencies:read: Read currency data and revision history
+            currencies:write: Create and update currency records
+            currencies:delete: Permanently delete currency records
+            currencies:export: Export currencies to Excel format
+
   schemas:
     Error:
       type: object
       description: Standardized error response format for all API errors.
       required:
-        - error_code
         - message
       properties:
-        error_code:
-          type: string
-          description: >
-            Machine-readable error code that identifies the type of error.
-            Uses UPPER_SNAKE_CASE format for consistency.
-          example: "VALIDATION_ERROR"
         message:
           type: string
           description: Human-readable error message describing what went wrong.
@@ -499,35 +363,6 @@ components:
           type: string
           description: Specific error message for this field or detail.
           example: "Must be exactly 3 uppercase letters"
-        value:
-          type: string
-          description: The invalid value that was provided (if applicable).
-          example: "usd"
-        constraint:
-          type: string
-          description: The validation constraint that was violated (if applicable).
-          example: "pattern"
-
-    ImportError:
-      type: object
-      description: Details about an error encountered during currency import.
-      properties:
-        row:
-          type: integer
-          description: Row number in the Excel file where the error occurred
-          example: 3
-        field:
-          type: string
-          description: Field that caused the validation error
-          example: "code"
-        message:
-          type: string
-          description: Human-readable error message
-          example: "Invalid currency code format"
-        value:
-          type: string
-          description: The invalid value that was provided
-          example: "usd"
 
     Currency:
       type: object
@@ -570,44 +405,11 @@ components:
           minimum: 0
           maximum: 4
           example: 2
-
-    CurrencyUpdate:
-      type: object
-      description: >
-        Schema for partial updates to currency information.
-        All fields are optional since this is used for PATCH operations.
-        Only provided fields will be updated.
-      properties:
-        code:
-          type: string
-          description: >
-            Three-letter international currency code (alphabetic code).
-            Always consists of three uppercase Latin letters.
-          minLength: 3
-          maxLength: 3
-          pattern: '^[A-Z]{3}$'
-          example: "USD"
-        number:
-          type: string
-          description: >
-            Three-digit numeric currency code. 
-            Passed as a string to preserve leading zeros (e.g., '840' for USD).
-          minLength: 3
-          maxLength: 3
-          pattern: '^\d{3}$'
-          example: "840"
-        name:
-          type: string
-          description: Official name of the currency in Russian or English.
-          example: "US Dollar"
-        decimals:
-          type: integer
-          description: >
-            The number of decimal places (minor units) for fractional parts (cents, kopecks).
-            Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
-          minimum: 0
-          maximum: 4
-          example: 2
+        is_deleted:
+          type: boolean
+          description: Indicates whether the currency record has been soft-deleted.
+          default: false
+          example: false
 
     CurrencyRevision:
       type: object
@@ -714,6 +516,11 @@ components:
           format: uuid
           description: UUID of the user or system component that performed the latest change.
           example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        is_deleted:
+          type: boolean
+          description: Indicates whether the currency record has been soft-deleted.
+          default: false
+          example: false
         created_at:
           type: string
           format: date-time
@@ -724,6 +531,12 @@ components:
           format: date-time
           description: The date and time when the currency record was last updated.
           example: "2026-10-05T07:54:00Z"
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date and time when the currency record was soft-deleted. Null if the record is active.
+          example: null
 
   parameters:
     CurrencyID:
@@ -765,10 +578,91 @@ components:
         pattern: "^[a-zA-Z0-9_-]+$"
         example: "eyJwYWdlIjoyLCJsaW1pdCI6NTB9"
   
+    UpdateMask:
+      name: updateMask
+      in: query
+      required: false
+      description: >
+        Fields to be updated. A comma-separated string of paths to the fields (e.g., `title,author.bio`). 
+        If the parameter is omitted or set to `*`, all fields passed in the request body are updated.
+      schema:
+        type: string
+        example: "title,author.bio"
+
+    Force:
+      name: force
+      in: query
+      required: false
+      description: >
+        If set to `true`, the action will be forced, bypassing 
+        certain validation rules or the resource's lock state.
+      schema:
+        type: boolean
+        default: false
+
+    AllowDeleted:
+      name: allowDeleted
+      in: query
+      required: false
+      description: >
+        If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
+      schema:
+        type: boolean
+        default: false
+
+    Filter:
+      name: filter
+      in: query
+      required: false
+      description: >
+        An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT),
+        and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
+      schema:
+        type: string
+        example: 'status = "ACTIVE" AND price < 100'
+
+    OrderBy:
+      name: order_by
+      in: query
+      required: false
+      description: >
+        A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction,
+        use the `desc` suffix (e.g., `author.name desc, title`).
+      schema:
+        type: string
+        example: 'author.name desc, title asc'
+
+    RevisionNumber:
+      name: revisionNumber
+      in: path
+      description: >
+        The sequential number of the revision, starting from 1.
+        Must be a positive integer.
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 3
+
   responses:
-    CurrencyCreated:
-      description: Currency successfully created
+    Error:
+      description: Error response
       content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Validation failed"
+            details:
+              - field: "code"
+                message: "Must be exactly 3 uppercase letters"
+              - field: "number"
+                message: "Must be exactly 3 digits"
+
+    SuccessWithExpandedCurrency:
+      description: Successful response with expanded currency information
+      content: 
         application/json:
           schema:
             $ref: '#/components/schemas/ExpandedCurrency'
@@ -782,66 +676,68 @@ components:
             created_at: "2026-10-05T07:54:00Z"
             updated_at: "2026-10-05T07:54:00Z"
 
-    BadRequest:
-      description: Invalid request data (validation error)
+    SuccessWithExpandedCurrencies:
+      description: Successful response with list of expanded currency information
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
-          examples:
-            validation_error:
-              summary: Validation error
-              value:
-                error_code: "VALIDATION_ERROR"
-                message: "Validation failed"
-                details:
-                  - field: "code"
-                    message: "Must be exactly 3 uppercase letters"
-                  - field: "number"
-                    message: "Must be exactly 3 digits"
+            type: object
+            properties:
+              currencies:
+                type: array
+                description: List of currencies
+                items:
+                  $ref: '#/components/schemas/ExpandedCurrency'
+              nextPageToken:
+                type: string
+                description: Token to retrieve the next page
+                example: "next_page_token_value"
 
-    Conflict:
-      description: Currency already exists (conflict on code or number)
+    SuccessWithCurrencyRevision:
+      description: Successful response with information about currency revision
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
-          examples:
-            duplicate_currency:
-              summary: Duplicate currency
-              value:
-                error_code: "DUPLICATE_CURRENCY"
-                message: "Currency with this code already exists"
-                details:
-                  - field: "code"
-                    message: "Currency code 'USD' is already in use"
+            $ref: '#/components/schemas/CurrencyRevision'
+          example:
+            id: 1003
+            currency_id: 840
+            revision_number: 3
+            change:
+              - op: "replace"
+                path: "/name"
+                value: "US Dollar"
+            changed_by: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            changed_at: "2026-10-05T07:54:00Z"
+    
+    SuccessWithCurrencyRevisionList:
+      description: Successful response with information about currency revisions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              currencies:
+                type: array
+                description: List of currency revisions
+                items:
+                  $ref: '#/components/schemas/CurrencyRevision'
+              nextPageToken:
+                type: string
+                description: Token to retrieve the next page
+                example: "next_page_token_value"
 
-    UnprocessableEntity:
-      description: Unprocessable entity (business logic validation failed)
-      content:
-        application/json:
+    SuccessWithExcelFile:
+      description: The file has been successfully generated and is ready for download.
+      headers:
+        Content-Disposition:
           schema:
-            $ref: '#/components/schemas/Error'
-          examples:
-            business_logic_error:
-              summary: Business logic error
-              value:
-                error_code: "BUSINESS_LOGIC_ERROR"
-                message: "Invalid currency configuration"
-                details: []
-
-    NotFound:
-      description: Currency not found
+            type: string
+          example: 'attachment; filename="report_2023.xlsx"'
+          description: >
+            A header instructing the browser to download the file as an attachment with a specified name.
       content:
-        application/json:
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
           schema:
-            $ref: '#/components/schemas/Error'
-          examples:
-            currency_not_found:
-              summary: Currency not found
-              value:
-                error_code: "NOT_FOUND"
-                message: "Currency with the specified ID was not found"
-                details:
-                  - field: "currencyID"
-                    message: "No currency exists with ID 999"
+            type: string
+            format: binary

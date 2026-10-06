@@ -9,57 +9,6 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// Defines values for ExportCurrenciesJSONBodyFields.
-const (
-	Code      ExportCurrenciesJSONBodyFields = "code"
-	CreatedAt ExportCurrenciesJSONBodyFields = "created_at"
-	Decimals  ExportCurrenciesJSONBodyFields = "decimals"
-	Name      ExportCurrenciesJSONBodyFields = "name"
-	Number    ExportCurrenciesJSONBodyFields = "number"
-	Revision  ExportCurrenciesJSONBodyFields = "revision"
-	UpdatedAt ExportCurrenciesJSONBodyFields = "updated_at"
-)
-
-// Valid indicates whether the value is a known member of the ExportCurrenciesJSONBodyFields enum.
-func (e ExportCurrenciesJSONBodyFields) Valid() bool {
-	switch e {
-	case Code:
-		return true
-	case CreatedAt:
-		return true
-	case Decimals:
-		return true
-	case Name:
-		return true
-	case Number:
-		return true
-	case Revision:
-		return true
-	case UpdatedAt:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ExportCurrenciesJSONBodyFormat.
-const (
-	Csv  ExportCurrenciesJSONBodyFormat = "csv"
-	Xlsx ExportCurrenciesJSONBodyFormat = "xlsx"
-)
-
-// Valid indicates whether the value is a known member of the ExportCurrenciesJSONBodyFormat enum.
-func (e ExportCurrenciesJSONBodyFormat) Valid() bool {
-	switch e {
-	case Csv:
-		return true
-	case Xlsx:
-		return true
-	default:
-		return false
-	}
-}
-
 // Currency Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
 type Currency struct {
 	// Code Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters.
@@ -67,6 +16,9 @@ type Currency struct {
 
 	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
 	Decimals int `json:"decimals"`
+
+	// IsDeleted Indicates whether the currency record has been soft-deleted.
+	IsDeleted *bool `json:"is_deleted,omitempty"`
 
 	// Name Official name of the currency in Russian or English.
 	Name string `json:"name"`
@@ -96,28 +48,10 @@ type CurrencyRevision struct {
 	RevisionNumber *int `json:"revision_number,omitempty"`
 }
 
-// CurrencyUpdate Schema for partial updates to currency information. All fields are optional since this is used for PATCH operations. Only provided fields will be updated.
-type CurrencyUpdate struct {
-	// Code Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters.
-	Code *string `json:"code,omitempty"`
-
-	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
-	Decimals *int `json:"decimals,omitempty"`
-
-	// Name Official name of the currency in Russian or English.
-	Name *string `json:"name,omitempty"`
-
-	// Number Three-digit numeric currency code.  Passed as a string to preserve leading zeros (e.g., '840' for USD).
-	Number *string `json:"number,omitempty"`
-}
-
 // Error Standardized error response format for all API errors.
 type Error struct {
 	// Details Optional array of detailed error information. Can include field-specific validation errors or additional context.
 	Details *[]ErrorDetail `json:"details,omitempty"`
-
-	// ErrorCode Machine-readable error code that identifies the type of error. Uses UPPER_SNAKE_CASE format for consistency.
-	ErrorCode string `json:"error_code"`
 
 	// Message Human-readable error message describing what went wrong.
 	Message string `json:"message"`
@@ -125,17 +59,11 @@ type Error struct {
 
 // ErrorDetail Detailed information about a specific error or validation issue.
 type ErrorDetail struct {
-	// Constraint The validation constraint that was violated (if applicable).
-	Constraint *string `json:"constraint,omitempty"`
-
 	// Field The field name that caused the error (if applicable).
 	Field *string `json:"field,omitempty"`
 
 	// Message Specific error message for this field or detail.
 	Message *string `json:"message,omitempty"`
-
-	// Value The invalid value that was provided (if applicable).
-	Value *string `json:"value,omitempty"`
 }
 
 // ExpandedCurrency Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
@@ -148,6 +76,12 @@ type ExpandedCurrency struct {
 
 	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
 	Decimals int `json:"decimals"`
+
+	// DeletedAt The date and time when the currency record was soft-deleted. Null if the record is active.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// IsDeleted Indicates whether the currency record has been soft-deleted.
+	IsDeleted *bool `json:"is_deleted,omitempty"`
 
 	// LastChanger UUID of the user or system component that performed the latest change.
 	LastChanger openapi_types.UUID `json:"last_changer"`
@@ -165,23 +99,17 @@ type ExpandedCurrency struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ImportError Details about an error encountered during currency import.
-type ImportError struct {
-	// Field Field that caused the validation error
-	Field *string `json:"field,omitempty"`
-
-	// Message Human-readable error message
-	Message *string `json:"message,omitempty"`
-
-	// Row Row number in the Excel file where the error occurred
-	Row *int `json:"row,omitempty"`
-
-	// Value The invalid value that was provided
-	Value *string `json:"value,omitempty"`
-}
+// AllowDeleted defines model for AllowDeleted.
+type AllowDeleted = bool
 
 // CurrencyID defines model for CurrencyID.
 type CurrencyID = int64
+
+// Filter defines model for Filter.
+type Filter = string
+
+// Force defines model for Force.
+type Force = bool
 
 // ListPageSize defines model for ListPageSize.
 type ListPageSize = int
@@ -189,81 +117,92 @@ type ListPageSize = int
 // ListPageToken defines model for ListPageToken.
 type ListPageToken = string
 
-// BadRequest Standardized error response format for all API errors.
-type BadRequest = Error
+// OrderBy defines model for OrderBy.
+type OrderBy = string
 
-// Conflict Standardized error response format for all API errors.
-type Conflict = Error
+// RevisionNumber defines model for RevisionNumber.
+type RevisionNumber = int64
 
-// CurrencyCreated Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
-type CurrencyCreated = ExpandedCurrency
+// UpdateMask defines model for UpdateMask.
+type UpdateMask = string
 
-// NotFound Standardized error response format for all API errors.
-type NotFound = Error
+// SuccessWithCurrencyRevisionList defines model for SuccessWithCurrencyRevisionList.
+type SuccessWithCurrencyRevisionList struct {
+	// Currencies List of currency revisions
+	Currencies *[]CurrencyRevision `json:"currencies,omitempty"`
 
-// UnprocessableEntity Standardized error response format for all API errors.
-type UnprocessableEntity = Error
+	// NextPageToken Token to retrieve the next page
+	NextPageToken *string `json:"nextPageToken,omitempty"`
+}
 
-// GetV1CurrenciesParams defines parameters for GetV1Currencies.
-type GetV1CurrenciesParams struct {
+// SuccessWithExpandedCurrencies defines model for SuccessWithExpandedCurrencies.
+type SuccessWithExpandedCurrencies struct {
+	// Currencies List of currencies
+	Currencies *[]ExpandedCurrency `json:"currencies,omitempty"`
+
+	// NextPageToken Token to retrieve the next page
+	NextPageToken *string `json:"nextPageToken,omitempty"`
+}
+
+// SuccessWithExpandedCurrency Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
+type SuccessWithExpandedCurrency = ExpandedCurrency
+
+// ListCurrenciesParams defines parameters for ListCurrencies.
+type ListCurrenciesParams struct {
 	// PageSize Number of elements per page
 	PageSize *ListPageSize `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
 	// PageToken Pagination token for retrieving the next page of results. Use the token from the previous response to get the next page.
 	PageToken *ListPageToken `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+
+	// Filter An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT), and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `author.name desc, title`).
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
+	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
 }
 
-// ExportCurrenciesJSONBody defines parameters for ExportCurrencies.
-type ExportCurrenciesJSONBody struct {
-	// Fields Fields to include in the export. If not specified, all fields will be included.
-	Fields  *[]ExportCurrenciesJSONBodyFields `json:"fields,omitempty"`
-	Filters *struct {
-		// Codes Filter by specific currency codes
-		Codes *[]string `json:"codes,omitempty"`
-
-		// CreatedAfter Filter currencies created after this date
-		CreatedAfter *time.Time `json:"created_after,omitempty"`
-
-		// UpdatedAfter Filter currencies updated after this date
-		UpdatedAfter *time.Time `json:"updated_after,omitempty"`
-	} `json:"filters,omitempty"`
-
-	// Format Output file format
-	Format *ExportCurrenciesJSONBodyFormat `json:"format,omitempty"`
+// DeleteCurrencyParams defines parameters for DeleteCurrency.
+type DeleteCurrencyParams struct {
+	// Force If set to `true`, the action will be forced, bypassing  certain validation rules or the resource's lock state.
+	Force *Force `form:"force,omitempty" json:"force,omitempty"`
 }
 
-// ExportCurrenciesJSONBodyFields defines parameters for ExportCurrencies.
-type ExportCurrenciesJSONBodyFields string
+// GetCurrencyParams defines parameters for GetCurrency.
+type GetCurrencyParams struct {
+	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
+	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+}
 
-// ExportCurrenciesJSONBodyFormat defines parameters for ExportCurrencies.
-type ExportCurrenciesJSONBodyFormat string
-
-// ImportCurrenciesMultipartBody defines parameters for ImportCurrencies.
-type ImportCurrenciesMultipartBody struct {
-	// File Excel file (.xlsx or .xls) containing currency data
-	File openapi_types.File `json:"file"`
-
-	// ValidateOnly If true, only validate the file without importing. Returns validation results without creating records.
-	ValidateOnly *bool `json:"validateOnly,omitempty"`
+// UpdateCurrencyParams defines parameters for UpdateCurrency.
+type UpdateCurrencyParams struct {
+	// UpdateMask Fields to be updated. A comma-separated string of paths to the fields (e.g., `title,author.bio`).  If the parameter is omitted or set to `*`, all fields passed in the request body are updated.
+	UpdateMask *UpdateMask `form:"updateMask,omitempty" json:"updateMask,omitempty"`
 }
 
 // ListCurrencyRevisionsParams defines parameters for ListCurrencyRevisions.
 type ListCurrencyRevisionsParams struct {
-	// PageSize Number of revisions per page
-	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+	// PageSize Number of elements per page
+	PageSize *ListPageSize `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
-	// PageToken Pagination token for retrieving the next page
-	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+	// PageToken Pagination token for retrieving the next page of results. Use the token from the previous response to get the next page.
+	PageToken *ListPageToken `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+
+	// Filter An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT), and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `author.name desc, title`).
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
+	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
 }
 
 // CreateCurrencyJSONRequestBody defines body for CreateCurrency for application/json ContentType.
 type CreateCurrencyJSONRequestBody = Currency
 
-// ExportCurrenciesJSONRequestBody defines body for ExportCurrencies for application/json ContentType.
-type ExportCurrenciesJSONRequestBody ExportCurrenciesJSONBody
-
-// ImportCurrenciesMultipartRequestBody defines body for ImportCurrencies for multipart/form-data ContentType.
-type ImportCurrenciesMultipartRequestBody ImportCurrenciesMultipartBody
-
 // UpdateCurrencyJSONRequestBody defines body for UpdateCurrency for application/json ContentType.
-type UpdateCurrencyJSONRequestBody = CurrencyUpdate
+type UpdateCurrencyJSONRequestBody = Currency
