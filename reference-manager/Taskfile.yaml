@@ -52,13 +52,10 @@ tasks:
 
   swagger:
     desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
-    vars:
-      OPENAPI_FILES:
-        sh: find api/openapi -name "openapi.yaml"
     cmds:
       - |
         URLS_JSON="["
-        for file in {{.OPENAPI_FILES}}; do
+        for file in $(find api/openapi -name "openapi.yaml"); do
           rel_path=${file#api/openapi/}
           name=$(dirname "$rel_path")
           URLS_JSON="${URLS_JSON}{\"url\":\"api/${rel_path}\",\"name\":\"${name}\"},"
