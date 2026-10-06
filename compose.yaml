@@ -86,7 +86,7 @@ services:
       KC_EXAMPLE_CALLER_SECRET: ${KC_EXAMPLE_CALLER_SECRET:-localdemoexamplecaller}
       KC_EXAMPLE_STRANGER_SECRET: ${KC_EXAMPLE_STRANGER_SECRET:-localdemoexamplestranger}
     volumes:
-      - ./keycloak/realm/desired.json:/realm/desired.json:ro
+      - ./infra/keycloak/realm/desired.json:/realm/desired.json:ro
       - ./infra/scripts/keycloak_converge.py:/scripts/keycloak_converge.py:ro
     command: ["python", "/scripts/keycloak_converge.py"]
     depends_on:

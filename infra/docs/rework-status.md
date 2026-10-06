@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | Нет комплекта документов | Шаг 0–5 | `infra/docs/` | `check-mermaid.py`, `validate-contracts.py` 06.10.2026 | verified |
 | Пустой Compose | Шаг 2 | `compose.yaml`, `compose.dev.yaml` | `docker compose config` и `infra/scripts/smoke.sh` exit 0 | verified |
-| Нет realm и клиентов | Шаг 2 | `keycloak/realm/desired.json` | Bootstrap повторно, токен `example-caller` после restart | verified |
+| Нет realm и клиентов | Шаг 2 | `infra/keycloak/realm/desired.json` | Bootstrap повторно, токен `example-caller` после restart | verified |
 | Нет MinIO | Шаг 2 | `infra/images/minio` | Сборка, digest `sha256:cc5db89840c1112b7b9f7bd1a765be04f48087d5bbf8c2f06ba9d064b6f7560f`, бакеты и эталон S3 | verified |
 | Нет эталонов | Шаг 3 | `infra/examples/` | `run-examples.sh`: успех, отказ, повтор, DLQ, OIDC, span коллектора | verified |
 | CI отключён | Шаг 7 | `.github/workflows/` | Файлы workflow разобраны; прогон GitHub Actions не выполнялся | implemented |
