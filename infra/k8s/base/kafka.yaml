@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      initContainers:
+        - name: prepare
+          image: apache/kafka:4.3.1
+          securityContext:
+            runAsUser: 0
+          command: ["bash", "/scripts/kafka-init.sh"]
+          envFrom:
+            - secretRef:
+                name: arch-infra-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: certs
+              mountPath: /var/lib/kafka/certs
+            - name: config
+              mountPath: /var/lib/kafka/config
+            - name: scripts
+              mountPath: /scripts
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1
+          command: ["/opt/kafka/bin/kafka-server-start.sh", "/var/lib/kafka/config/server.properties"]
+          ports:
+            - name: internal
+              containerPort: 9092
+            - name: external
+              containerPort: 29092
+          readinessProbe:
+            tcpSocket:
+              port: internal
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: certs
+              mountPath: /var/lib/kafka/certs
+            - name: config
+              mountPath: /var/lib/kafka/config
+        - name: bootstrap
+          image: apache/kafka:4.3.1
+          command: ["bash", "-c", "if [ -f /var/lib/kafka/config/bootstrapped ]; then sleep infinity; fi; until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 --command-config /var/lib/kafka/config/admin.properties; do sleep 2; done; bash /scripts/kafka-converge.sh; touch /var/lib/kafka/config/bootstrapped; sleep infinity"]
+          volumeMounts:
+            - name: certs
+              mountPath: /var/lib/kafka/certs
+            - name: config
+              mountPath: /var/lib/kafka/config
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: certs
+          emptyDir: {}
+        - name: config
+          emptyDir: {}
+        - name: scripts
+          configMap:
+            name: kafka-scripts
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: internal
+      port: 9092
