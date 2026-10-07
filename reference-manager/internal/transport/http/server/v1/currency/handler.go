@@ -6,8 +6,7 @@ import (
 	currencyv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/currency"
 )
 
-type Service interface {
-}
+type Service any
 
 type Handler struct {
 	service Service
