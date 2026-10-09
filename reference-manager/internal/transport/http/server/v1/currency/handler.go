@@ -12,6 +12,7 @@ import (
 //go:generate go run go.uber.org/mock/mockgen -source=handler.go -destination=mocks/service.go -package=mocks
 type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
+	DeleteCurrency(ctx context.Context, currencyID int64, force bool) (*currencydmn.ExpandedCurrency, error)
 }
 
 type Handler struct {
@@ -50,21 +51,27 @@ func (h *Handler) CreateCurrency(w http.ResponseWriter, r *http.Request) {
 
 // DeleteCurrency implements [currencyv1.ServerInterface].
 func (h *Handler) DeleteCurrency(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, params currencyv1.DeleteCurrencyParams) {
-	panic("unimplemented")
-}
+	force := false
+	if params.Force != nil {
+		force = *params.Force
+	}
 
-// ExportCurrencies implements [currencyv1.ServerInterface].
-func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request) {
-	panic("unimplemented")
+	deleted, err := h.service.DeleteCurrency(r.Context(), currencyID, force)
+	if err != nil {
+		apiErr, status := errToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, expandedCurrencyToAPI(deleted))
 }
 
 // GetCurrency implements [currencyv1.ServerInterface].
 func (h *Handler) GetCurrency(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, params currencyv1.GetCurrencyParams) {
-	panic("unimplemented")
-}
-
-// GetCurrencyRevision implements [currencyv1.ServerInterface].
-func (h *Handler) GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, revisionNumber currencyv1.RevisionNumber) {
 	panic("unimplemented")
 }
 
@@ -73,12 +80,22 @@ func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params 
 	panic("unimplemented")
 }
 
+// UpdateCurrency implements [currencyv1.ServerInterface].
+func (h *Handler) UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, params currencyv1.UpdateCurrencyParams) {
+	panic("unimplemented")
+}
+
+// GetCurrencyRevision implements [currencyv1.ServerInterface].
+func (h *Handler) GetCurrencyRevision(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, revisionNumber currencyv1.RevisionNumber) {
+	panic("unimplemented")
+}
+
 // ListCurrencyRevisions implements [currencyv1.ServerInterface].
 func (h *Handler) ListCurrencyRevisions(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, params currencyv1.ListCurrencyRevisionsParams) {
 	panic("unimplemented")
 }
 
-// UpdateCurrency implements [currencyv1.ServerInterface].
-func (h *Handler) UpdateCurrency(w http.ResponseWriter, r *http.Request, currencyID currencyv1.CurrencyID, params currencyv1.UpdateCurrencyParams) {
+// ExportCurrencies implements [currencyv1.ServerInterface].
+func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request) {
 	panic("unimplemented")
 }
