@@ -1,12 +1,18 @@
 package currencyhndl
 
 import (
+	"context"
 	"net/http"
 
+	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
 	currencyv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/currency"
+	"github.com/go-chi/render"
 )
 
-type Service any
+//go:generate go run go.uber.org/mock/mockgen -source=handler.go -destination=mocks/service.go -package=mocks
+type Service interface {
+	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
+}
 
 type Handler struct {
 	service Service
@@ -20,7 +26,26 @@ func NewHandler(service Service) *Handler {
 
 // CreateCurrency implements [currencyv1.ServerInterface].
 func (h *Handler) CreateCurrency(w http.ResponseWriter, r *http.Request) {
-	panic("unimplemented")
+	var currency currencyv1.Currency
+	if err := render.DecodeJSON(r.Body, &currency); err != nil {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, currencyv1.Error{Message: "failed to decode http request body"})
+
+		return
+	}
+
+	created, err := h.service.CreateCurrency(r.Context(), currencyToModel(&currency))
+	if err != nil {
+		apiErr, status := errToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusCreated)
+	render.JSON(w, r, expandedCurrencyToAPI(created))
 }
 
 // DeleteCurrency implements [currencyv1.ServerInterface].

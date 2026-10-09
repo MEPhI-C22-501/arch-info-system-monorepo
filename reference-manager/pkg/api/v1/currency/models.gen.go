@@ -5,8 +5,7 @@ package currencyv1
 
 import (
 	"time"
-
-	openapi_types "github.com/oapi-codegen/runtime/types"
+	"uuid"
 )
 
 // Currency Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
@@ -15,10 +14,10 @@ type Currency struct {
 	Code string `json:"code"`
 
 	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
-	Decimals int `json:"decimals"`
+	Decimals int8 `json:"decimals"`
 
 	// IsDeleted Indicates whether the currency record has been soft-deleted.
-	IsDeleted *bool `json:"is_deleted,omitempty"`
+	IsDeleted bool `json:"is_deleted"`
 
 	// Name Official name of the currency in Russian or English.
 	Name string `json:"name"`
@@ -36,7 +35,7 @@ type CurrencyRevision struct {
 	ChangedAt *time.Time `json:"changed_at,omitempty"`
 
 	// ChangedBy UUID of the user or system component that performed the change.
-	ChangedBy *openapi_types.UUID `json:"changed_by,omitempty"`
+	ChangedBy *uuid.UUID `json:"changed_by,omitempty"`
 
 	// CurrencyId Identifier of the currency this revision belongs to (references ISO 4217 standard currency data).
 	CurrencyId *int64 `json:"currency_id,omitempty"`
@@ -45,7 +44,7 @@ type CurrencyRevision struct {
 	Id *int64 `json:"id,omitempty"`
 
 	// RevisionNumber The sequential number of the revision, starting from 1.
-	RevisionNumber *int `json:"revision_number,omitempty"`
+	RevisionNumber *int32 `json:"revision_number,omitempty"`
 }
 
 // Error Standardized error response format for all API errors.
@@ -75,16 +74,16 @@ type ExpandedCurrency struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
-	Decimals int `json:"decimals"`
+	Decimals int8 `json:"decimals"`
 
 	// DeletedAt The date and time when the currency record was soft-deleted. Null if the record is active.
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	DeletedAt time.Time `json:"deleted_at"`
 
 	// IsDeleted Indicates whether the currency record has been soft-deleted.
-	IsDeleted *bool `json:"is_deleted,omitempty"`
+	IsDeleted bool `json:"is_deleted"`
 
 	// LastChanger UUID of the user or system component that performed the latest change.
-	LastChanger openapi_types.UUID `json:"last_changer"`
+	LastChanger uuid.UUID `json:"last_changer"`
 
 	// Name Official name of the currency in Russian or English.
 	Name string `json:"name"`
@@ -93,7 +92,7 @@ type ExpandedCurrency struct {
 	Number string `json:"number"`
 
 	// Revision The sequential number of the latest revision applied to this currency.
-	Revision int `json:"revision"`
+	Revision int32 `json:"revision"`
 
 	// UpdatedAt The date and time when the currency record was last updated.
 	UpdatedAt time.Time `json:"updated_at"`
@@ -112,7 +111,7 @@ type Filter = string
 type Force = bool
 
 // ListPageSize defines model for ListPageSize.
-type ListPageSize = int
+type ListPageSize = int64
 
 // ListPageToken defines model for ListPageToken.
 type ListPageToken = string

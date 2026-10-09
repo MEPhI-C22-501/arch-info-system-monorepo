@@ -5,5 +5,16 @@ generate:
   
 output-options:
   skip-prune: false
-  
+
+  type-mapping:
+    string:
+      formats:
+        uuid:
+          type: uuid.UUID
+          import: github.com/google/uuid
+
+    integer:
+      default:
+        type: int64
+
 output: pkg/api/v1/currency/models.gen.go
