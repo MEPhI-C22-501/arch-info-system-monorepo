@@ -1,0 +1,60 @@
+name: Task Tracker Checks
+
+on:
+  pull_request:
+    paths: ['task-tracker/**', '.github/workflows/task-tracker-checks.yaml']
+  push:
+    branches: [main]
+    paths: ['task-tracker/**', '.github/workflows/task-tracker-checks.yaml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: task-tracker/backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: task-tracker/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: task-tracker/frontend
+        run: npm ci
+      - name: Lint Java
+        working-directory: task-tracker/backend
+        run: mvn -B checkstyle:check
+      - name: Check TypeScript
+        working-directory: task-tracker/frontend
+        run: npm run lint
+      - name: Test backend
+        working-directory: task-tracker/backend
+        run: mvn -B test
+      - name: Test frontend
+        working-directory: task-tracker/frontend
+        run: npm test
+      - name: Build frontend
+        working-directory: task-tracker/frontend
+        run: npm run build
+      - name: Validate Compose and build images
+        working-directory: task-tracker
+        run: |
+          docker compose config --quiet
+          docker compose build
+      - name: Save test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-tracker-test-reports
+          path: task-tracker/backend/target/surefire-reports/
+          if-no-files-found: ignore
