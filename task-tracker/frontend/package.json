@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "lint": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
