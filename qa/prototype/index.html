@@ -139,6 +139,10 @@ function startRun(S, run) {
     throw new Error('SUITE_ALREADY_RUNNING: набор уже выполняется на этом окружении');
   run.status = 'IN_PROGRESS';
 }
+function lastResult(S, key) {
+  for (const run of S.runs) { const res = run.results.find(x => x.caseKey === key && x.status !== 'NOT_RUN'); if (res) return { run, res }; }
+  return null;
+}
 function versionOf(S, res) { return findCase(S, res.caseKey).versions.find(v => v.version === res.version); }
 function recordResult(S, run, res, status, failedStep, actual, by) {
   if (run.status !== 'IN_PROGRESS') throw new Error('RUN_FINISHED: результаты изменяются только в выполняющемся прогоне');
@@ -246,6 +250,11 @@ const VIEWS = {
       '<label>Название<input type="text" id="cTitle" value="' + esc(v.title) + '"' + (ed ? '' : ' disabled') + '></label>' +
       '<h3>Шаги версии ' + v.version + '</h3><table><tr><th>№</th><th>Действие</th><th>Ожидаемый результат</th></tr>' + v.steps.map((s, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(s[0]) + '</td><td>' + esc(s[1]) + '</td></tr>').join('') + '</table>' +
       (ed ? '<div class="bar" style="margin-top:10px"><input type="text" id="sAct" placeholder="Новый шаг: действие" style="flex:1;width:auto"><input type="text" id="sExp" placeholder="Ожидаемый результат" style="flex:1;width:auto"><button class="btn primary" data-act="saveCase">Сохранить версию</button></div>' : '') + '</div>' +
+      (() => { const lr = lastResult(S, c.key); return '<div class="panel"><h3 style="margin-top:0">Последний результат <span class="muted">(только чтение)</span></h3>' +
+        (lr ? '<p>' + tag(lr.res.status) + ' · прогон <a href="#" data-open="run:' + lr.run.key + '">' + lr.run.key + '</a> · окружение ' + lr.run.env + ' · версия кейса ' + lr.res.version +
+          (lr.res.failedStep ? ' · упал шаг ' + lr.res.failedStep : '') + '</p>' + (lr.res.actual ? '<p>Фактический результат: ' + esc(lr.res.actual) + '</p>' : '')
+          : '<div class="empty">Кейс ещё не выполнялся</div>') +
+        '<p class="muted">Фактический результат записывается в прогоне, а не в карточке кейса (ADR-014).</p></div>'; })() +
       '<div class="panel"><h3 style="margin-top:0">История версий</h3><table><tr><th>Версия</th><th>Автор</th><th>Дата</th><th>Изменено</th></tr>' + [...c.versions].reverse().map(x => '<tr><td>' + x.version + '</td><td>' + x.author + '</td><td>' + x.at + '</td><td>' + esc(x.changed.join(', ')) + '</td></tr>').join('') + '</table></div>';
   },
   plans() {
