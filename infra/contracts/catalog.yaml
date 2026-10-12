@@ -1,0 +1,82 @@
+# Индекс контрактов. Спецификации не копируются.
+apis:
+  - id: task-tracker
+    owner: task-tracker
+    path: task-tracker/docs/block-g-api-and-events/openapi.yaml
+    version: 1.1.0-draft
+    base_path: /api
+    implementation: server-present
+    status: draft
+    validation: team-task-tracker
+  - id: planning-system
+    owner: planning-system
+    path: planning-system/docs/contracts/openapi.json
+    version: "1.0.0"
+    base_path: /api/v1
+    implementation: documents-only
+    status: draft
+    validation: none
+  - id: planning-task-tracker-receiver
+    owner: planning-system
+    path: planning-system/docs/contracts/task-tracker-receiver.openapi.json
+    version: consumer-proposal
+    base_path: unknown
+    implementation: not-publisher-contract
+    status: draft
+    validation: compare-with-task-tracker
+  - id: reference-manager-health
+    owner: reference-manager
+    path: reference-manager/api/openapi/v1/health/openapi.yaml
+    version: "1.0.0"
+    base_path: /v1/health
+    implementation: server-present
+    status: implemented
+    validation: reference-manager-checks
+  - id: reference-manager-currency
+    owner: reference-manager
+    path: reference-manager/api/openapi/v1/currency/openapi.yaml
+    version: "1.0.0"
+    base_path: /v1
+    implementation: server-present
+    status: implemented
+    validation: reference-manager-checks
+  - id: reference-manager-root
+    owner: reference-manager
+    path: reference-manager/api/openapi/v1/openapi.yaml
+    version: missing
+    base_path: /v1
+    implementation: file-missing
+    status: draft
+    validation: team-must-add-or-correct-130
+  - id: reports
+    owner: reports
+    path: reports/api/openapi/v1/openapi.yaml
+    version: 0.1.0-draft
+    base_path: /api/v1
+    implementation: documents-only
+    status: draft
+    validation: none
+  - id: qa
+    owner: qa
+    path: qa/api/openapi/v1/openapi.yaml
+    version: 0.1.0-draft
+    base_path: /api/v1
+    implementation: documents-only
+    status: draft
+    validation: none
+events:
+  - topic: task-tracker.events.v1
+    publisher: task-tracker
+    status: draft
+  - topic: dev.qa.test-run.v1
+    publisher: qa
+    status: draft
+  - topic: dev.qa.defect.v1
+    publisher: qa
+    status: draft
+  - topic: dev.infra.examples.v1
+    publisher: infra-example
+    status: implemented
+schemas:
+  - path: infra/contracts/schemas/envelope.schema.json
+  - path: infra/contracts/schemas/dlq.schema.json

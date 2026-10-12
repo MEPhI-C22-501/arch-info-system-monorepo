@@ -1,0 +1,28 @@
+name: Infrastructure checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Compose config
+        run: |
+          docker compose -f compose.yaml config --quiet
+          docker compose -f compose.yaml -f compose.dev.yaml config --quiet
+          docker compose -f compose.yaml -f compose.dev.yaml -f compose.examples.yaml config --quiet
+      - name: Whitespace
+        run: git diff --check "origin/${{ github.base_ref || 'main' }}...HEAD"
+      - name: Contracts and diagrams
+        run: |
+          python3 -m pip install --user jsonschema==4.26.0 PyYAML==6.0.3
+          python3 infra/scripts/validate-contracts.py
+          python3 infra/scripts/check-mermaid.py

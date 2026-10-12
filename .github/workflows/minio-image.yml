@@ -1,0 +1,21 @@
+name: MinIO image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build from pinned source release
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: infra/images/minio
+          push: false
+          tags: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+          # Публикация включается после появления namespace и прав. PR этот job не запускает.

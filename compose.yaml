@@ -1,3 +1,288 @@
-# Общая конфигурация развёртывания через Docker Compose.
-# Состав сервисов и правила подключения приложений команд описаны в infra/vision.md.
-services: {}
+name: arch-info
+
+# Базовая среда. Порты хоста задаёт compose.dev.yaml.
+# Локально Keycloak работает через start-dev и HTTP. Общий стенд с TLS этим файлом не подменяется.
+# Контроллер Kafka слушает PLAINTEXT только внутри сети и наружу не публикуется.
+# Клиентские listener-ы — SASL_SSL.
+
+x-kafka-credentials: &kafka-credentials
+  KAFKA_SSL_PASSWORD: ${KAFKA_SSL_PASSWORD:-localdemokafkassl}
+  KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:-localdemokafkaadmin}
+  KAFKA_TASK_TRACKER_PASSWORD: ${KAFKA_TASK_TRACKER_PASSWORD:-localdemokafkatt}
+  KAFKA_PLANNING_PASSWORD: ${KAFKA_PLANNING_PASSWORD:-localdemokafkapl}
+  KAFKA_REPORTS_PASSWORD: ${KAFKA_REPORTS_PASSWORD:-localdemokafkarep}
+  KAFKA_QA_PASSWORD: ${KAFKA_QA_PASSWORD:-localdemokafkaqa}
+  KAFKA_REFERENCE_MANAGER_PASSWORD: ${KAFKA_REFERENCE_MANAGER_PASSWORD:-localdemokafkarm}
+  KAFKA_EXAMPLE_PASSWORD: ${KAFKA_EXAMPLE_PASSWORD:-localdemokafkaex}
+
+services:
+  keycloak-db:
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-localdemokeycloakdb}
+    volumes:
+      - keycloak-db:/var/lib/postgresql
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-localdemokeycloakadmin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-localdemokeycloakdb}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks: [edge, data]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+    restart: unless-stopped
+
+  keycloak-bootstrap:
+    image: arch-info-tools:2026.10.06
+    build:
+      context: infra/images/tools
+    user: "0:0"
+    environment:
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_DESIRED: /realm/desired.json
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-localdemokeycloakadmin}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-localdemouserpass}
+      KC_PROVISIONER_SECRET: ${KC_PROVISIONER_SECRET:-localdemoprovisioner}
+      KC_TESTING_CLIENT_SECRET: ${KC_TESTING_CLIENT_SECRET:-localdemotesting}
+      KC_REPORTS_CLIENT_SECRET: ${KC_REPORTS_CLIENT_SECRET:-localdemoreports}
+      KC_PLANNING_SERVICE_SECRET: ${KC_PLANNING_SERVICE_SECRET:-localdemoplan}
+      KC_QA_CI_SECRET: ${KC_QA_CI_SECRET:-localdemoqaci}
+      KC_QA_EXECUTOR_SECRET: ${KC_QA_EXECUTOR_SECRET:-localdemoqaexec}
+      KC_EXAMPLE_API_SECRET: ${KC_EXAMPLE_API_SECRET:-localdemoexampleapi}
+      KC_EXAMPLE_CALLER_SECRET: ${KC_EXAMPLE_CALLER_SECRET:-localdemoexamplecaller}
+      KC_EXAMPLE_STRANGER_SECRET: ${KC_EXAMPLE_STRANGER_SECRET:-localdemoexamplestranger}
+    volumes:
+      - ./infra/keycloak/realm/desired.json:/realm/desired.json:ro
+      - ./infra/scripts/keycloak_converge.py:/scripts/keycloak_converge.py:ro
+    command: ["python", "/scripts/keycloak_converge.py"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks: [edge]
+    restart: "no"
+
+  kafka-init:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    user: "0:0"
+    entrypoint: ["bash", "/scripts/kafka-init.sh"]
+    environment:
+      <<: *kafka-credentials
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - kafka-certs:/var/lib/kafka/certs
+      - kafka-config:/var/lib/kafka/config
+      - ./infra/scripts/kafka-init.sh:/scripts/kafka-init.sh:ro
+    networks: [edge]
+    restart: "no"
+
+  kafka:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    user: "1000:1000"
+    command: ["/opt/kafka/bin/kafka-server-start.sh", "/var/lib/kafka/config/server.properties"]
+    environment:
+      KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - kafka-certs:/var/lib/kafka/certs
+      - kafka-config:/var/lib/kafka/config
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [edge]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 --command-config /var/lib/kafka/config/admin.properties",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  kafka-bootstrap:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    user: "1000:1000"
+    entrypoint: ["bash", "/scripts/kafka-converge.sh"]
+    volumes:
+      - kafka-certs:/var/lib/kafka/certs:ro
+      - kafka-config:/var/lib/kafka/config:ro
+      - ./infra/scripts/kafka-converge.sh:/scripts/kafka-converge.sh:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [edge]
+    restart: "no"
+
+  minio:
+    build:
+      context: infra/images/minio
+    image: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-localdemominioroot}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-localdemominiorootpass}
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - minio-data:/data
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  minio-bootstrap:
+    image: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+    entrypoint: ["bash", "/scripts/minio-converge.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-localdemominioroot}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-localdemominiorootpass}
+      S3_TASK_TRACKER_SECRET: ${S3_TASK_TRACKER_SECRET:-localdemos3tasktracker}
+      S3_PLANNING_SECRET: ${S3_PLANNING_SECRET:-localdemos3planning}
+      S3_REFERENCE_MANAGER_SECRET: ${S3_REFERENCE_MANAGER_SECRET:-localdemos3reference}
+      S3_REPORTS_SECRET: ${S3_REPORTS_SECRET:-localdemos3reports}
+      S3_QA_SECRET: ${S3_QA_SECRET:-localdemos3qa}
+      S3_EXAMPLE_WRITER_SECRET: ${S3_EXAMPLE_WRITER_SECRET:-localdemos3writer}
+      S3_EXAMPLE_READER_SECRET: ${S3_EXAMPLE_READER_SECRET:-localdemos3reader}
+      S3_EXAMPLE_STRANGER_SECRET: ${S3_EXAMPLE_STRANGER_SECRET:-localdemos3stranger}
+    volumes:
+      - ./infra/scripts/minio-converge.sh:/scripts/minio-converge.sh:ro
+      - ./infra/config/minio/policies:/policies:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks: [edge]
+    restart: "no"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.149.0@sha256:0fba96233274f6d665ac8831ad99dfe6479a9a20459f6e2719c0d20945773b46
+    user: "0:0"
+    command: ["--config=file:/etc/otel/collector.yaml"]
+    volumes:
+      - ./infra/config/otel/collector.yaml:/etc/otel/collector.yaml:ro
+      - otel-data:/var/lib/otel
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "validate", "--config=file:/etc/otel/collector.yaml"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  reports-db:
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: reports
+      POSTGRES_USER: reports
+      POSTGRES_PASSWORD: ${REPORTS_DB_PASSWORD:-localdemoreportsdb}
+      REPORTS_REPL_PASSWORD: ${REPORTS_REPL_PASSWORD:-localdemorepl}
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - hot_standby=on
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - listen_addresses=*
+    volumes:
+      - reports-db:/var/lib/postgresql
+      - ./infra/config/postgres/10-replication.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reports -d reports"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  reports-db-replica:
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      REPORTS_REPL_PASSWORD: ${REPORTS_REPL_PASSWORD:-localdemorepl}
+      PGDATA: /var/lib/postgresql/18/docker
+    entrypoint: ["bash", "/scripts/replica-entrypoint.sh"]
+    volumes:
+      - reports-replica:/var/lib/postgresql
+      - ./infra/config/postgres/replica-entrypoint.sh:/scripts/replica-entrypoint.sh:ro
+    depends_on:
+      reports-db:
+        condition: service_healthy
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reports -d reports"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  reports-seed:
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      PGPASSWORD: ${REPORTS_DB_PASSWORD:-localdemoreportsdb}
+    entrypoint: ["bash", "-c", "psql -h reports-db -U reports -d reports -v ON_ERROR_STOP=1 -f /seed/reports-mart.sql"]
+    volumes:
+      - ./infra/seed/reports-mart.sql:/seed/reports-mart.sql:ro
+    depends_on:
+      reports-db:
+        condition: service_healthy
+    networks: [data]
+    restart: "no"
+
+networks:
+  edge:
+  data:
+    internal: true
+
+volumes:
+  keycloak-db:
+  kafka-data:
+  kafka-certs:
+  kafka-config:
+  minio-data:
+  otel-data:
+  reports-db:
+  reports-replica:

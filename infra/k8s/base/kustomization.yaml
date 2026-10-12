@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: arch-infra
+resources:
+  - namespaces.yaml
+  - data.yaml
+  - keycloak.yaml
+  - kafka.yaml
+  - minio.yaml
+  - otel.yaml
+configMapGenerator:
+  - name: otel-config
+    files:
+      - collector.yaml=../../config/otel/collector.yaml
+  - name: reports-db-init
+    files:
+      - 10-replication.sh=../../config/postgres/10-replication.sh
+      - replica-entrypoint.sh=../../config/postgres/replica-entrypoint.sh
+  - name: kafka-scripts
+    files:
+      - kafka-init.sh=../../scripts/kafka-init.sh
+      - kafka-converge.sh=../../scripts/kafka-converge.sh
+generatorOptions:
+  disableNameSuffixHash: true

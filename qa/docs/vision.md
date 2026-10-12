@@ -21,7 +21,7 @@ QA System хранит тест-кейсы, собирает их в тест-п
 
 ### 1.2. Место в системе
 
-Пользователь входит через [Keycloak](../../keycloak/README.md). Итерации берутся из [Task Tracker](../../task-tracker/README.md), релизные рамки и вехи — из [Planning System](../../planning-system/README.md), классификаторы — из [Reference Manager](../../reference-manager/README.md). Дефекты публикуются в Task Tracker как задачи вида «Ошибка»: в требованиях заказчика эта роль отведена TFS, в нашем ландшафте её выполняет Task Tracker. Результаты тестирования забирает [Reports](../../reports/docs/vision.md) для отчётов R-07 и R-09. Вложения лежат в S3, события идут через Kafka, развёртывание обеспечивает [Infra](../../infra/vision.md).
+Пользователь входит через [Keycloak](../../infra/keycloak/README.md). Итерации берутся из [Task Tracker](../../task-tracker/README.md), релизные рамки и вехи — из [Planning System](../../planning-system/README.md), классификаторы — из [Reference Manager](../../reference-manager/README.md). Дефекты публикуются в Task Tracker как задачи вида «Ошибка»: в требованиях заказчика эта роль отведена TFS, в нашем ландшафте её выполняет Task Tracker. Результаты тестирования забирает [Reports](../../reports/docs/vision.md) для отчётов R-07 и R-09. Вложения лежат в S3, события идут через Kafka, развёртывание обеспечивает [Infra](../../infra/vision.md).
 
 На схеме QA System показана одним блоком: видно только, с кем она обменивается данными.
 

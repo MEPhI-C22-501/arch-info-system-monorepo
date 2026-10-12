@@ -1,14 +1,23 @@
 name: Deploy
 
-# Заготовка: развёртывание будет добавлено после настройки стенда и образов.
+# Внешний хост не подключён. Workflow проверяет манифест выпуска и не получает секреты публикации.
 on:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
-  deploy:
-    if: ${{ false }}
+  release-manifest:
     runs-on: ubuntu-latest
     steps:
-      - run: echo 'Развёртывание стенда пока не настроено.'
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Validate release manifest
+        run: |
+          python3 -m pip install --user PyYAML==6.0.3
+          python3 infra/scripts/validate-release.py
+      - name: External deploy
+        run: |
+          echo "Площадка, TLS и runner стенда не заданы. Доставка наружу не выполняется."
+          exit 0
