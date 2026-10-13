@@ -1,0 +1,6 @@
+# build context of the interface image: only the static files and the nginx configuration
+**
+!frontend/admin/**
+frontend/admin/tests/**
+frontend/admin/README.md
+!deployments/nginx/**

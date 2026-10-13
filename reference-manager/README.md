@@ -9,14 +9,14 @@ The service is the single source of reference data and HR master data: employees
 | Path | Contents |
 | --- | --- |
 | `backend/` | Go service: `cmd/`, `internal/`, `pkg/`, OpenAPI specs in `api/openapi/`, integration tests in `tests/`, `go.mod`, lint and Docker ignore files |
-| `frontend/` | Administration interface. Today it holds only the mock prototype `frontend/prototype/index.html` |
+| `frontend/` | Administration interface: `frontend/admin/` is the step 1 admin panel on mock data (see its README), `frontend/prototype/index.html` is the original single-file prototype |
 | `deployments/` | Dockerfiles, Docker Compose, configuration examples and database migrations of both parts |
 | `documents/` | Requirements and design documents (in Russian) |
 | `Taskfile.yaml` | Entry point for every command below. Run `task` from this directory, it switches into `backend/` where needed |
 
 ## Requirements
 
-Make sure the following tools are installed: [Go](https://go.dev/doc/install), [Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [task](https://github.com/go-task/task) and [migrate](https://github.com/golang-migrate/migrate)
+Make sure the following tools are installed: [Go](https://go.dev/doc/install), [Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [task](https://github.com/go-task/task) and [migrate](https://github.com/golang-migrate/migrate). [Node.js](https://nodejs.org/) 18 or newer runs the frontend tests (`task tests:frontend`).
 
 ## Configuration
 
@@ -137,7 +137,7 @@ Build the application, create Docker images, and start all required services:
 task up
 ```
 
-The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`.
+The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`. The admin panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`).
 
 To stop the local environment and remove its associated volumes:
 
