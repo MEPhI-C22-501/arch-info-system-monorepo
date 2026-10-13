@@ -127,7 +127,35 @@ table('Operation (техническая)','operations',[
  'Один результат на неизменный набор входов; после lease timeout допустим повтор с тем же ключом.',
  'UNIQUE(operation_type,input_hash); INDEX(status,lease_until)');
 
-let md = `# 120 — Физическая модель данных\n\nРедакция 1.0, 05.10.2026. Проект PostgreSQL, миграции ещё не реализованы.\nИсточник доменной семантики — [050](050.entities.md); решения — [145](145.architecture-decisions.md).\nГенератор: [build-data-model.mjs](../scripts/build-data-model.mjs).\n\n## Правила хранения\n\nNN означает NOT NULL; NULL допускается только явно. PK каждой таблицы — id.\nУ всех строк created_at/created_by; revision есть только у изменяемых записей.\nUUID задаёт приложение; decimal не float. UTC для моментов, date + IANA TZ для\nкалендаря. Все FK локальные, ON DELETE RESTRICT по умолчанию. Полиморфные/внешние\nссылки проверяет сервис. Бизнес-объекты архивируются статусом, физического delete нет.\nУдалять дочерние строки DRAFT можно только через доменную транзакцию с проверкой\nссылок; каскадного удаления исторических данных нет. Только export_rows допускает\nON DELETE CASCADE от EXPIRED export_batches при регламентной очистке.\n\nJSONB не отменяет схему: referenceSnapshot и inputSnapshot сохраняют методику,\nзначения, source revisions и ручные оценки с автором; envelope определяется 140.\nИзменение состояния после APPROVED не разрешает менять плановое содержимое.\nТриггеры/сервисные транзакции проверяют это также для дочерних таблиц.\n\n## ER-диаграмма\n\n\`\`\`mermaid\nerDiagram\n`;
+let md = `# 120 — Физическая модель данных\n\nРедакция 1.1, 13.10.2026. Целевая нормализованная модель и фактическое snapshot-хранение.\nИсточник доменной семантики — [050](050.entities.md); решения — [145](145.architecture-decisions.md).\nГенератор: [build-data-model.mjs](../scripts/build-data-model.mjs).\n\n## Правила хранения\n\nNN означает NOT NULL; NULL допускается только явно. PK каждой таблицы — id.\nУ всех строк created_at/created_by; revision есть только у изменяемых записей.\nUUID задаёт приложение; decimal не float. UTC для моментов, date + IANA TZ для\nкалендаря. Все FK локальные, ON DELETE RESTRICT по умолчанию. Полиморфные/внешние\nссылки проверяет сервис. Бизнес-объекты архивируются статусом, физического delete нет.\nУдалять дочерние строки DRAFT можно только через доменную транзакцию с проверкой\nссылок; каскадного удаления исторических данных нет. Только export_rows допускает\nON DELETE CASCADE от EXPIRED export_batches при регламентной очистке.\n\nJSONB не отменяет схему: referenceSnapshot и inputSnapshot сохраняют методику,\nзначения, source revisions и ручные оценки с автором; envelope определяется 140.\nИзменение состояния после APPROVED не разрешает менять плановое содержимое.\nТриггеры/сервисные транзакции проверяют это также для дочерних таблиц.\n\n## Концептуальная UML-модель
+
+\`\`\`mermaid
+classDiagram
+  Project "1" *-- "0..*" PlanVersion
+  PlanVersion "1" *-- "0..*" PlanItem
+  PlanItem "1" *-- "0..*" ResourceDemand
+  ResourceDemand "1" o-- "0..*" Allocation
+  Project "1" o-- "0..*" TaskSnapshot
+  PlanVersion "1" o-- "0..*" ForecastSnapshot
+  Project "0..1" o-- "0..*" Attachment
+  PlanVersion "0..1" o-- "0..*" Attachment
+\`\`\`
+
+Доменная связь Attachment — XOR; logicalItemId переживает копирование версии.
+HR-профиль и задача принадлежат внешним мастерам; локально сохраняются проекции.
+
+## Фактическая схема исполняемой версии
+
+По [ADR-015](145.architecture-decisions.md) текущая поставка использует
+[001-schema.sql](../migrations/001-schema.sql) и
+[002-baseline-guard.sql](../migrations/002-baseline-guard.sql): records (JSONB
+snapshot, составной PK, область/проект/revision), request_results (идемпотентность),
+audit (append-only), schema_versions. [Реализация](../server/storage.py) запускает
+те же миграции. Ниже сохранена целевая нормализация 24 таблиц; она не выдаётся
+за уже установленную физическую схему. Перенос должен сохранить контрактные
+snapshots, ID и baseline и пройти T-TECH/регрессию.
+
+## ER-диаграмма\n\n\`\`\`mermaid\nerDiagram\n`;
 for(const t of tables){md+=`  ${t.name} {\n`; for(const [n,ty,c] of t.fields)md+=`    ${ty.replace(/\(.+?\)/g,'').replace('[]','_array')} ${n}${c.includes('PK')?' PK':c.includes('FK')?' FK':''}\n`; md+='  }\n';}
 const rels=[['portfolios','programs'],['portfolios','projects'],['projects','plan_versions'],['plan_versions','plan_items'],['plan_items','dependencies'],['plan_items','resource_demands'],['resource_demands','allocations'],['plan_versions','review_requirements'],['review_requirements','approval_decisions'],['projects','task_snapshots'],['plan_versions','forecast_snapshots'],['forecast_snapshots','forecast_lines'],['plan_items','forecast_lines'],['projects','attachments'],['plan_versions','attachments'],['plan_versions','publications'],['projects','notifications'],['projects','iteration_snapshots'],['projects','outbox_messages'],['portfolios','export_batches'],['export_batches','export_rows'],['plan_versions','operations']];
 for(const [a,b]of rels)md+=`  ${a} ||--o{ ${b} : references\n`;

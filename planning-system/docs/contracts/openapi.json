@@ -2884,11 +2884,14 @@
                 "type": "object",
                 "properties": {
                   "baseVersionId": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "minLength": 1,
                     "description": "Устойчивый UUID",
                     "examples": [
-                      "10000000-0000-4000-8000-000000000001"
+                      null
                     ],
                     "format": "uuid"
                   },
@@ -2922,7 +2925,7 @@
               "examples": {
                 "success": {
                   "value": {
-                    "baseVersionId": "10000000-0000-4000-8000-000000000001",
+                    "baseVersionId": null,
                     "kind": "PLAN",
                     "name": "Сценарий 2"
                   }

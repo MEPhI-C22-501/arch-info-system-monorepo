@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-13",
+  "timezone": "Europe/Moscow",
+  "baseMain": "27864b5e707a77b922cb4fb7db5df68be4271fe3",
+  "documentation": {
+    "checks": {
+      "links": 741,
+      "markdown": 41,
+      "events": 35,
+      "http_examples": 275,
+      "operations": 36
+    },
+    "requirements": {
+      "covered": 17,
+      "partial": 28
+    },
+    "stories": 20,
+    "errors": 0
+  },
+  "postgres": {
+    "python": "3.12",
+    "image": "postgres:16.6-alpine",
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sqlite": {
+    "python": "3.14.3",
+    "passed": 19,
+    "skipped": 1,
+    "reason": "PostgreSQL trigger requires PostgreSQL"
+  },
+  "browser": {
+    "app": "http://127.0.0.1:8080",
+    "checks": [
+      "server persistence",
+      "resource conflict and confirmation",
+      "review and activation",
+      "scenario isolation",
+      "review return",
+      "forecast",
+      "file upload",
+      "XSS escaping",
+      "role navigation",
+      "personal calendar",
+      "mobile"
+    ],
+    "errors": []
+  },
+  "codeCheck": "ruff E9,F63,F7,F82 passed; JS syntax passed",
+  "stand": {
+    "composeProject": "planning-review-ready-20261013",
+    "api": "healthy",
+    "postgres": "healthy",
+    "migration": "exit 0",
+    "worker": "running",
+    "url": "http://localhost:8080",
+    "imageId": "sha256:547d8ec81a12c76577a636913d2a44c77276420c6bda84c0401cd3d6a1b90602",
+    "mode": "development, synthetic seed, mock receipts"
+  },
+  "notVerified": [
+    "GitHub CI execution and registry publication",
+    "minikube live smoke/PVC",
+    "real external services",
+    "full NFR and security checklist",
+    "restore and telemetry",
+    "Kafka/notification DLQ"
+  ]
+}
