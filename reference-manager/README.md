@@ -4,6 +4,16 @@
 
 The service is the single source of reference data and HR master data: employees (HR profiles), organizational units, positions with dated assignments, salaries and absences, and shared classifiers such as currencies and countries. User accounts, passwords and access roles live in Keycloak; the service creates an account when an employee is hired and disables it on dismissal. It exposes a REST API with one collection per catalog for listing, reading, creating, updating and soft-deleting records. Requirements and design documents are in [documents/](documents/README.md).
 
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `backend/` | Go service: `cmd/`, `internal/`, `pkg/`, OpenAPI specs in `api/openapi/`, integration tests in `tests/`, `go.mod`, lint and Docker ignore files |
+| `frontend/` | Administration interface. Today it holds only the mock prototype `frontend/prototype/index.html` |
+| `deployments/` | Dockerfiles, Docker Compose, configuration examples and database migrations of both parts |
+| `documents/` | Requirements and design documents (in Russian) |
+| `Taskfile.yaml` | Entry point for every command below. Run `task` from this directory, it switches into `backend/` where needed |
+
 ## Requirements
 
 Make sure the following tools are installed: [Go](https://go.dev/doc/install), [Docker](https://docs.docker.com/engine/install/), [Docker Compose](https://docs.docker.com/compose/install/), [task](https://github.com/go-task/task) and [migrate](https://github.com/golang-migrate/migrate)

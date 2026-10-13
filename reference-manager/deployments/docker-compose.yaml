@@ -3,8 +3,8 @@ services:
     container_name: reference_manager
     image: erp/reference-manager:dev
     build:
-      context: ..
-      dockerfile: deployments/docker/reference-manager.dockerfile
+      context: ../backend
+      dockerfile: ../deployments/docker/reference-manager.dockerfile
 
     command: [ "--configs", "/app/configs/reference-manager" ]
 
