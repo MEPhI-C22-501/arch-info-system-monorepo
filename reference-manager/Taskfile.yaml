@@ -1,15 +1,26 @@
 version: '3'
 
+# entry point for the whole module, run `task` from reference-manager/
+# layout: backend/ (Go service), frontend/ (administration interface),
+# deployments/ (Dockerfiles, Compose, configs, migrations of both parts)
+
+vars:
+  BACKEND_DIR: backend
+  FRONTEND_DIR: frontend
+  BACKEND_DOCKERFILE: deployments/docker/reference-manager.dockerfile
+  BACKEND_IMAGE: erp/reference-manager:latest
+
 tasks:
   generate:
-    desc: Generate all artifacts (server, models, client)
+    desc: Generate backend artifacts from the OpenAPI specs (server, models, client)
+    dir: '{{.BACKEND_DIR}}'
     cmds:
       - |
         find api/openapi -name "openapi.yaml" -type f | while read file; do
           dir=$(dirname "$file")
-          
+
           configs=("codegen.server.yaml" "codegen.models.yaml" "codegen.client.yaml")
-          
+
           for config_name in "${configs[@]}"; do
             config="$dir/$config_name"
             if [ -f "$config" ]; then
@@ -22,11 +33,28 @@ tasks:
   lint:
     desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
+      - task: lint:backend
+      - task: lint:docker
+
+  lint:backend:
+    desc: Run golangci-lint on the backend
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
       - golangci-lint run ./... {{.CLI_ARGS}}
-      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < deployments/docker/reference-manager.dockerfile
+
+  lint:docker:
+    desc: Run hadolint on the backend Dockerfile
+    cmds:
+      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.BACKEND_DOCKERFILE}}
 
   tests:
     desc: Run all tests
+    cmds:
+      - task: tests:backend
+
+  tests:backend:
+    desc: Run backend tests
+    dir: '{{.BACKEND_DIR}}'
     cmds:
       - echo "not implemented"
 
@@ -36,15 +64,20 @@ tasks:
       - migrate create -ext sql -dir deployments/migrations -seq {{.CLI_ARGS}}
 
   build:
-    desc: Build Docker image for the reference manager application
+    desc: Build Docker images of the module
     cmds:
-      - docker build -f deployments/docker/reference-manager.dockerfile -t erp/reference-manager:latest .
+      - task: build:backend
+
+  build:backend:
+    desc: Build the backend Docker image
+    cmds:
+      - docker build -f {{.BACKEND_DOCKERFILE}} -t {{.BACKEND_IMAGE}} {{.BACKEND_DIR}}
 
   up:
     desc: Start the local development environment using Docker Compose
     cmds:
       - docker compose -f deployments/docker-compose.yaml up -d --build
-  
+
   down:
     desc: Stop the local environment and remove associated volumes
     cmds:
@@ -52,6 +85,7 @@ tasks:
 
   swagger:
     desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
+    dir: '{{.BACKEND_DIR}}'
     cmds:
       - |
         URLS_JSON="["
