@@ -9,6 +9,8 @@ vars:
   FRONTEND_DIR: frontend
   BACKEND_DOCKERFILE: deployments/docker/reference-manager.dockerfile
   BACKEND_IMAGE: erp/reference-manager:latest
+  FRONTEND_DOCKERFILE: deployments/docker/reference-manager-ui.dockerfile
+  FRONTEND_IMAGE: erp/reference-manager-ui:latest
 
 tasks:
   generate:
@@ -43,20 +45,27 @@ tasks:
       - golangci-lint run ./... {{.CLI_ARGS}}
 
   lint:docker:
-    desc: Run hadolint on the backend Dockerfile
+    desc: Run hadolint on the Dockerfiles of the backend and the frontend
     cmds:
       - docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.BACKEND_DOCKERFILE}}
+      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.FRONTEND_DOCKERFILE}}
 
   tests:
     desc: Run all tests
     cmds:
       - task: tests:backend
+      - task: tests:frontend
 
   tests:backend:
     desc: Run backend tests
     dir: '{{.BACKEND_DIR}}'
     cmds:
       - echo "not implemented"
+
+  tests:frontend:
+    desc: Run the unit tests of the admin panel (Node 18+, no dependencies)
+    cmds:
+      - node --test {{.FRONTEND_DIR}}/admin/tests/*.test.js
 
   migration:
     desc: Create new migration file
@@ -67,11 +76,17 @@ tasks:
     desc: Build Docker images of the module
     cmds:
       - task: build:backend
+      - task: build:frontend
 
   build:backend:
     desc: Build the backend Docker image
     cmds:
       - docker build -f {{.BACKEND_DOCKERFILE}} -t {{.BACKEND_IMAGE}} {{.BACKEND_DIR}}
+
+  build:frontend:
+    desc: Build the frontend Docker image (nginx with the admin panel under /admin/)
+    cmds:
+      - docker build -f {{.FRONTEND_DOCKERFILE}} -t {{.FRONTEND_IMAGE}} .
 
   up:
     desc: Start the local development environment using Docker Compose
