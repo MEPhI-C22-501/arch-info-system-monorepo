@@ -1,1 +1,274 @@
 package http
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"slices"
+	"strings"
+
+	"github.com/cucumber/godog"
+	"github.com/wI2L/jsondiff"
+
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/internal/gherkin"
+)
+
+var fileBodyExts = []string{".json"}
+
+type Steps struct {
+	baseURL string
+	client  *http.Client
+
+	featureURI string
+
+	method  string
+	query   url.Values
+	headers http.Header
+	body    []byte
+
+	response     *http.Response
+	responseBody []byte
+}
+
+func New(baseURL string, client *http.Client) *Steps {
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	return &Steps{
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+		client:  client,
+	}
+}
+
+func (s *Steps) Register(sc *godog.ScenarioContext) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		s.reset(scenario.Uri)
+		return ctx, nil
+	})
+
+	sc.Step(`^a (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) HTTP request$`, s.aRequest)
+	sc.Step(`^the HTTP request contains URL parameters$`, s.requestContainsURLParameters)
+	sc.Step(`^the HTTP request contains headers$`, s.requestContainsHeaders)
+	sc.Step(`^the HTTP request contains a body$`, s.requestContainsBody)
+	sc.Step(`^the HTTP request contains a body from file "([^"]*)"$`, s.requestContainsBodyFromFile)
+	sc.Step(`^the HTTP request is sent to "([^"]*)"$`, s.requestIsSentTo)
+	sc.Step(`^an HTTP response is received with status (\d+)$`, s.responseIsReceivedWithStatus)
+	sc.Step(`^the HTTP response contains headers$`, s.responseContainsHeaders)
+	sc.Step(`^the HTTP response contains a body$`, s.responseContainsBody)
+	sc.Step(`^the HTTP response contains a body from file "([^"]*)"$`, s.responseContainsBodyFromFile)
+}
+
+func (s *Steps) reset(featureURI string) {
+	s.featureURI = featureURI
+	s.method = ""
+	s.query = url.Values{}
+	s.headers = http.Header{}
+	s.body = nil
+	s.response = nil
+	s.responseBody = nil
+}
+
+func (s *Steps) aRequest(method string) error {
+	s.method = method
+	return nil
+}
+
+func (s *Steps) requestContainsURLParameters(params *godog.DocString) error {
+	for i, line := range strings.Split(params.Content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return fmt.Errorf("line %d: URL parameter must be in form key=value: %q", i+1, line)
+		}
+
+		s.query.Add(strings.TrimSpace(key), strings.TrimSpace(value))
+	}
+
+	return nil
+}
+
+func (s *Steps) requestContainsHeaders(headers *godog.DocString) error {
+	table, err := parseHeaderTable(headers.Content)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range table.Rows {
+		s.headers.Add(row[0], row[1])
+	}
+
+	return nil
+}
+
+func (s *Steps) requestContainsBody(body *godog.DocString) error {
+	s.body = []byte(body.Content)
+	return nil
+}
+
+func (s *Steps) requestContainsBodyFromFile(path string) error {
+	body, err := gherkin.ReadFile(s.featureURI, path, fileBodyExts...)
+	if err != nil {
+		return fmt.Errorf("read request body: %w", err)
+	}
+
+	s.body = body
+
+	return nil
+}
+
+func (s *Steps) requestIsSentTo(ctx context.Context, path string) error {
+	if s.method == "" {
+		return fmt.Errorf("HTTP method is not set")
+	}
+
+	target, err := url.Parse(s.baseURL + path)
+	if err != nil {
+		return fmt.Errorf("parse request URL: %w", err)
+	}
+
+	query := target.Query()
+	for key, values := range s.query {
+		for _, value := range values {
+			query.Add(key, value)
+		}
+	}
+	target.RawQuery = query.Encode()
+
+	var body io.Reader
+	if s.body != nil {
+		body = bytes.NewReader(s.body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, s.method, target.String(), body)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header = s.headers.Clone()
+	if s.body != nil && req.Header.Get("Content-Type") == "" && json.Valid(s.body) {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response body: %w", err)
+	}
+
+	s.response = resp
+	s.responseBody = respBody
+
+	return nil
+}
+
+func (s *Steps) responseIsReceivedWithStatus(status int) error {
+	if s.response == nil {
+		return fmt.Errorf("HTTP request was not sent")
+	}
+
+	if s.response.StatusCode != status {
+		return fmt.Errorf("expected status %d, got %d, body: %s", status, s.response.StatusCode, s.responseBody)
+	}
+
+	return nil
+}
+
+func (s *Steps) responseContainsHeaders(headers *godog.DocString) error {
+	if s.response == nil {
+		return fmt.Errorf("HTTP request was not sent")
+	}
+
+	table, err := parseHeaderTable(headers.Content)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range table.Rows {
+		name, expected := row[0], row[1]
+
+		actual, ok := s.response.Header[http.CanonicalHeaderKey(name)]
+		if !ok {
+			return fmt.Errorf("response header %q is missing", name)
+		}
+
+		if !slices.Contains(actual, expected) {
+			return fmt.Errorf("response header %q: expected %q, got %q", name, expected, actual)
+		}
+	}
+
+	return nil
+}
+
+func (s *Steps) responseContainsBody(body *godog.DocString) error {
+	return s.compareResponseBody([]byte(body.Content))
+}
+
+func (s *Steps) responseContainsBodyFromFile(path string) error {
+	expected, err := gherkin.ReadFile(s.featureURI, path, fileBodyExts...)
+	if err != nil {
+		return fmt.Errorf("read expected response body: %w", err)
+	}
+
+	return s.compareResponseBody(expected)
+}
+
+func (s *Steps) compareResponseBody(expected []byte) error {
+	if s.response == nil {
+		return fmt.Errorf("HTTP request was not sent")
+	}
+
+	if !json.Valid(expected) {
+		if !bytes.Equal(bytes.TrimSpace(expected), bytes.TrimSpace(s.responseBody)) {
+			return fmt.Errorf("response body mismatch:\nexpected: %s\nactual:   %s", expected, s.responseBody)
+		}
+
+		return nil
+	}
+
+	if !json.Valid(s.responseBody) {
+		return fmt.Errorf("response body is not valid JSON: %s", s.responseBody)
+	}
+
+	ignored, err := anyValuePointers(expected, s.responseBody)
+	if err != nil {
+		return err
+	}
+
+	patch, err := jsondiff.CompareJSON(expected, s.responseBody, jsondiff.Ignores(ignored...))
+	if err != nil {
+		return fmt.Errorf("compare response body: %w", err)
+	}
+
+	if len(patch) > 0 {
+		return fmt.Errorf("response body mismatch:\ndiff: %s\nactual: %s", patch, s.responseBody)
+	}
+
+	return nil
+}
+
+func parseHeaderTable(content string) (gherkin.Table, error) {
+	table, err := gherkin.ParseTable(content)
+	if err != nil {
+		return gherkin.Table{}, fmt.Errorf("parse headers table: %w", err)
+	}
+
+	if len(table.Columns) != 2 {
+		return gherkin.Table{}, fmt.Errorf("headers table must have 2 columns (Header, Value), got %d", len(table.Columns))
+	}
+
+	return table, nil
+}

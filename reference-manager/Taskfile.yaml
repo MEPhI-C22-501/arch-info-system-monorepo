@@ -60,10 +60,17 @@ tasks:
       - task: tests:frontend
 
   tests:backend:
-    desc: Run backend tests
+    desc: Run backend unit tests
     dir: '{{.BACKEND_DIR}}'
     cmds:
-      - echo "not implemented"
+      - go test ./...
+
+  tests:integration:
+    desc: Run backend integration tests, the environment from docker-compose.test.yaml is started by testcontainers
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      # a single package, with a package list go test buffers the output until the package finishes even with -v
+      - go test -v -tags integration -count=1 ./tests {{.CLI_ARGS}}
 
   tests:frontend:
     desc: Run the unit tests of the admin panel (Node 18+, no dependencies)
