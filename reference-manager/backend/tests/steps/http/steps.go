@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/wI2L/jsondiff"
@@ -168,14 +170,40 @@ func (s *Steps) requestIsSentTo(ctx context.Context, path string) error {
 	}
 	target.RawQuery = query.Encode()
 
+	// The service limits the request rate, so a rejected request is sent again after the time it asks to wait.
+	for attempt := 1; ; attempt++ {
+		resp, respBody, err := s.send(ctx, target.String())
+		if err != nil {
+			return err
+		}
+
+		s.response = resp
+		s.responseBody = respBody
+
+		if resp.StatusCode != http.StatusTooManyRequests || attempt == maxRateLimitedAttempts {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryAfter(resp)):
+		}
+	}
+}
+
+// maxRateLimitedAttempts is how many times a request is sent while the service rejects it with 429 Too Many Requests.
+const maxRateLimitedAttempts = 5
+
+func (s *Steps) send(ctx context.Context, target string) (*http.Response, []byte, error) {
 	var body io.Reader
 	if s.body != nil {
 		body = bytes.NewReader(s.body)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, s.method, target.String(), body)
+	req, err := http.NewRequestWithContext(ctx, s.method, target, body)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return nil, nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header = s.headers.Clone()
@@ -185,19 +213,26 @@ func (s *Steps) requestIsSentTo(ctx context.Context, path string) error {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("send request: %w", err)
+		return nil, nil, fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read response body: %w", err)
+		return nil, nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	s.response = resp
-	s.responseBody = respBody
+	return resp, respBody, nil
+}
 
-	return nil
+// retryAfter returns the delay from the Retry-After header in seconds, one second when it is absent or malformed.
+func retryAfter(resp *http.Response) time.Duration {
+	seconds, err := strconv.Atoi(resp.Header.Get("Retry-After"))
+	if err != nil || seconds <= 0 {
+		return time.Second
+	}
+
+	return time.Duration(seconds) * time.Second
 }
 
 func (s *Steps) responseIsReceivedWithStatus(status int) error {

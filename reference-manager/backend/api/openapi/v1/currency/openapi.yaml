@@ -287,9 +287,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CurrencyID'
         - $ref: '#/components/parameters/RevisionNumber'
+        - $ref: '#/components/parameters/AllowDeleted'
       responses:
         '200':
-          $ref: '#/components/responses/SuccessWithCurrencyRevisionList'
+          $ref: '#/components/responses/SuccessWithCurrencyRevision'
         '400':
           description: Bad Request. Invalid currency ID or revision number format.
           $ref: '#/components/responses/Error'
@@ -736,7 +737,7 @@ components:
           schema:
             type: object
             properties:
-              currencies:
+              revisions:
                 type: array
                 description: List of currency revisions
                 items:

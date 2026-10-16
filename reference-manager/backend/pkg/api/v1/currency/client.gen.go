@@ -164,7 +164,7 @@ type ClientInterface interface {
 	// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListCurrencies List currencies with pagination
@@ -331,8 +331,8 @@ func (c *Client) ListCurrencyRevisions(ctx context.Context, currencyID CurrencyI
 // Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber)
+func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber, params)
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +818,7 @@ func NewListCurrencyRevisionsRequest(server string, currencyID CurrencyID, param
 }
 
 // NewGetCurrencyRevisionRequest constructs an http.Request for the GetCurrencyRevision method
-func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber RevisionNumber) (*http.Request, error) {
+func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -848,6 +848,33 @@ func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisio
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.AllowDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "allowDeleted", *params.AllowDeleted, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -988,7 +1015,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
+	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
 }
 
 type ListCurrenciesResponse struct {
@@ -1625,7 +1652,7 @@ type GetCurrencyRevisionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SuccessWithCurrencyRevisionList
+	JSON200 *SuccessWithCurrencyRevision
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -1643,7 +1670,7 @@ type GetCurrencyRevisionResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetCurrencyRevisionResponse) GetJSON200() *SuccessWithCurrencyRevisionList {
+func (r GetCurrencyRevisionResponse) GetJSON200() *SuccessWithCurrencyRevision {
 	return r.JSON200
 }
 
@@ -1851,8 +1878,8 @@ func (c *ClientWithResponses) ListCurrencyRevisionsWithResponse(ctx context.Cont
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
-	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, reqEditors...)
+func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
+	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2408,7 +2435,7 @@ func ParseGetCurrencyRevisionResponse(rsp *http.Response) (*GetCurrencyRevisionR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SuccessWithCurrencyRevisionList
+		var dest SuccessWithCurrencyRevision
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

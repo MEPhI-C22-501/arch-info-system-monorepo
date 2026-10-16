@@ -1,0 +1,14 @@
+{
+  "id": 5,
+  "currency_id": 2,
+  "revision_number": 2,
+  "change": [
+    {
+      "op": "replace",
+      "path": "/is_deleted",
+      "value": true
+    }
+  ],
+  "changed_by": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "changed_at": "2026-10-05T10:00:00Z"
+}

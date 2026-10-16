@@ -2,7 +2,9 @@ package currencyhndl
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
@@ -19,6 +21,13 @@ type Service interface {
 	UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error)
 	DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error)
 	PurgeCurrency(ctx context.Context, currencyID int64) error
+	GetCurrencyRevision(
+		ctx context.Context,
+		currencyID int64,
+		revisionNumber int32,
+		allowDeleted bool,
+	) (*currencydmn.CurrencyRevision, error)
+	ListCurrencyRevisions(ctx context.Context, request *currencydmn.RevisionListRequest) (*currencydmn.RevisionListPage, error)
 }
 
 type Handler struct {
@@ -159,6 +168,67 @@ func (h *Handler) DeleteCurrency(
 	render.JSON(w, r, expandedCurrencyToAPI(deleted))
 }
 
+func (h *Handler) GetCurrencyRevision(
+	w http.ResponseWriter,
+	r *http.Request,
+	currencyID currencyv1.CurrencyID,
+	revisionNumber currencyv1.RevisionNumber,
+	params currencyv1.GetCurrencyRevisionParams,
+) {
+	revision, err := h.service.GetCurrencyRevision(r.Context(), currencyID, revisionNumber, valueOrZero(params.AllowDeleted))
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	resp, err := currencyRevisionToAPI(revision)
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, resp)
+}
+
+func (h *Handler) ListCurrencyRevisions(
+	w http.ResponseWriter,
+	r *http.Request,
+	currencyID currencyv1.CurrencyID,
+	params currencyv1.ListCurrencyRevisionsParams,
+) {
+	page, err := h.service.ListCurrencyRevisions(r.Context(), revisionListParamsToModel(currencyID, &params))
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	resp, err := revisionListPageToAPI(page)
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, resp)
+}
+
 // HandleParamError responds to requests whose path or query parameters could not be parsed.
 func (h *Handler) HandleParamError(w http.ResponseWriter, r *http.Request, _ error) {
 	render.Status(r, http.StatusBadRequest)
@@ -214,6 +284,55 @@ func expandedCurrencyToAPI(c *currencydmn.ExpandedCurrency) *currencyv1.Expanded
 	}
 }
 
+func revisionListParamsToModel(
+	currencyID int64,
+	p *currencyv1.ListCurrencyRevisionsParams,
+) *currencydmn.RevisionListRequest {
+	return &currencydmn.RevisionListRequest{
+		CurrencyID:   currencyID,
+		PageSize:     valueOrZero(p.PageSize),
+		PageToken:    valueOrZero(p.PageToken),
+		Filter:       valueOrZero(p.Filter),
+		OrderBy:      valueOrZero(p.OrderBy),
+		AllowDeleted: valueOrZero(p.AllowDeleted),
+	}
+}
+
+func revisionListPageToAPI(p *currencydmn.RevisionListPage) (*currencyv1.SuccessWithCurrencyRevisionList, error) {
+	revisions := make([]currencyv1.CurrencyRevision, 0, len(p.Revisions))
+	for _, revision := range p.Revisions {
+		apiRevision, err := currencyRevisionToAPI(revision)
+		if err != nil {
+			return nil, err
+		}
+
+		revisions = append(revisions, *apiRevision)
+	}
+
+	resp := &currencyv1.SuccessWithCurrencyRevisionList{Revisions: &revisions}
+	if p.NextPageToken != "" {
+		resp.NextPageToken = &p.NextPageToken
+	}
+
+	return resp, nil
+}
+
+func currencyRevisionToAPI(r *currencydmn.CurrencyRevision) (*currencyv1.CurrencyRevision, error) {
+	var change []map[string]any
+	if err := json.Unmarshal(r.Change, &change); err != nil {
+		return nil, fmt.Errorf("unmarshal change of currency revision %d: %w", r.ID, err)
+	}
+
+	return &currencyv1.CurrencyRevision{
+		Id:             &r.ID,
+		CurrencyId:     &r.CurrencyID,
+		RevisionNumber: &r.RevisionNumber,
+		Change:         &change,
+		ChangedBy:      &r.ChangedBy,
+		ChangedAt:      &r.ChangedAt,
+	}, nil
+}
+
 func errorToAPI(err error) (currencyv1.Error, int) {
 	var invalidArgErr *domains.InvalidArgumentError
 
@@ -226,6 +345,8 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 		return currencyv1.Error{Message: "currency was modified concurrently, retry the request"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
+	case errors.Is(err, domains.ErrRevisionNotFound):
+		return currencyv1.Error{Message: "currency revision not found"}, http.StatusNotFound
 	case errors.Is(err, domains.ErrNotFound):
 		return currencyv1.Error{Message: "currency not found"}, http.StatusNotFound
 	default:

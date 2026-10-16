@@ -160,6 +160,36 @@ func (mr *MockCurrencyVersionRepositoryMockRecorder) CreateCurrencyRevision(ctx,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCurrencyRevision", reflect.TypeOf((*MockCurrencyVersionRepository)(nil).CreateCurrencyRevision), ctx, m)
 }
 
+// GetCurrencyRevision mocks base method.
+func (m *MockCurrencyVersionRepository) GetCurrencyRevision(ctx context.Context, currencyID int64, revisionNumber int32) (*currencydmn.CurrencyRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrencyRevision", ctx, currencyID, revisionNumber)
+	ret0, _ := ret[0].(*currencydmn.CurrencyRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrencyRevision indicates an expected call of GetCurrencyRevision.
+func (mr *MockCurrencyVersionRepositoryMockRecorder) GetCurrencyRevision(ctx, currencyID, revisionNumber any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrencyRevision", reflect.TypeOf((*MockCurrencyVersionRepository)(nil).GetCurrencyRevision), ctx, currencyID, revisionNumber)
+}
+
+// ListCurrencyRevisions mocks base method.
+func (m *MockCurrencyVersionRepository) ListCurrencyRevisions(ctx context.Context, query *currencydmn.RevisionListQuery) ([]*currencydmn.CurrencyRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCurrencyRevisions", ctx, query)
+	ret0, _ := ret[0].([]*currencydmn.CurrencyRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCurrencyRevisions indicates an expected call of ListCurrencyRevisions.
+func (mr *MockCurrencyVersionRepositoryMockRecorder) ListCurrencyRevisions(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCurrencyRevisions", reflect.TypeOf((*MockCurrencyVersionRepository)(nil).ListCurrencyRevisions), ctx, query)
+}
+
 // MockExpandedCurrencyRepository is a mock of ExpandedCurrencyRepository interface.
 type MockExpandedCurrencyRepository struct {
 	ctrl     *gomock.Controller

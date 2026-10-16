@@ -939,3 +939,381 @@ func TestHandlerDeleteCurrency(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlerGetCurrencyRevision(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupServiceMock func(m *mocks.MockService)
+		}
+		args struct {
+			currencyID     currencyv1.CurrencyID
+			revisionNumber currencyv1.RevisionNumber
+			params         currencyv1.GetCurrencyRevisionParams
+		}
+		want struct {
+			responseStatus int
+			responseBody   string
+		}
+	)
+
+	var (
+		changer      = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		changedAt    = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
+		allowDeleted = true
+
+		revisionModel = &currencydmn.CurrencyRevision{
+			ID:             10,
+			CurrencyID:     1,
+			RevisionNumber: 2,
+			Change:         []byte(`[{"op":"replace","path":"/name","value":"US Dollar"}]`),
+			ChangedBy:      changer,
+			ChangedAt:      changedAt,
+		}
+		revisionBody = `{
+			"id": 10,
+			"currency_id": 1,
+			"revision_number": 2,
+			"change": [{"op": "replace", "path": "/name", "value": "US Dollar"}],
+			"changed_by": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+			"changed_at": "2026-10-06T07:54:00Z"
+		}`
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"success": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(revisionModel, nil)
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   revisionBody,
+			},
+		},
+		"revision of a deleted currency is allowed": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), true).
+						Return(revisionModel, nil)
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+				params: currencyv1.GetCurrencyRevisionParams{
+					AllowDeleted: &allowDeleted,
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   revisionBody,
+			},
+		},
+		"currency not found": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, fmt.Errorf("get expanded currency: %w", domains.ErrNotFound))
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusNotFound,
+				responseBody:   `{"message": "currency not found"}`,
+			},
+		},
+		"revision not found": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, fmt.Errorf("get currency revision 2: %w", domains.ErrRevisionNotFound))
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusNotFound,
+				responseBody:   `{"message": "currency revision not found"}`,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, domains.ErrUnauthenticated)
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusUnauthorized,
+				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"malformed stored change": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(&currencydmn.CurrencyRevision{ID: 10, Change: []byte(`{`)}, nil)
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+		"unexpected service error": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, errors.New("connection refused"))
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			mockService := mocks.NewMockService(ctrl)
+			tc.fields.setupServiceMock(mockService)
+
+			handler := currencyhndl.NewHandler(mockService)
+
+			r := httptest.NewRequest(http.MethodGet, "/v1/currencies/1/revisions/2", nil)
+			rec := httptest.NewRecorder()
+
+			handler.GetCurrencyRevision(rec, r, tc.args.currencyID, tc.args.revisionNumber, tc.args.params)
+
+			assert.Equal(t, tc.want.responseStatus, rec.Code)
+			assert.JSONEq(t, tc.want.responseBody, rec.Body.String())
+		})
+	}
+}
+
+func TestHandlerListCurrencyRevisions(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupServiceMock func(m *mocks.MockService)
+		}
+		args struct {
+			params currencyv1.ListCurrencyRevisionsParams
+		}
+		want struct {
+			responseStatus int
+			responseBody   string
+		}
+	)
+
+	var (
+		changer   = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		changedAt = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
+
+		pageSize     int32 = 1
+		pageToken          = "token"
+		filter             = "revision_number = 1"
+		orderBy            = "changed_at desc"
+		allowDeleted       = true
+
+		revision = &currencydmn.CurrencyRevision{
+			ID:             1,
+			CurrencyID:     1,
+			RevisionNumber: 1,
+			Change:         []byte(`[{"op":"add","path":"/code","value":"USD"}]`),
+			ChangedBy:      changer,
+			ChangedAt:      changedAt,
+		}
+		revisionBody = `{
+			"id": 1,
+			"currency_id": 1,
+			"revision_number": 1,
+			"change": [{"op": "add", "path": "/code", "value": "USD"}],
+			"changed_by": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+			"changed_at": "2026-10-05T07:54:00Z"
+		}`
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"page with a next page token": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), &currencydmn.RevisionListRequest{
+							CurrencyID:   1,
+							PageSize:     1,
+							PageToken:    "token",
+							Filter:       "revision_number = 1",
+							OrderBy:      "changed_at desc",
+							AllowDeleted: true,
+						}).
+						Return(&currencydmn.RevisionListPage{
+							Revisions:     []*currencydmn.CurrencyRevision{revision},
+							NextPageToken: "next",
+						}, nil)
+				},
+			},
+			args: args{
+				params: currencyv1.ListCurrencyRevisionsParams{
+					PageSize:     &pageSize,
+					PageToken:    &pageToken,
+					Filter:       &filter,
+					OrderBy:      &orderBy,
+					AllowDeleted: &allowDeleted,
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   `{"revisions": [` + revisionBody + `], "nextPageToken": "next"}`,
+			},
+		},
+		"empty last page": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), &currencydmn.RevisionListRequest{CurrencyID: 1}).
+						Return(&currencydmn.RevisionListPage{}, nil)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   `{"revisions": []}`,
+			},
+		},
+		"invalid argument": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, &domains.InvalidArgumentError{
+							Argument: "filter",
+							Err:      errors.New("undeclared identifier 'code'"),
+						})
+				},
+			},
+			want: want{
+				responseStatus: http.StatusBadRequest,
+				responseBody:   `{"message": "invalid filter: undeclared identifier 'code'"}`,
+			},
+		},
+		"currency not found": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, fmt.Errorf("get expanded currency: %w", domains.ErrNotFound))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusNotFound,
+				responseBody:   `{"message": "currency not found"}`,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, domains.ErrUnauthenticated)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusUnauthorized,
+				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"malformed stored change": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(&currencydmn.RevisionListPage{
+							Revisions: []*currencydmn.CurrencyRevision{{ID: 1, Change: []byte(`{`)}},
+						}, nil)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+		"unexpected service error": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, errors.New("connection refused"))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			mockService := mocks.NewMockService(ctrl)
+			tc.fields.setupServiceMock(mockService)
+
+			handler := currencyhndl.NewHandler(mockService)
+
+			r := httptest.NewRequest(http.MethodGet, "/v1/currencies/1/revisions", nil)
+			rec := httptest.NewRecorder()
+
+			handler.ListCurrencyRevisions(rec, r, 1, tc.args.params)
+
+			assert.Equal(t, tc.want.responseStatus, rec.Code)
+			assert.JSONEq(t, tc.want.responseBody, rec.Body.String())
+		})
+	}
+}

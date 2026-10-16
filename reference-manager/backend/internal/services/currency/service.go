@@ -27,6 +27,8 @@ type CurrencyRepository interface {
 
 type CurrencyVersionRepository interface {
 	CreateCurrencyRevision(ctx context.Context, m *currencydmn.CurrencyRevision) error
+	GetCurrencyRevision(ctx context.Context, currencyID int64, revisionNumber int32) (*currencydmn.CurrencyRevision, error)
+	ListCurrencyRevisions(ctx context.Context, query *currencydmn.RevisionListQuery) ([]*currencydmn.CurrencyRevision, error)
 }
 
 type ExpandedCurrencyRepository interface {
@@ -125,11 +127,69 @@ func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListR
 		return nil, fmt.Errorf("list expanded currencies: %w", err)
 	}
 
-	page := &currencydmn.ListPage{Currencies: currencies}
-	if len(currencies) > int(pageSize) {
-		page.Currencies = currencies[:pageSize]
-		page.NextPageToken = pageToken{Offset: token.Offset + int64(pageSize), Checksum: token.Checksum}.String()
+	page := &currencydmn.ListPage{}
+	page.Currencies, page.NextPageToken = cutPage(currencies, pageSize, token)
+
+	return page, nil
+}
+
+// GetCurrencyRevision returns a revision of a currency, revisions of deleted currencies are hidden unless allowed.
+func (s *Service) GetCurrencyRevision(
+	ctx context.Context,
+	currencyID int64,
+	revisionNumber int32,
+	allowDeleted bool,
+) (*currencydmn.CurrencyRevision, error) {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return nil, domains.ErrUnauthenticated
 	}
+
+	if _, err := s.getCurrency(ctx, currencyID, allowDeleted); err != nil {
+		return nil, err
+	}
+
+	revision, err := s.currencyVersionRepository.GetCurrencyRevision(ctx, currencyID, revisionNumber)
+	if err != nil {
+		if errors.Is(err, domains.ErrNotFound) {
+			return nil, fmt.Errorf("get currency revision %d: %w", revisionNumber, domains.ErrRevisionNotFound)
+		}
+
+		return nil, fmt.Errorf("get currency revision: %w", err)
+	}
+
+	return revision, nil
+}
+
+// ListCurrencyRevisions returns a page of revisions of a currency, revisions of deleted currencies are hidden unless allowed.
+func (s *Service) ListCurrencyRevisions(
+	ctx context.Context,
+	request *currencydmn.RevisionListRequest,
+) (*currencydmn.RevisionListPage, error) {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	query, token, err := revisionListQuery(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getCurrency(ctx, request.CurrencyID, request.AllowDeleted); err != nil {
+		return nil, err
+	}
+
+	pageSize := query.Limit
+
+	// One extra revision is requested to find out whether there is a next page.
+	query.Limit++
+
+	revisions, err := s.currencyVersionRepository.ListCurrencyRevisions(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list currency revisions: %w", err)
+	}
+
+	page := &currencydmn.RevisionListPage{}
+	page.Revisions, page.NextPageToken = cutPage(revisions, pageSize, token)
 
 	return page, nil
 }
