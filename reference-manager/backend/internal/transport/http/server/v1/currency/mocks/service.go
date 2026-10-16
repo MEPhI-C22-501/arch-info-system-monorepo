@@ -71,6 +71,21 @@ func (mr *MockServiceMockRecorder) DeleteCurrency(ctx, currencyID any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCurrency", reflect.TypeOf((*MockService)(nil).DeleteCurrency), ctx, currencyID)
 }
 
+// ExportCurrencies mocks base method.
+func (m *MockService) ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExportCurrencies", ctx)
+	ret0, _ := ret[0].([]*currencydmn.ExpandedCurrency)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExportCurrencies indicates an expected call of ExportCurrencies.
+func (mr *MockServiceMockRecorder) ExportCurrencies(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExportCurrencies", reflect.TypeOf((*MockService)(nil).ExportCurrencies), ctx)
+}
+
 // GetCurrency mocks base method.
 func (m *MockService) GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
 	m.ctrl.T.Helper()

@@ -793,6 +793,112 @@ func TestServiceListCurrenciesPageToken(t *testing.T) {
 	}
 }
 
+func TestServiceExportCurrencies(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupExpandedCurrencyRepositoryMock func(m *mocks.MockExpandedCurrencyRepository)
+		}
+		args struct {
+			ctx context.Context
+		}
+		want struct {
+			currencies []*currencydmn.ExpandedCurrency
+			err        error
+		}
+	)
+
+	var (
+		errDatabase = errors.New("database error")
+
+		authenticatedCtx = actor.WithUserID(context.Background(), uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+
+		usd = &currencydmn.ExpandedCurrency{ID: 1, Code: "USD", Number: "840", Name: "US Dollar", Decimals: 2}
+		eur = &currencydmn.ExpandedCurrency{ID: 2, Code: "EUR", Number: "978", Name: "Euro", Decimals: 2}
+
+		// Export takes all active currencies in the default order.
+		allActiveCurrencies = gomock.Cond(func(q *currencydmn.ListQuery) bool {
+			return q.Limit == 0 &&
+				q.Offset == 0 &&
+				!q.AllowDeleted &&
+				q.Filter.CheckedExpr == nil &&
+				len(q.OrderBy.Fields) == 0
+		})
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"success": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						ListExpandedCurrencies(gomock.Any(), allActiveCurrencies).
+						Return([]*currencydmn.ExpandedCurrency{usd, eur}, nil)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				currencies: []*currencydmn.ExpandedCurrency{usd, eur},
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: func(_ *mocks.MockExpandedCurrencyRepository) {},
+			},
+			args: args{
+				ctx: context.Background(),
+			},
+			want: want{
+				err: domains.ErrUnauthenticated,
+			},
+		},
+		"list expanded currencies failed": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						ListExpandedCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, errDatabase)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+
+			mockExpandedCurrencyRepository := mocks.NewMockExpandedCurrencyRepository(ctrl)
+			tc.fields.setupExpandedCurrencyRepositoryMock(mockExpandedCurrencyRepository)
+
+			service := currencysrv.NewService(
+				mocks.NewMockTxManager(ctrl),
+				mocks.NewMockCurrencyRepository(ctrl),
+				mocks.NewMockCurrencyVersionRepository(ctrl),
+				mockExpandedCurrencyRepository,
+			)
+
+			currencies, err := service.ExportCurrencies(tc.args.ctx)
+
+			assert.ErrorIs(t, err, tc.want.err)
+			assert.Equal(t, tc.want.currencies, currencies)
+		})
+	}
+}
+
 func TestServiceUpdateCurrency(t *testing.T) {
 	t.Parallel()
 

@@ -133,6 +133,21 @@ func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListR
 	return page, nil
 }
 
+// ExportCurrencies returns all active currencies in creation order.
+func (s *Service) ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error) {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	// The query has no limit: the currency reference is small enough to be exported at once.
+	currencies, err := s.expandedCurrencyRepository.ListExpandedCurrencies(ctx, &currencydmn.ListQuery{})
+	if err != nil {
+		return nil, fmt.Errorf("list expanded currencies: %w", err)
+	}
+
+	return currencies, nil
+}
+
 // GetCurrencyRevision returns a revision of a currency, revisions of deleted currencies are hidden unless allowed.
 func (s *Service) GetCurrencyRevision(
 	ctx context.Context,

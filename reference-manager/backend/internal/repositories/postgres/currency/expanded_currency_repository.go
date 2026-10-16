@@ -121,7 +121,9 @@ func buildListExpandedCurrenciesQuery(q *currencydmn.ListQuery) (string, []any, 
 		b.WriteString("\nWHERE " + strings.Join(conditions, " AND "))
 	}
 	b.WriteString("\nORDER BY " + orderBy)
-	b.WriteString("\nLIMIT " + args.Add(q.Limit) + " OFFSET " + args.Add(q.Offset))
+	if q.Limit > 0 {
+		b.WriteString("\nLIMIT " + args.Add(q.Limit) + " OFFSET " + args.Add(q.Offset))
+	}
 
 	return b.String(), args.Values(), nil
 }

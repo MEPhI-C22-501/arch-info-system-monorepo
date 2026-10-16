@@ -22,7 +22,8 @@ type ListQuery struct {
 	OrderBy      ordering.OrderBy
 	AllowDeleted bool
 	Offset       int64
-	Limit        int32
+	// Limit is the maximum number of currencies, zero means no limit, the offset is ignored then.
+	Limit int32
 }
 
 type ListPage struct {
