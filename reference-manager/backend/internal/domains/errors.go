@@ -10,6 +10,8 @@ var (
 	ErrNotFound        = errors.New("error not found")
 	ErrUnauthenticated = errors.New("unauthenticated")
 	ErrInvalidArgument = errors.New("invalid argument")
+	// ErrConflict means the resource was changed concurrently, the client can retry the request.
+	ErrConflict = errors.New("conflict")
 )
 
 // InvalidArgumentError describes a request argument the client has to fix, its message is safe to return to the client.

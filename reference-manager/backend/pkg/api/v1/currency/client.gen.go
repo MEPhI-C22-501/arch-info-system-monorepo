@@ -122,7 +122,7 @@ type ClientInterface interface {
 
 	// DeleteCurrency Delete currency record
 	//
-	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 	//
 	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
 	DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -239,7 +239,7 @@ func (c *Client) ExportCurrencies(ctx context.Context, reqEditors ...RequestEdit
 
 // DeleteCurrency Delete currency record
 //
-// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 //
 // Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
 func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -938,7 +938,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteCurrencyWithResponse Delete currency record
 	//
-	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -1250,8 +1250,8 @@ func (r ExportCurrenciesResponse) ContentType() string {
 type DeleteCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON204 the response for an HTTP 204 `application/json` response
-	JSON204 *SuccessWithExpandedCurrency
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -1260,6 +1260,8 @@ type DeleteCurrencyResponse struct {
 	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
 	// JSON503 the response for an HTTP 503 `application/json` response
@@ -1268,9 +1270,9 @@ type DeleteCurrencyResponse struct {
 	JSON504 *Error
 }
 
-// GetJSON204 returns the response for an HTTP 204 `application/json` response
-func (r DeleteCurrencyResponse) GetJSON204() *SuccessWithExpandedCurrency {
-	return r.JSON204
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON200() *SuccessWithExpandedCurrency {
+	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -1291,6 +1293,11 @@ func (r DeleteCurrencyResponse) GetJSON403() *Error {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r DeleteCurrencyResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON409() *Error {
+	return r.JSON409
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -1764,7 +1771,7 @@ func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, 
 
 // DeleteCurrencyWithResponse Delete currency record
 //
-// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -2083,12 +2090,15 @@ func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, e
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 204:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SuccessWithExpandedCurrency
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON204 = &dest
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
@@ -2117,6 +2127,13 @@ func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, e
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

@@ -792,3 +792,813 @@ func TestServiceListCurrenciesPageToken(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceUpdateCurrency(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupTxManagerMock                  func(m *mocks.MockTxManager)
+			setupCurrencyRepositoryMock         func(m *mocks.MockCurrencyRepository)
+			setupCurrencyVersionRepositoryMock  func(m *mocks.MockCurrencyVersionRepository)
+			setupExpandedCurrencyRepositoryMock func(m *mocks.MockExpandedCurrencyRepository)
+		}
+		args struct {
+			ctx     context.Context
+			request *currencydmn.UpdateRequest
+		}
+		want struct {
+			result *currencydmn.ExpandedCurrency
+			err    error
+		}
+	)
+
+	var (
+		currencyID  int64 = 1
+		changer           = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		createdAt         = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
+		updatedAt         = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
+		errDatabase       = errors.New("database error")
+
+		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+
+		current = &currencydmn.ExpandedCurrency{
+			ID:          currencyID,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "US Dollar",
+			Decimals:    2,
+			Revision:    1,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   createdAt,
+		}
+		deleted = &currencydmn.ExpandedCurrency{
+			ID:          currencyID,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "US Dollar",
+			Decimals:    2,
+			IsDeleted:   true,
+			Revision:    2,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
+			DeletedAt:   updatedAt,
+		}
+		updated = &currencydmn.ExpandedCurrency{
+			ID:          currencyID,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "United States Dollar",
+			Decimals:    2,
+			Revision:    2,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
+		}
+		// requested changes the name and the number, and tries to delete the currency.
+		requested = &currencydmn.Currency{
+			Code:      "USD",
+			Number:    "999",
+			Name:      "United States Dollar",
+			Decimals:  2,
+			IsDeleted: true,
+		}
+		renamed = &currencydmn.Currency{
+			ID:       currencyID,
+			Code:     "USD",
+			Number:   "840",
+			Name:     "United States Dollar",
+			Decimals: 2,
+		}
+		renameRevision = gomock.Cond(func(r *currencydmn.CurrencyRevision) bool {
+			return r.CurrencyID == currencyID &&
+				r.RevisionNumber == 2 &&
+				r.ChangedBy == changer &&
+				jsonEqual(r.Change, `[{"op": "replace", "path": "/name", "value": "United States Dollar"}]`)
+		})
+
+		runInTx = func(m *mocks.MockTxManager) {
+			m.EXPECT().
+				Do(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, fn func(ctx context.Context) error) error {
+					return fn(ctx)
+				})
+		}
+		returnCurrent = func(c *currencydmn.ExpandedCurrency) func(m *mocks.MockExpandedCurrencyRepository) {
+			return func(m *mocks.MockExpandedCurrencyRepository) {
+				m.EXPECT().
+					GetExpandedCurrency(gomock.Any(), currencyID).
+					Return(c, nil)
+			}
+		}
+		returnCurrentAndUpdated = func(m *mocks.MockExpandedCurrencyRepository) {
+			gomock.InOrder(
+				m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(current, nil),
+				m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(updated, nil),
+			)
+		}
+		updateCurrency = func(m *mocks.MockCurrencyRepository) {
+			m.EXPECT().
+				UpdateCurrency(gomock.Any(), renamed).
+				Return(nil)
+		}
+		createRevision = func(m *mocks.MockCurrencyVersionRepository) {
+			m.EXPECT().
+				CreateCurrencyRevision(gomock.Any(), renameRevision).
+				Return(nil)
+		}
+		noTxManagerCalls                  = func(_ *mocks.MockTxManager) {}
+		noCurrencyRepositoryCalls         = func(_ *mocks.MockCurrencyRepository) {}
+		noCurrencyVersionRepositoryCalls  = func(_ *mocks.MockCurrencyVersionRepository) {}
+		noExpandedCurrencyRepositoryCalls = func(_ *mocks.MockExpandedCurrencyRepository) {}
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"success with mask": {
+			fields: fields{
+				setupTxManagerMock:                  runInTx,
+				setupCurrencyRepositoryMock:         updateCurrency,
+				setupCurrencyVersionRepositoryMock:  createRevision,
+				setupExpandedCurrencyRepositoryMock: returnCurrentAndUpdated,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: " name ",
+				},
+			},
+			want: want{
+				result: updated,
+			},
+		},
+		"success without mask": {
+			fields: fields{
+				setupTxManagerMock: runInTx,
+				setupCurrencyRepositoryMock: func(m *mocks.MockCurrencyRepository) {
+					m.EXPECT().
+						UpdateCurrency(gomock.Any(), &currencydmn.Currency{
+							ID:       currencyID,
+							Code:     "USD",
+							Number:   "999",
+							Name:     "United States Dollar",
+							Decimals: 2,
+						}).
+						Return(nil)
+				},
+				setupCurrencyVersionRepositoryMock: func(m *mocks.MockCurrencyVersionRepository) {
+					m.EXPECT().
+						CreateCurrencyRevision(gomock.Any(), gomock.Cond(func(r *currencydmn.CurrencyRevision) bool {
+							return r.RevisionNumber == 2 && jsonEqual(r.Change, `[
+								{"op": "replace", "path": "/name", "value": "United States Dollar"},
+								{"op": "replace", "path": "/number", "value": "999"}
+							]`)
+						})).
+						Return(nil)
+				},
+				setupExpandedCurrencyRepositoryMock: returnCurrentAndUpdated,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				result: updated,
+			},
+		},
+		"nothing changed": {
+			fields: fields{
+				setupTxManagerMock:                  runInTx,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: returnCurrent(current),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "code,decimals",
+				},
+			},
+			want: want{
+				result: current,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: context.Background(),
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				err: domains.ErrUnauthenticated,
+			},
+		},
+		"read-only field in mask": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "name,is_deleted",
+				},
+			},
+			want: want{
+				err: domains.ErrInvalidArgument,
+			},
+		},
+		"unknown field in mask": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "symbol",
+				},
+			},
+			want: want{
+				err: domains.ErrInvalidArgument,
+			},
+		},
+		"currency not found": {
+			fields: fields{
+				setupTxManagerMock:                 runInTx,
+				setupCurrencyRepositoryMock:        noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock: noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						GetExpandedCurrency(gomock.Any(), currencyID).
+						Return(nil, domains.ErrNotFound)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				err: domains.ErrNotFound,
+			},
+		},
+		"currency is deleted": {
+			fields: fields{
+				setupTxManagerMock:                  runInTx,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: returnCurrent(deleted),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				err: domains.ErrNotFound,
+			},
+		},
+		"code or number already taken": {
+			fields: fields{
+				setupTxManagerMock: runInTx,
+				setupCurrencyRepositoryMock: func(m *mocks.MockCurrencyRepository) {
+					m.EXPECT().
+						UpdateCurrency(gomock.Any(), renamed).
+						Return(domains.ErrAlreadyExists)
+				},
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: returnCurrent(current),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "name",
+				},
+			},
+			want: want{
+				err: domains.ErrAlreadyExists,
+			},
+		},
+		"revision taken concurrently": {
+			fields: fields{
+				setupTxManagerMock:          runInTx,
+				setupCurrencyRepositoryMock: updateCurrency,
+				setupCurrencyVersionRepositoryMock: func(m *mocks.MockCurrencyVersionRepository) {
+					m.EXPECT().
+						CreateCurrencyRevision(gomock.Any(), renameRevision).
+						Return(domains.ErrAlreadyExists)
+				},
+				setupExpandedCurrencyRepositoryMock: returnCurrent(current),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "name",
+				},
+			},
+			want: want{
+				err: domains.ErrConflict,
+			},
+		},
+		"create currency revision failed": {
+			fields: fields{
+				setupTxManagerMock:          runInTx,
+				setupCurrencyRepositoryMock: updateCurrency,
+				setupCurrencyVersionRepositoryMock: func(m *mocks.MockCurrencyVersionRepository) {
+					m.EXPECT().
+						CreateCurrencyRevision(gomock.Any(), renameRevision).
+						Return(errDatabase)
+				},
+				setupExpandedCurrencyRepositoryMock: returnCurrent(current),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "name",
+				},
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+		"get updated currency failed": {
+			fields: fields{
+				setupTxManagerMock:                 runInTx,
+				setupCurrencyRepositoryMock:        updateCurrency,
+				setupCurrencyVersionRepositoryMock: createRevision,
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					gomock.InOrder(
+						m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(current, nil),
+						m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(nil, errDatabase),
+					)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+					UpdateMask: "name",
+				},
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+		"transaction failed": {
+			fields: fields{
+				setupTxManagerMock: func(m *mocks.MockTxManager) {
+					m.EXPECT().
+						Do(gomock.Any(), gomock.Any()).
+						Return(errDatabase)
+				},
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+
+			mockTxManager := mocks.NewMockTxManager(ctrl)
+			tc.fields.setupTxManagerMock(mockTxManager)
+
+			mockCurrencyRepository := mocks.NewMockCurrencyRepository(ctrl)
+			tc.fields.setupCurrencyRepositoryMock(mockCurrencyRepository)
+
+			mockCurrencyVersionRepository := mocks.NewMockCurrencyVersionRepository(ctrl)
+			tc.fields.setupCurrencyVersionRepositoryMock(mockCurrencyVersionRepository)
+
+			mockExpandedCurrencyRepository := mocks.NewMockExpandedCurrencyRepository(ctrl)
+			tc.fields.setupExpandedCurrencyRepositoryMock(mockExpandedCurrencyRepository)
+
+			service := currencysrv.NewService(
+				mockTxManager,
+				mockCurrencyRepository,
+				mockCurrencyVersionRepository,
+				mockExpandedCurrencyRepository,
+			)
+
+			result, err := service.UpdateCurrency(tc.args.ctx, tc.args.request)
+
+			assert.ErrorIs(t, err, tc.want.err)
+			assert.Equal(t, tc.want.result, result)
+		})
+	}
+}
+
+func TestServiceDeleteCurrency(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupTxManagerMock                  func(m *mocks.MockTxManager)
+			setupCurrencyRepositoryMock         func(m *mocks.MockCurrencyRepository)
+			setupCurrencyVersionRepositoryMock  func(m *mocks.MockCurrencyVersionRepository)
+			setupExpandedCurrencyRepositoryMock func(m *mocks.MockExpandedCurrencyRepository)
+		}
+		args struct {
+			ctx context.Context
+		}
+		want struct {
+			result *currencydmn.ExpandedCurrency
+			err    error
+		}
+	)
+
+	var (
+		currencyID  int64 = 1
+		changer           = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		createdAt         = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
+		deletedAt         = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
+		errDatabase       = errors.New("database error")
+
+		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+
+		current = &currencydmn.ExpandedCurrency{
+			ID:          currencyID,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "US Dollar",
+			Decimals:    2,
+			Revision:    1,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   createdAt,
+		}
+		deleted = &currencydmn.ExpandedCurrency{
+			ID:          currencyID,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "US Dollar",
+			Decimals:    2,
+			IsDeleted:   true,
+			Revision:    2,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   deletedAt,
+			DeletedAt:   deletedAt,
+		}
+		deletedModel = &currencydmn.Currency{
+			ID:        currencyID,
+			Code:      "USD",
+			Number:    "840",
+			Name:      "US Dollar",
+			Decimals:  2,
+			IsDeleted: true,
+		}
+		deletionRevision = gomock.Cond(func(r *currencydmn.CurrencyRevision) bool {
+			return r.CurrencyID == currencyID &&
+				r.RevisionNumber == 2 &&
+				r.ChangedBy == changer &&
+				jsonEqual(r.Change, `[{"op": "replace", "path": "/is_deleted", "value": true}]`)
+		})
+
+		runInTx = func(m *mocks.MockTxManager) {
+			m.EXPECT().
+				Do(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, fn func(ctx context.Context) error) error {
+					return fn(ctx)
+				})
+		}
+		updateCurrency = func(m *mocks.MockCurrencyRepository) {
+			m.EXPECT().
+				UpdateCurrency(gomock.Any(), deletedModel).
+				Return(nil)
+		}
+		noTxManagerCalls                  = func(_ *mocks.MockTxManager) {}
+		noCurrencyRepositoryCalls         = func(_ *mocks.MockCurrencyRepository) {}
+		noCurrencyVersionRepositoryCalls  = func(_ *mocks.MockCurrencyVersionRepository) {}
+		noExpandedCurrencyRepositoryCalls = func(_ *mocks.MockExpandedCurrencyRepository) {}
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"success": {
+			fields: fields{
+				setupTxManagerMock:          runInTx,
+				setupCurrencyRepositoryMock: updateCurrency,
+				setupCurrencyVersionRepositoryMock: func(m *mocks.MockCurrencyVersionRepository) {
+					m.EXPECT().
+						CreateCurrencyRevision(gomock.Any(), deletionRevision).
+						Return(nil)
+				},
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					gomock.InOrder(
+						m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(current, nil),
+						m.EXPECT().GetExpandedCurrency(gomock.Any(), currencyID).Return(deleted, nil),
+					)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				result: deleted,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: context.Background(),
+			},
+			want: want{
+				err: domains.ErrUnauthenticated,
+			},
+		},
+		"currency not found": {
+			fields: fields{
+				setupTxManagerMock:                 runInTx,
+				setupCurrencyRepositoryMock:        noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock: noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						GetExpandedCurrency(gomock.Any(), currencyID).
+						Return(nil, domains.ErrNotFound)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: domains.ErrNotFound,
+			},
+		},
+		"currency is already deleted": {
+			fields: fields{
+				setupTxManagerMock:                 runInTx,
+				setupCurrencyRepositoryMock:        noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock: noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						GetExpandedCurrency(gomock.Any(), currencyID).
+						Return(deleted, nil)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: domains.ErrNotFound,
+			},
+		},
+		"revision taken concurrently": {
+			fields: fields{
+				setupTxManagerMock:          runInTx,
+				setupCurrencyRepositoryMock: updateCurrency,
+				setupCurrencyVersionRepositoryMock: func(m *mocks.MockCurrencyVersionRepository) {
+					m.EXPECT().
+						CreateCurrencyRevision(gomock.Any(), deletionRevision).
+						Return(domains.ErrAlreadyExists)
+				},
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						GetExpandedCurrency(gomock.Any(), currencyID).
+						Return(current, nil)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: domains.ErrConflict,
+			},
+		},
+		"update currency failed": {
+			fields: fields{
+				setupTxManagerMock: runInTx,
+				setupCurrencyRepositoryMock: func(m *mocks.MockCurrencyRepository) {
+					m.EXPECT().
+						UpdateCurrency(gomock.Any(), deletedModel).
+						Return(errDatabase)
+				},
+				setupCurrencyVersionRepositoryMock: noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
+					m.EXPECT().
+						GetExpandedCurrency(gomock.Any(), currencyID).
+						Return(current, nil)
+				},
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+		"transaction failed": {
+			fields: fields{
+				setupTxManagerMock: func(m *mocks.MockTxManager) {
+					m.EXPECT().
+						Do(gomock.Any(), gomock.Any()).
+						Return(errDatabase)
+				},
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+
+			mockTxManager := mocks.NewMockTxManager(ctrl)
+			tc.fields.setupTxManagerMock(mockTxManager)
+
+			mockCurrencyRepository := mocks.NewMockCurrencyRepository(ctrl)
+			tc.fields.setupCurrencyRepositoryMock(mockCurrencyRepository)
+
+			mockCurrencyVersionRepository := mocks.NewMockCurrencyVersionRepository(ctrl)
+			tc.fields.setupCurrencyVersionRepositoryMock(mockCurrencyVersionRepository)
+
+			mockExpandedCurrencyRepository := mocks.NewMockExpandedCurrencyRepository(ctrl)
+			tc.fields.setupExpandedCurrencyRepositoryMock(mockExpandedCurrencyRepository)
+
+			service := currencysrv.NewService(
+				mockTxManager,
+				mockCurrencyRepository,
+				mockCurrencyVersionRepository,
+				mockExpandedCurrencyRepository,
+			)
+
+			result, err := service.DeleteCurrency(tc.args.ctx, currencyID)
+
+			assert.ErrorIs(t, err, tc.want.err)
+			assert.Equal(t, tc.want.result, result)
+		})
+	}
+}
+
+func TestServicePurgeCurrency(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupCurrencyRepositoryMock func(m *mocks.MockCurrencyRepository)
+		}
+		args struct {
+			ctx context.Context
+		}
+		want struct {
+			err error
+		}
+	)
+
+	var (
+		currencyID  int64 = 1
+		changer           = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		errDatabase       = errors.New("database error")
+
+		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+
+		deleteCurrency = func(err error) func(m *mocks.MockCurrencyRepository) {
+			return func(m *mocks.MockCurrencyRepository) {
+				m.EXPECT().
+					DeleteCurrency(gomock.Any(), currencyID).
+					Return(err)
+			}
+		}
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"success": {
+			fields: fields{
+				setupCurrencyRepositoryMock: deleteCurrency(nil),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupCurrencyRepositoryMock: func(_ *mocks.MockCurrencyRepository) {},
+			},
+			args: args{
+				ctx: context.Background(),
+			},
+			want: want{
+				err: domains.ErrUnauthenticated,
+			},
+		},
+		"currency not found": {
+			fields: fields{
+				setupCurrencyRepositoryMock: deleteCurrency(domains.ErrNotFound),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: domains.ErrNotFound,
+			},
+		},
+		"delete currency failed": {
+			fields: fields{
+				setupCurrencyRepositoryMock: deleteCurrency(errDatabase),
+			},
+			args: args{
+				ctx: authenticatedCtx,
+			},
+			want: want{
+				err: errDatabase,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+
+			mockCurrencyRepository := mocks.NewMockCurrencyRepository(ctrl)
+			tc.fields.setupCurrencyRepositoryMock(mockCurrencyRepository)
+
+			service := currencysrv.NewService(
+				mocks.NewMockTxManager(ctrl),
+				mockCurrencyRepository,
+				mocks.NewMockCurrencyVersionRepository(ctrl),
+				mocks.NewMockExpandedCurrencyRepository(ctrl),
+			)
+
+			err := service.PurgeCurrency(tc.args.ctx, currencyID)
+
+			assert.ErrorIs(t, err, tc.want.err)
+		})
+	}
+}

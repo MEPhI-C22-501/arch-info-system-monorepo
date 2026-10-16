@@ -3,7 +3,9 @@ package currencysrv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"uuid"
 
 	"github.com/wI2L/jsondiff"
 
@@ -19,6 +21,8 @@ type TxManager interface {
 
 type CurrencyRepository interface {
 	CreateCurrency(ctx context.Context, m *currencydmn.Currency) (int64, error)
+	UpdateCurrency(ctx context.Context, m *currencydmn.Currency) error
+	DeleteCurrency(ctx context.Context, currencyID int64) error
 }
 
 type CurrencyVersionRepository interface {
@@ -98,17 +102,7 @@ func (s *Service) GetCurrency(ctx context.Context, currencyID int64, allowDelete
 		return nil, domains.ErrUnauthenticated
 	}
 
-	currency, err := s.expandedCurrencyRepository.GetExpandedCurrency(ctx, currencyID)
-	if err != nil {
-		return nil, fmt.Errorf("get expanded currency: %w", err)
-	}
-
-	// Soft-deleted currencies are hidden unless the caller explicitly asks for them.
-	if currency.IsDeleted && !allowDeleted {
-		return nil, fmt.Errorf("currency %d is deleted: %w", currencyID, domains.ErrNotFound)
-	}
-
-	return currency, nil
+	return s.getCurrency(ctx, currencyID, allowDeleted)
 }
 
 func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error) {
@@ -138,6 +132,142 @@ func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListR
 	}
 
 	return page, nil
+}
+
+func (s *Service) UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error) {
+	changer, ok := actor.UserIDFromContext(ctx)
+	if !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	fields, err := parseUpdateMask(request.UpdateMask)
+	if err != nil {
+		return nil, err
+	}
+
+	var updated *currencydmn.ExpandedCurrency
+	err = s.txManager.Do(ctx, func(ctx context.Context) error {
+		current, err := s.getCurrency(ctx, request.CurrencyID, false)
+		if err != nil {
+			return err
+		}
+
+		currency := current.Currency()
+		applyUpdateMask(currency, request.Currency, fields)
+
+		updated, err = s.changeCurrency(ctx, current, currency, changer)
+
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return updated, nil
+}
+
+// DeleteCurrency soft-deletes a currency, the deletion is recorded as a revision.
+func (s *Service) DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error) {
+	changer, ok := actor.UserIDFromContext(ctx)
+	if !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	var deleted *currencydmn.ExpandedCurrency
+	err := s.txManager.Do(ctx, func(ctx context.Context) error {
+		current, err := s.getCurrency(ctx, currencyID, false)
+		if err != nil {
+			return err
+		}
+
+		currency := current.Currency()
+		currency.IsDeleted = true
+
+		deleted, err = s.changeCurrency(ctx, current, currency, changer)
+
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return deleted, nil
+}
+
+// PurgeCurrency permanently removes a currency together with its revisions, deleted currencies included.
+func (s *Service) PurgeCurrency(ctx context.Context, currencyID int64) error {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return domains.ErrUnauthenticated
+	}
+
+	if err := s.currencyRepository.DeleteCurrency(ctx, currencyID); err != nil {
+		return fmt.Errorf("delete currency: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) getCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
+	currency, err := s.expandedCurrencyRepository.GetExpandedCurrency(ctx, currencyID)
+	if err != nil {
+		return nil, fmt.Errorf("get expanded currency: %w", err)
+	}
+
+	// Soft-deleted currencies are hidden unless the caller explicitly asks for them.
+	if currency.IsDeleted && !allowDeleted {
+		return nil, fmt.Errorf("currency %d is deleted: %w", currencyID, domains.ErrNotFound)
+	}
+
+	return currency, nil
+}
+
+// changeCurrency stores the new state of the current currency with the next revision, it has to run in a transaction.
+// The current currency is returned as is when nothing has changed.
+func (s *Service) changeCurrency(
+	ctx context.Context,
+	current *currencydmn.ExpandedCurrency,
+	currency *currencydmn.Currency,
+	changer uuid.UUID,
+) (*currencydmn.ExpandedCurrency, error) {
+	patch, err := jsondiff.Compare(current.Currency().Snapshot(), currency.Snapshot())
+	if err != nil {
+		return nil, fmt.Errorf("build change patch: %w", err)
+	}
+
+	if len(patch) == 0 {
+		return current, nil
+	}
+
+	change, err := json.Marshal(patch)
+	if err != nil {
+		return nil, fmt.Errorf("marshal change patch: %w", err)
+	}
+
+	if err := s.currencyRepository.UpdateCurrency(ctx, currency); err != nil {
+		return nil, fmt.Errorf("update currency: %w", err)
+	}
+
+	err = s.currencyVersionRepository.CreateCurrencyRevision(ctx, &currencydmn.CurrencyRevision{
+		CurrencyID:     current.ID,
+		RevisionNumber: current.Revision + 1,
+		Change:         change,
+		ChangedBy:      changer,
+	})
+	if err != nil {
+		// The revision number is taken when another request has changed the currency since it was read.
+		if errors.Is(err, domains.ErrAlreadyExists) {
+			return nil, fmt.Errorf("create currency revision %d: %w", current.Revision+1, domains.ErrConflict)
+		}
+
+		return nil, fmt.Errorf("create currency revision: %w", err)
+	}
+
+	changed, err := s.expandedCurrencyRepository.GetExpandedCurrency(ctx, current.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get expanded currency: %w", err)
+	}
+
+	return changed, nil
 }
 
 // creationPatch describes a newly created currency as a JSON Patch (RFC 6902) against an empty document.

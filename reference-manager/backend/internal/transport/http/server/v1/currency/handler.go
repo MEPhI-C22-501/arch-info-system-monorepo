@@ -16,6 +16,9 @@ type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
 	GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error)
 	ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error)
+	UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error)
+	DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error)
+	PurgeCurrency(ctx context.Context, currencyID int64) error
 }
 
 type Handler struct {
@@ -88,6 +91,74 @@ func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params 
 	render.JSON(w, r, listPageToAPI(page))
 }
 
+func (h *Handler) UpdateCurrency(
+	w http.ResponseWriter,
+	r *http.Request,
+	currencyID currencyv1.CurrencyID,
+	params currencyv1.UpdateCurrencyParams,
+) {
+	var currency currencyv1.Currency
+	if err := render.DecodeJSON(r.Body, &currency); err != nil {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, currencyv1.Error{Message: "failed to decode request"})
+
+		return
+	}
+
+	updated, err := h.service.UpdateCurrency(r.Context(), &currencydmn.UpdateRequest{
+		CurrencyID: currencyID,
+		Currency:   currencyToModel(&currency),
+		UpdateMask: valueOrZero(params.UpdateMask),
+	})
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, expandedCurrencyToAPI(updated))
+}
+
+// DeleteCurrency soft-deletes a currency and returns it, with force the currency is removed permanently without content.
+func (h *Handler) DeleteCurrency(
+	w http.ResponseWriter,
+	r *http.Request,
+	currencyID currencyv1.CurrencyID,
+	params currencyv1.DeleteCurrencyParams,
+) {
+	if valueOrZero(params.Force) {
+		if err := h.service.PurgeCurrency(r.Context(), currencyID); err != nil {
+			apiErr, status := errorToAPI(err)
+
+			render.Status(r, status)
+			render.JSON(w, r, apiErr)
+
+			return
+		}
+
+		render.NoContent(w, r)
+
+		return
+	}
+
+	deleted, err := h.service.DeleteCurrency(r.Context(), currencyID)
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, expandedCurrencyToAPI(deleted))
+}
+
 // HandleParamError responds to requests whose path or query parameters could not be parsed.
 func (h *Handler) HandleParamError(w http.ResponseWriter, r *http.Request, _ error) {
 	render.Status(r, http.StatusBadRequest)
@@ -151,6 +222,8 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 		return currencyv1.Error{Message: invalidArgErr.Error()}, http.StatusBadRequest
 	case errors.Is(err, domains.ErrAlreadyExists):
 		return currencyv1.Error{Message: "currency already exists"}, http.StatusConflict
+	case errors.Is(err, domains.ErrConflict):
+		return currencyv1.Error{Message: "currency was modified concurrently, retry the request"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
 	case errors.Is(err, domains.ErrNotFound):

@@ -56,6 +56,21 @@ func (mr *MockServiceMockRecorder) CreateCurrency(ctx, currency any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCurrency", reflect.TypeOf((*MockService)(nil).CreateCurrency), ctx, currency)
 }
 
+// DeleteCurrency mocks base method.
+func (m *MockService) DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCurrency", ctx, currencyID)
+	ret0, _ := ret[0].(*currencydmn.ExpandedCurrency)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteCurrency indicates an expected call of DeleteCurrency.
+func (mr *MockServiceMockRecorder) DeleteCurrency(ctx, currencyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCurrency", reflect.TypeOf((*MockService)(nil).DeleteCurrency), ctx, currencyID)
+}
+
 // GetCurrency mocks base method.
 func (m *MockService) GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
 	m.ctrl.T.Helper()
@@ -84,4 +99,33 @@ func (m *MockService) ListCurrencies(ctx context.Context, request *currencydmn.L
 func (mr *MockServiceMockRecorder) ListCurrencies(ctx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCurrencies", reflect.TypeOf((*MockService)(nil).ListCurrencies), ctx, request)
+}
+
+// PurgeCurrency mocks base method.
+func (m *MockService) PurgeCurrency(ctx context.Context, currencyID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PurgeCurrency", ctx, currencyID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PurgeCurrency indicates an expected call of PurgeCurrency.
+func (mr *MockServiceMockRecorder) PurgeCurrency(ctx, currencyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PurgeCurrency", reflect.TypeOf((*MockService)(nil).PurgeCurrency), ctx, currencyID)
+}
+
+// UpdateCurrency mocks base method.
+func (m *MockService) UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrency", ctx, request)
+	ret0, _ := ret[0].(*currencydmn.ExpandedCurrency)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateCurrency indicates an expected call of UpdateCurrency.
+func (mr *MockServiceMockRecorder) UpdateCurrency(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrency", reflect.TypeOf((*MockService)(nil).UpdateCurrency), ctx, request)
 }

@@ -39,3 +39,40 @@ func (r *CurrencyRepository) CreateCurrency(ctx context.Context, m *currencydmn.
 
 	return id, nil
 }
+
+//go:embed sql/update_currency.sql
+var updateCurrencyQuery string
+
+func (r *CurrencyRepository) UpdateCurrency(ctx context.Context, m *currencydmn.Currency) error {
+	tag, err := r.db.Querier(ctx).
+		Exec(ctx, updateCurrencyQuery, m.ID, m.Code, m.Number, m.Name, m.Decimals, m.IsDeleted)
+	if err != nil {
+		if postgresrepo.HasErrorCode(err, postgresrepo.UniqueViolationCode) {
+			return domains.ErrAlreadyExists
+		}
+
+		return fmt.Errorf("update currency: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domains.ErrNotFound
+	}
+
+	return nil
+}
+
+//go:embed sql/delete_currency.sql
+var deleteCurrencyQuery string
+
+func (r *CurrencyRepository) DeleteCurrency(ctx context.Context, currencyID int64) error {
+	tag, err := r.db.Querier(ctx).Exec(ctx, deleteCurrencyQuery, currencyID)
+	if err != nil {
+		return fmt.Errorf("delete currency: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domains.ErrNotFound
+	}
+
+	return nil
+}

@@ -94,6 +94,34 @@ func (mr *MockCurrencyRepositoryMockRecorder) CreateCurrency(ctx, m any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCurrency", reflect.TypeOf((*MockCurrencyRepository)(nil).CreateCurrency), ctx, m)
 }
 
+// DeleteCurrency mocks base method.
+func (m *MockCurrencyRepository) DeleteCurrency(ctx context.Context, currencyID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCurrency", ctx, currencyID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCurrency indicates an expected call of DeleteCurrency.
+func (mr *MockCurrencyRepositoryMockRecorder) DeleteCurrency(ctx, currencyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCurrency", reflect.TypeOf((*MockCurrencyRepository)(nil).DeleteCurrency), ctx, currencyID)
+}
+
+// UpdateCurrency mocks base method.
+func (m_2 *MockCurrencyRepository) UpdateCurrency(ctx context.Context, m *currencydmn.Currency) error {
+	m_2.ctrl.T.Helper()
+	ret := m_2.ctrl.Call(m_2, "UpdateCurrency", ctx, m)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrency indicates an expected call of UpdateCurrency.
+func (mr *MockCurrencyRepositoryMockRecorder) UpdateCurrency(ctx, m any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrency", reflect.TypeOf((*MockCurrencyRepository)(nil).UpdateCurrency), ctx, m)
+}
+
 // MockCurrencyVersionRepository is a mock of CurrencyVersionRepository interface.
 type MockCurrencyVersionRepository struct {
 	ctrl     *gomock.Controller
