@@ -126,13 +126,16 @@ type RevisionNumber = int32
 // UpdateMask defines model for UpdateMask.
 type UpdateMask = string
 
+// SuccessWithCurrencyRevision Currency revision record reflecting changes made to currency data. This model is read-only.
+type SuccessWithCurrencyRevision = CurrencyRevision
+
 // SuccessWithCurrencyRevisionList defines model for SuccessWithCurrencyRevisionList.
 type SuccessWithCurrencyRevisionList struct {
-	// Currencies List of currency revisions
-	Currencies *[]CurrencyRevision `json:"currencies,omitempty"`
-
 	// NextPageToken Token to retrieve the next page
 	NextPageToken *string `json:"nextPageToken,omitempty"`
+
+	// Revisions List of currency revisions
+	Revisions *[]CurrencyRevision `json:"revisions,omitempty"`
 }
 
 // SuccessWithExpandedCurrencies defines model for SuccessWithExpandedCurrencies.
@@ -197,6 +200,12 @@ type ListCurrencyRevisionsParams struct {
 	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `author.name desc, title`).
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
+	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
+	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+}
+
+// GetCurrencyRevisionParams defines parameters for GetCurrencyRevision.
+type GetCurrencyRevisionParams struct {
 	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
 	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
 }

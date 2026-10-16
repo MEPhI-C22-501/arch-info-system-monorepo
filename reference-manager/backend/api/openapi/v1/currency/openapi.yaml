@@ -199,16 +199,19 @@ paths:
       operationId: deleteCurrency
       summary: Delete currency record
       description: >
-        Permanently delete a currency record from the system.
-        This action cannot be undone. All associated revision history will also be removed.
+        Soft-delete a currency record: the record is marked as deleted and a new revision is created.
+        With `force=true` the record is permanently deleted from the system together with its revision history,
+        deleted records included. Forced deletion cannot be undone.
       parameters:
         - $ref: "#/components/parameters/CurrencyID"
         - $ref: '#/components/parameters/Force'
       security:
         -  KeycloakOAuth2: [currencies:delete]
       responses:
-        '204':
+        '200':
           $ref: '#/components/responses/SuccessWithExpandedCurrency'
+        '204':
+          description: No Content. The currency has been permanently deleted with `force=true`.
         '400':
           description: Bad Request. Invalid currency ID format or malformed query parameters.
           $ref: '#/components/responses/Error'
@@ -219,7 +222,10 @@ paths:
           description: Forbidden. The client is authenticated but lacks the necessary permissions to delete this currency.
           $ref: '#/components/responses/Error'
         '404':
-          description: Not Found. The requested currency does not exist or has already been permanently deleted.
+          description: Not Found. The requested currency does not exist or has already been deleted.
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Conflict. The currency was modified by another request since it was read.
           $ref: '#/components/responses/Error'
         '500':
           description: Internal Server Error. An unexpected error occurred on the server while processing the request.
@@ -281,9 +287,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CurrencyID'
         - $ref: '#/components/parameters/RevisionNumber'
+        - $ref: '#/components/parameters/AllowDeleted'
       responses:
         '200':
-          $ref: '#/components/responses/SuccessWithCurrencyRevisionList'
+          $ref: '#/components/responses/SuccessWithCurrencyRevision'
         '400':
           description: Bad Request. Invalid currency ID or revision number format.
           $ref: '#/components/responses/Error'
@@ -730,7 +737,7 @@ components:
           schema:
             type: object
             properties:
-              currencies:
+              revisions:
                 type: array
                 description: List of currency revisions
                 items:

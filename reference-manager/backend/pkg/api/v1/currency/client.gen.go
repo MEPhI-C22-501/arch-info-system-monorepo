@@ -122,7 +122,7 @@ type ClientInterface interface {
 
 	// DeleteCurrency Delete currency record
 	//
-	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 	//
 	// Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
 	DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -164,7 +164,7 @@ type ClientInterface interface {
 	// Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListCurrencies List currencies with pagination
@@ -239,7 +239,7 @@ func (c *Client) ExportCurrencies(ctx context.Context, reqEditors ...RequestEdit
 
 // DeleteCurrency Delete currency record
 //
-// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 //
 // Corresponds with DELETE /v1/currencies/{currencyID} (the `DeleteCurrency` operationId).
 func (c *Client) DeleteCurrency(ctx context.Context, currencyID CurrencyID, params *DeleteCurrencyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -331,8 +331,8 @@ func (c *Client) ListCurrencyRevisions(ctx context.Context, currencyID CurrencyI
 // Retrieve detailed information about a specific revision of a currency. Shows the exact state of the currency at that revision point and the changes applied.
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber)
+func (c *Client) GetCurrencyRevision(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCurrencyRevisionRequest(c.Server, currencyID, revisionNumber, params)
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +818,7 @@ func NewListCurrencyRevisionsRequest(server string, currencyID CurrencyID, param
 }
 
 // NewGetCurrencyRevisionRequest constructs an http.Request for the GetCurrencyRevision method
-func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber RevisionNumber) (*http.Request, error) {
+func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -848,6 +848,33 @@ func NewGetCurrencyRevisionRequest(server string, currencyID CurrencyID, revisio
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.AllowDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "allowDeleted", *params.AllowDeleted, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -938,7 +965,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteCurrencyWithResponse Delete currency record
 	//
-	// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+	// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -988,7 +1015,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
+	GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error)
 }
 
 type ListCurrenciesResponse struct {
@@ -1250,8 +1277,8 @@ func (r ExportCurrenciesResponse) ContentType() string {
 type DeleteCurrencyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON204 the response for an HTTP 204 `application/json` response
-	JSON204 *SuccessWithExpandedCurrency
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuccessWithExpandedCurrency
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -1260,6 +1287,8 @@ type DeleteCurrencyResponse struct {
 	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
 	// JSON503 the response for an HTTP 503 `application/json` response
@@ -1268,9 +1297,9 @@ type DeleteCurrencyResponse struct {
 	JSON504 *Error
 }
 
-// GetJSON204 returns the response for an HTTP 204 `application/json` response
-func (r DeleteCurrencyResponse) GetJSON204() *SuccessWithExpandedCurrency {
-	return r.JSON204
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON200() *SuccessWithExpandedCurrency {
+	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -1291,6 +1320,11 @@ func (r DeleteCurrencyResponse) GetJSON403() *Error {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r DeleteCurrencyResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteCurrencyResponse) GetJSON409() *Error {
+	return r.JSON409
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -1618,7 +1652,7 @@ type GetCurrencyRevisionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SuccessWithCurrencyRevisionList
+	JSON200 *SuccessWithCurrencyRevision
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -1636,7 +1670,7 @@ type GetCurrencyRevisionResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetCurrencyRevisionResponse) GetJSON200() *SuccessWithCurrencyRevisionList {
+func (r GetCurrencyRevisionResponse) GetJSON200() *SuccessWithCurrencyRevision {
 	return r.JSON200
 }
 
@@ -1764,7 +1798,7 @@ func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, 
 
 // DeleteCurrencyWithResponse Delete currency record
 //
-// Permanently delete a currency record from the system. This action cannot be undone. All associated revision history will also be removed.
+// Soft-delete a currency record: the record is marked as deleted and a new revision is created. With `force=true` the record is permanently deleted from the system together with its revision history, deleted records included. Forced deletion cannot be undone.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -1844,8 +1878,8 @@ func (c *ClientWithResponses) ListCurrencyRevisionsWithResponse(ctx context.Cont
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /v1/currencies/{currencyID}/revisions/{revisionNumber} (the `GetCurrencyRevision` operationId).
-func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
-	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, reqEditors...)
+func (c *ClientWithResponses) GetCurrencyRevisionWithResponse(ctx context.Context, currencyID CurrencyID, revisionNumber RevisionNumber, params *GetCurrencyRevisionParams, reqEditors ...RequestEditorFn) (*GetCurrencyRevisionResponse, error) {
+	rsp, err := c.GetCurrencyRevision(ctx, currencyID, revisionNumber, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2083,12 +2117,15 @@ func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, e
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 204:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SuccessWithExpandedCurrency
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON204 = &dest
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
@@ -2117,6 +2154,13 @@ func ParseDeleteCurrencyResponse(rsp *http.Response) (*DeleteCurrencyResponse, e
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -2391,7 +2435,7 @@ func ParseGetCurrencyRevisionResponse(rsp *http.Response) (*GetCurrencyRevisionR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SuccessWithCurrencyRevisionList
+		var dest SuccessWithCurrencyRevision
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
