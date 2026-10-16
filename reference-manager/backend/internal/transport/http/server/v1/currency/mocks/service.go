@@ -55,3 +55,18 @@ func (mr *MockServiceMockRecorder) CreateCurrency(ctx, currency any) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCurrency", reflect.TypeOf((*MockService)(nil).CreateCurrency), ctx, currency)
 }
+
+// GetCurrency mocks base method.
+func (m *MockService) GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrency", ctx, currencyID, allowDeleted)
+	ret0, _ := ret[0].(*currencydmn.ExpandedCurrency)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrency indicates an expected call of GetCurrency.
+func (mr *MockServiceMockRecorder) GetCurrency(ctx, currencyID, allowDeleted any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrency", reflect.TypeOf((*MockService)(nil).GetCurrency), ctx, currencyID, allowDeleted)
+}

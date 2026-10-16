@@ -6,6 +6,8 @@ name: reference-manager-tests
 services:
   reference-manager:
     image: erp/reference-manager:test
+    # always rebuild, otherwise compose reuses a stale image left by a previous run
+    pull_policy: build
     build:
       context: ..
       dockerfile: ../deployments/docker/reference-manager.dockerfile

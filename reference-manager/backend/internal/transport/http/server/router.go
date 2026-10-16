@@ -33,7 +33,12 @@ func NewRouter(
 	)
 
 	healthv1.HandlerFromMux(health.NewHandler(readinessChecker), r)
-	currencyv1.HandlerFromMux(currencyhndl.NewHandler(currencyService), r)
+
+	currencyHandler := currencyhndl.NewHandler(currencyService)
+	currencyv1.HandlerWithOptions(currencyHandler, currencyv1.ChiServerOptions{
+		BaseRouter:       r,
+		ErrorHandlerFunc: currencyHandler.HandleParamError,
+	})
 
 	return r
 }

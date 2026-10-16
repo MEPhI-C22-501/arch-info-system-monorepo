@@ -14,6 +14,7 @@ import (
 //go:generate go tool mockgen -source=handler.go -destination=mocks/service.go -package=mocks
 type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
+	GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error)
 }
 
 type Handler struct {
@@ -49,6 +50,34 @@ func (h *Handler) CreateCurrency(w http.ResponseWriter, r *http.Request) {
 
 	render.Status(r, http.StatusCreated)
 	render.JSON(w, r, expandedCurrencyToAPI(created))
+}
+
+func (h *Handler) GetCurrency(
+	w http.ResponseWriter,
+	r *http.Request,
+	currencyID currencyv1.CurrencyID,
+	params currencyv1.GetCurrencyParams,
+) {
+	allowDeleted := params.AllowDeleted != nil && *params.AllowDeleted
+
+	currency, err := h.service.GetCurrency(r.Context(), currencyID, allowDeleted)
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, expandedCurrencyToAPI(currency))
+}
+
+// HandleParamError responds to requests whose path or query parameters could not be parsed.
+func (h *Handler) HandleParamError(w http.ResponseWriter, r *http.Request, _ error) {
+	render.Status(r, http.StatusBadRequest)
+	render.JSON(w, r, currencyv1.Error{Message: "invalid request parameters"})
 }
 
 func currencyToModel(c *currencyv1.Currency) *currencydmn.Currency {

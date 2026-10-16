@@ -92,6 +92,24 @@ func (s *Service) CreateCurrency(ctx context.Context, currency *currencydmn.Curr
 	return created, nil
 }
 
+func (s *Service) GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	currency, err := s.expandedCurrencyRepository.GetExpandedCurrency(ctx, currencyID)
+	if err != nil {
+		return nil, fmt.Errorf("get expanded currency: %w", err)
+	}
+
+	// Soft-deleted currencies are hidden unless the caller explicitly asks for them.
+	if currency.IsDeleted && !allowDeleted {
+		return nil, fmt.Errorf("currency %d is deleted: %w", currencyID, domains.ErrNotFound)
+	}
+
+	return currency, nil
+}
+
 // creationPatch describes a newly created currency as a JSON Patch (RFC 6902) against an empty document.
 func creationPatch(c *currencydmn.Currency) (json.RawMessage, error) {
 	patch, err := jsondiff.Compare(map[string]any{}, c.Snapshot())
