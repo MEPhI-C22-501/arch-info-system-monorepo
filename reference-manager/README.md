@@ -33,6 +33,7 @@ Configuration is split into separate files by responsibility:
 | `transport.yaml` | HTTP transport configuration                        |
 | `log.yaml`       | Logging configuration                               |
 | `databases.yaml` | Database connections, retries, and connection pools |
+| `auth.yaml`      | Verification of Keycloak access tokens              |
 
 Environment-specific configuration examples are stored separately in the examples directory.
 
@@ -127,6 +128,26 @@ PostgreSQL connection pool settings are configured under `databases.postgres.poo
 | `max_connection_idle_time` | `duration` | Maximum time an unused connection can remain in the pool |
 | `health_check_period`      | `duration` | Interval between connection pool health checks           |
 
+### Authentication and authorization
+
+Every API request except `/v1/health/*` needs a Keycloak access token in the `Authorization: Bearer <token>` header. The service verifies the token signature with the realm keys (JWKS), its issuer, audience, lifetime and type, and takes the actor from it: the user ID from `sub` and the roles from `realm_access.roles` together with `resource_access.<client_id>.roles`. A request without a valid token gets `401`, an operation the roles do not grant gets `403`. Roles are checked by the matrix "role - reference group - access level" from [documents/070.role-matrix.md](documents/070.role-matrix.md): currencies are read and exported by every role of the service and changed by `reference-admin` only.
+
+The keys are cached and refreshed in the background and when a token is signed by an unknown key, so key rotation needs no restart and requests keep working while Keycloak is unavailable. The service starts without Keycloak as well.
+
+Token verification is configured under `auth.keycloak`.
+
+| Parameter                           | Type       | Description                                                                                       |
+| ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `issuer_url`                        | `string`   | Realm URL, the `iss` claim must match it exactly. Required                                        |
+| `jwks_url`                          | `string`   | Realm keys URL when the service reaches Keycloak by another address, derived from the issuer otherwise |
+| `audience`                          | `string`   | Required value of the `aud` claim, not checked when empty                                         |
+| `client_id`                         | `string`   | Client whose roles are taken from `resource_access` in addition to the realm roles                |
+| `algorithms`                        | `[]string` | Accepted signing algorithms, `RS256` by default                                                   |
+| `leeway`                            | `duration` | Allowed clock skew when checking the token lifetime, `30s` by default                             |
+| `jwks.refresh_interval`             | `duration` | Period of the background refresh of the keys, `1h` by default                                     |
+| `jwks.unknown_key_refresh_interval` | `duration` | Minimal period between refreshes caused by unknown keys, `1m` by default                          |
+| `jwks.request_timeout`              | `duration` | Timeout of a request for the keys, `5s` by default                                                |
+
 ## Run local environment
 
 The local development environment is managed using [Task](https://taskfile.dev/) and Docker Compose.
@@ -138,6 +159,16 @@ task up
 ```
 
 The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`. The admin panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`).
+
+The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+
+Get a token and call the API:
+
+```bash
+TOKEN=$(curl -s -d grant_type=password -d client_id=reference-manager-ui -d username=admin -d password=admin \
+  http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token | jq -r .access_token)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/currencies/
+```
 
 To stop the local environment and remove its associated volumes:
 
