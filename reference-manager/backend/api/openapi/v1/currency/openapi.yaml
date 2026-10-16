@@ -399,6 +399,7 @@ components:
           example: "US Dollar"
         decimals:
           type: integer
+          format: int8
           description: >
             The number of decimal places (minor units) for fractional parts (cents, kopecks).
             Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
@@ -436,6 +437,7 @@ components:
           example: 840
         revision_number:
           type: integer
+          format: int32
           description: The sequential number of the revision, starting from 1.
           readOnly: true
           example: 3
@@ -501,6 +503,7 @@ components:
           example: "US Dollar"
         decimals:
           type: integer
+          format: int8
           description: >
             The number of decimal places (minor units) for fractional parts (cents, kopecks).
             Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
@@ -509,6 +512,7 @@ components:
           example: 2
         revision:
           type: integer
+          format: int32
           description: The sequential number of the latest revision applied to this currency.
           example: 3
         last_changer:
@@ -559,6 +563,7 @@ components:
       required: false
       schema:
         type: integer
+        format: int32
         minimum: 1
         maximum: 100
         default: 20
@@ -641,7 +646,7 @@ components:
       required: true
       schema:
         type: integer
-        format: int64
+        format: int32
         minimum: 1
         example: 3
 
