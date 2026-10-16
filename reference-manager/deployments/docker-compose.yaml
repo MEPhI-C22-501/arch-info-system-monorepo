@@ -20,6 +20,13 @@ services:
 
     restart: unless-stopped
 
+    healthcheck:
+      test: [ "CMD", "/app/healthcheck", "-url", "http://127.0.0.1:8080/v1/health/readyz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   reference-manager-migrations:
     container_name: reference_manager_migrations
     image: migrate/migrate:latest
@@ -63,13 +70,23 @@ services:
     container_name: reference_manager_ui
     image: erp/reference-manager-ui:dev
     build:
-      context: ..
-      dockerfile: deployments/docker/reference-manager-ui.dockerfile
+      context: ../frontend
+      dockerfile: ../deployments/docker/reference-manager-ui.dockerfile
 
     ports:
       - "${REFERENCE_MANAGER_UI_PORT:-8081}:8080"
 
+    volumes:
+      - ./configs/reference-manager-ui/local/reference-manager-ui.conf:/etc/nginx/conf.d/default.conf:ro
+
     restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
   reference_manager_database_data:

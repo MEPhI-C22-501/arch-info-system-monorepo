@@ -8,7 +8,7 @@
 | --- | --- |
 | Без сборки | Открыть `index.html` в браузере |
 | Локальный стенд | `task up` из `reference-manager/`, затем `http://localhost:8081/admin/` (порт - `REFERENCE_MANAGER_UI_PORT` в `deployments/.env`) |
-| Только образ интерфейса | `task build:frontend`, образ `erp/reference-manager-ui:latest`, nginx отдаёт панель по `/admin/` и `ok` по `/healthz` |
+| Только образ интерфейса | `task build:reference-manager-ui`, образ `erp/reference-manager-ui:latest`, nginx отдаёт панель по `/admin/` и `ok` по `/healthz` |
 
 Проверки: `task tests:frontend` запускает тесты имитации (`node --test`, Node 18 и новее, без зависимостей). `task lint:docker` проверяет Dockerfile интерфейса.
 
@@ -26,7 +26,7 @@
 | `js/app.js` | Экраны S-01..S-05, маршруты в фрагменте адреса, черновики форм, подтверждения |
 | `tests/` | Тесты фильтра, файла `.xlsx` и имитации сервиса |
 
-Образ собирается из `deployments/docker/reference-manager-ui.dockerfile` с конфигурацией `deployments/nginx/reference-manager-ui.conf`. Папка `tests/` и этот файл в образ не попадают.
+Образ собирается из `deployments/docker/reference-manager-ui.dockerfile`, конфигурация nginx `deployments/configs/reference-manager-ui/local/reference-manager-ui.conf` в образ не входит и монтируется при запуске (см. `deployments/docker-compose.yaml`). Папка `tests/` и этот файл в образ не попадают.
 
 ## Что имитируется
 
