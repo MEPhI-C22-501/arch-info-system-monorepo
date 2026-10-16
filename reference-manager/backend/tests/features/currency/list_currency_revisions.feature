@@ -3,11 +3,7 @@ Feature: Currency revision listing
   Background:
     Given the SQL query from file "testdata/currency_revisions.sql" is executed
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
 
   Scenario: Revisions of a currency are listed in chronological order by default
     When the HTTP request is sent to "/v1/currencies/1/revisions"
@@ -38,11 +34,7 @@ Feature: Currency revision listing
       [1, 2]
       """
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       pageSize=2
@@ -77,11 +69,7 @@ Feature: Currency revision listing
     And the HTTP request is sent to "/v1/currencies/1/revisions"
     And an HTTP response is received with status 200
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       pageSize=1
@@ -189,8 +177,8 @@ Feature: Currency revision listing
     Given a GET HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     When the HTTP request is sent to "/v1/currencies/1/revisions"
     Then an HTTP response is received with status 401
@@ -202,6 +190,6 @@ Feature: Currency revision listing
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |

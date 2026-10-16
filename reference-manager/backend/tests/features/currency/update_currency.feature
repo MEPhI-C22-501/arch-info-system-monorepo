@@ -3,11 +3,7 @@ Feature: Currency update
   Background:
     Given the SQL query from file "testdata/currencies.sql" is executed
     And a PATCH HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c |
-      """
+    And the HTTP request is authorized as "second-admin"
 
   Scenario: Fields from the update mask are updated with a new revision
     Given the HTTP request contains URL parameters
@@ -244,8 +240,8 @@ Feature: Currency update
     Given a PATCH HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     And the HTTP request contains a body from file "testdata/usd_renamed"
     When the HTTP request is sent to "/v1/currencies/1"
@@ -267,9 +263,9 @@ Feature: Currency update
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |
 
   Scenario: Currency is not updated from a malformed body
     Given the HTTP request contains a body

@@ -2,11 +2,7 @@ Feature: Currency creation
 
   Scenario: Currency is created with the first revision
     Given a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains a body from file "testdata/usd"
     When the HTTP request is sent to "/v1/currencies/"
     Then an HTTP response is received with status 201
@@ -61,11 +57,7 @@ Feature: Currency creation
 
   Scenario Outline: Currency <code> keeps its numeric code and minor units
     Given a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains a body
       """
       {
@@ -116,11 +108,7 @@ Feature: Currency creation
       INSERT INTO currencies (code, number, name, decimals) VALUES ('USD', '840', 'US Dollar', 2);
       """
     And a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains a body
       """
       {
@@ -160,8 +148,8 @@ Feature: Currency creation
     Given a POST HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     And the HTTP request contains a body from file "testdata/usd"
     When the HTTP request is sent to "/v1/currencies/"
@@ -183,17 +171,13 @@ Feature: Currency creation
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |
 
   Scenario: Currency is not created from a malformed body
     Given a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains a body
       """
       {"code": "USD",

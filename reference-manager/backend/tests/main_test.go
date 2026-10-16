@@ -16,7 +16,10 @@ import (
 	sqlsteps "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/sql"
 )
 
-const composeFile = "docker-compose.test.yaml"
+const (
+	composeFile = "docker-compose.test.yaml"
+	realm       = "arch-info-system"
+)
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m,
@@ -52,10 +55,11 @@ func TestFeatures(t *testing.T) {
 	defer transport.CloseIdleConnections()
 
 	client := &http.Client{Transport: transport}
+	tokens := httpsteps.NewTokens(env.KeycloakURL, realm, client)
 
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			httpsteps.New(env.BaseURL, client).Register(sc)
+			httpsteps.New(env.BaseURL, client, tokens).Register(sc)
 			sqlsteps.New(pool).Register(sc)
 		},
 		Options: &godog.Options{

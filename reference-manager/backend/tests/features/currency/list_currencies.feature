@@ -3,11 +3,7 @@ Feature: Currency listing
   Background:
     Given the SQL query from file "testdata/currencies.sql" is executed
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
 
   Scenario: Active currencies are listed in creation order by default
     When the HTTP request is sent to "/v1/currencies/"
@@ -31,11 +27,7 @@ Feature: Currency listing
     Then an HTTP response is received with status 200
     And the HTTP response contains a body from file "testdata/currencies_first_page"
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       pageSize=2
@@ -48,11 +40,7 @@ Feature: Currency listing
       ["JPY", "BHD"]
       """
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       pageSize=2
@@ -88,11 +76,7 @@ Feature: Currency listing
     And the HTTP request is sent to "/v1/currencies/"
     And an HTTP response is received with status 200
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       pageSize=1
@@ -211,8 +195,8 @@ Feature: Currency listing
     Given a GET HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     When the HTTP request is sent to "/v1/currencies/"
     Then an HTTP response is received with status 401
@@ -224,6 +208,6 @@ Feature: Currency listing
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |

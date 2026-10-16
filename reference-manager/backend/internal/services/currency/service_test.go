@@ -15,6 +15,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
 	currencysrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/currency"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/currency/mocks"
@@ -47,7 +48,7 @@ func TestServiceCreateCurrency(t *testing.T) {
 		createdAt         = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		currency = &currencydmn.Currency{
 			Code:     "USD",
@@ -137,6 +138,21 @@ func TestServiceCreateCurrency(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx:      actorContext(unprivilegedUserID, access.RoleReader),
+				currency: currency,
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"currency already exists": {
@@ -299,7 +315,7 @@ func TestServiceGetCurrency(t *testing.T) {
 		deletedAt         = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		expandedCurrency = &currencydmn.ExpandedCurrency{
 			ID:          currencyID,
@@ -390,6 +406,18 @@ func TestServiceGetCurrency(t *testing.T) {
 				err: domains.ErrUnauthenticated,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx:        actorContext(unprivilegedUserID),
+				currencyID: currencyID,
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
+			},
+		},
 		"currency not found": {
 			fields: fields{
 				setupExpandedCurrencyRepositoryMock: func(m *mocks.MockExpandedCurrencyRepository) {
@@ -471,7 +499,7 @@ func TestServiceListCurrencies(t *testing.T) {
 		changer     = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
 		errDatabase = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		usd = &currencydmn.ExpandedCurrency{ID: 1, Code: "USD", Number: "840", Name: "US Dollar", Decimals: 2}
 		eur = &currencydmn.ExpandedCurrency{ID: 2, Code: "EUR", Number: "978", Name: "Euro", Decimals: 2}
@@ -592,6 +620,18 @@ func TestServiceListCurrencies(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx:     actorContext(unprivilegedUserID),
+				request: &currencydmn.ListRequest{},
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"negative page size": {
@@ -734,7 +774,7 @@ func TestServiceListCurrenciesPageToken(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx = actor.WithUserID(context.Background(), uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+		ctx = actorContext(uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"), access.RoleAdmin)
 
 		usd = &currencydmn.ExpandedCurrency{ID: 1, Code: "USD"}
 		eur = &currencydmn.ExpandedCurrency{ID: 2, Code: "EUR"}
@@ -812,7 +852,7 @@ func TestServiceExportCurrencies(t *testing.T) {
 	var (
 		errDatabase = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+		authenticatedCtx = actorContext(uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"), access.RoleAdmin)
 
 		usd = &currencydmn.ExpandedCurrency{ID: 1, Code: "USD", Number: "840", Name: "US Dollar", Decimals: 2}
 		eur = &currencydmn.ExpandedCurrency{ID: 2, Code: "EUR", Number: "978", Name: "Euro", Decimals: 2}
@@ -856,6 +896,17 @@ func TestServiceExportCurrencies(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupExpandedCurrencyRepositoryMock: func(_ *mocks.MockExpandedCurrencyRepository) {},
+			},
+			args: args{
+				ctx: actorContext(unprivilegedUserID),
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"list expanded currencies failed": {
@@ -926,7 +977,7 @@ func TestServiceUpdateCurrency(t *testing.T) {
 		updatedAt         = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		current = &currencydmn.ExpandedCurrency{
 			ID:          currencyID,
@@ -1117,6 +1168,24 @@ func TestServiceUpdateCurrency(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: actorContext(unprivilegedUserID, access.RoleReader),
+				request: &currencydmn.UpdateRequest{
+					CurrencyID: currencyID,
+					Currency:   requested,
+				},
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"read-only field in mask": {
@@ -1373,7 +1442,7 @@ func TestServiceDeleteCurrency(t *testing.T) {
 		deletedAt         = time.Date(2026, 10, 6, 7, 54, 0, 0, time.UTC)
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		current = &currencydmn.ExpandedCurrency{
 			ID:          currencyID,
@@ -1472,6 +1541,20 @@ func TestServiceDeleteCurrency(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupTxManagerMock:                  noTxManagerCalls,
+				setupCurrencyRepositoryMock:         noCurrencyRepositoryCalls,
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx: actorContext(unprivilegedUserID, access.RoleReader),
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"currency not found": {
@@ -1627,7 +1710,7 @@ func TestServicePurgeCurrency(t *testing.T) {
 		changer           = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		deleteCurrency = func(err error) func(m *mocks.MockCurrencyRepository) {
 			return func(m *mocks.MockCurrencyRepository) {
@@ -1660,6 +1743,17 @@ func TestServicePurgeCurrency(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupCurrencyRepositoryMock: func(_ *mocks.MockCurrencyRepository) {},
+			},
+			args: args{
+				ctx: actorContext(unprivilegedUserID, access.RoleReader),
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"currency not found": {
@@ -1735,7 +1829,7 @@ func TestServiceGetCurrencyRevision(t *testing.T) {
 		changer              = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
 		errDatabase          = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		usd        = &currencydmn.ExpandedCurrency{ID: currencyID, Code: "USD", Revision: 2}
 		deletedUSD = &currencydmn.ExpandedCurrency{ID: currencyID, Code: "USD", Revision: 2, IsDeleted: true}
@@ -1832,6 +1926,20 @@ func TestServiceGetCurrencyRevision(t *testing.T) {
 			},
 			want: want{
 				err: domains.ErrUnauthenticated,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx:            actorContext(unprivilegedUserID),
+				currencyID:     currencyID,
+				revisionNumber: revisionNumber,
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
 			},
 		},
 		"currency not found": {
@@ -1967,7 +2075,7 @@ func TestServiceListCurrencyRevisions(t *testing.T) {
 		changer           = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
 		errDatabase       = errors.New("database error")
 
-		authenticatedCtx = actor.WithUserID(context.Background(), changer)
+		authenticatedCtx = actorContext(changer, access.RoleAdmin)
 
 		usd        = &currencydmn.ExpandedCurrency{ID: currencyID, Code: "USD", Revision: 3}
 		deletedUSD = &currencydmn.ExpandedCurrency{ID: currencyID, Code: "USD", Revision: 3, IsDeleted: true}
@@ -2144,6 +2252,19 @@ func TestServiceListCurrencyRevisions(t *testing.T) {
 				err: domains.ErrUnauthenticated,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
+				setupExpandedCurrencyRepositoryMock: noExpandedCurrencyRepositoryCalls,
+			},
+			args: args{
+				ctx:     actorContext(unprivilegedUserID),
+				request: &currencydmn.RevisionListRequest{CurrencyID: currencyID},
+			},
+			want: want{
+				err: domains.ErrPermissionDenied,
+			},
+		},
 		"negative page size": {
 			fields: fields{
 				setupCurrencyVersionRepositoryMock:  noCurrencyVersionRepositoryCalls,
@@ -2269,7 +2390,7 @@ func TestServiceListCurrencyRevisionsPageToken(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx = actor.WithUserID(context.Background(), uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+		ctx = actorContext(uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"), access.RoleAdmin)
 
 		first  = &currencydmn.CurrencyRevision{ID: 1, CurrencyID: 1, RevisionNumber: 1}
 		second = &currencydmn.CurrencyRevision{ID: 2, CurrencyID: 1, RevisionNumber: 2}
@@ -2331,4 +2452,12 @@ func TestServiceListCurrencyRevisionsPageToken(t *testing.T) {
 			assert.ErrorIs(t, err, domains.ErrInvalidArgument)
 		})
 	}
+}
+
+// unprivilegedUserID is the actor of the requests that lack the access level.
+var unprivilegedUserID = uuid.MustParse("5c0e5ab4-8d1c-4c43-9a6e-0f3c2d6b9e71")
+
+// actorContext returns a context of an authenticated actor with the roles.
+func actorContext(userID uuid.UUID, roles ...string) context.Context {
+	return actor.WithActor(context.Background(), &actor.Actor{UserID: userID, Roles: roles})
 }

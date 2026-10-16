@@ -3,11 +3,7 @@ Feature: Currency deletion
   Background:
     Given the SQL query from file "testdata/currencies.sql" is executed
     And a DELETE HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c |
-      """
+    And the HTTP request is authorized as "second-admin"
 
   Scenario: Currency is soft-deleted with a new revision
     When the HTTP request is sent to "/v1/currencies/1"
@@ -66,11 +62,7 @@ Feature: Currency deletion
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 200
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c |
-      """
+    And the HTTP request is authorized as "second-admin"
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 404
     And the HTTP response contains a body from file "testdata/not_found"
@@ -132,8 +124,8 @@ Feature: Currency deletion
     Given a DELETE HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     And the HTTP request contains URL parameters
       """
@@ -158,10 +150,10 @@ Feature: Currency deletion
       """
 
     Examples:
-      | case                           | user_id  | force |
-      | header is absent               |          | false |
-      | invalid UUID                   | not-uuid | false |
-      | header is absent, forced       |          | true  |
+      | case                    | authorization    | force |
+      | token is absent         |                  | false |
+      | token is not a JWT      | Bearer not-a-jwt | false |
+      | token is absent, forced |                  | true  |
 
   Scenario Outline: Currency is not deleted for invalid parameters (<case>)
     Given the HTTP request contains URL parameters

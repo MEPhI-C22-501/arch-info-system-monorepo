@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,9 +23,13 @@ import (
 
 var fileBodyExts = []string{".json"}
 
+// defaultClientID is the Keycloak client the tokens are issued to unless a scenario names another one.
+const defaultClientID = "reference-manager-ui"
+
 type Steps struct {
 	baseURL string
 	client  *http.Client
+	tokens  *Tokens
 
 	featureURI string
 
@@ -37,7 +42,7 @@ type Steps struct {
 	responseBody []byte
 }
 
-func New(baseURL string, client *http.Client) *Steps {
+func New(baseURL string, client *http.Client, tokens *Tokens) *Steps {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -45,6 +50,7 @@ func New(baseURL string, client *http.Client) *Steps {
 	return &Steps{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		client:  client,
+		tokens:  tokens,
 	}
 }
 
@@ -59,6 +65,8 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the HTTP request contains URL parameter "([^"]*)" from the HTTP response value at "([^"]*)"$`,
 		s.requestContainsURLParameterFromResponse)
 	sc.Step(`^the HTTP request contains headers$`, s.requestContainsHeaders)
+	sc.Step(`^the HTTP request is authorized as "([^"]*)"$`, s.requestIsAuthorizedAs)
+	sc.Step(`^the HTTP request is authorized as "([^"]*)" through the client "([^"]*)"$`, s.requestIsAuthorizedThroughClient)
 	sc.Step(`^the HTTP request contains a body$`, s.requestContainsBody)
 	sc.Step(`^the HTTP request contains a body from file "([^"]*)"$`, s.requestContainsBodyFromFile)
 	sc.Step(`^the HTTP request is sent to "([^"]*)"$`, s.requestIsSentTo)
@@ -134,6 +142,26 @@ func (s *Steps) requestContainsHeaders(headers *godog.DocString) error {
 	for _, row := range table.Rows {
 		s.headers.Add(row[0], row[1])
 	}
+
+	return nil
+}
+
+func (s *Steps) requestIsAuthorizedAs(ctx context.Context, username string) error {
+	return s.requestIsAuthorizedThroughClient(ctx, username, defaultClientID)
+}
+
+// requestIsAuthorizedThroughClient adds an access token of the Keycloak user issued to the client.
+func (s *Steps) requestIsAuthorizedThroughClient(ctx context.Context, username, clientID string) error {
+	if s.tokens == nil {
+		return errors.New("tokens of keycloak users are not configured")
+	}
+
+	token, err := s.tokens.Token(ctx, username, clientID)
+	if err != nil {
+		return err
+	}
+
+	s.headers.Set("Authorization", "Bearer "+token)
 
 	return nil
 }

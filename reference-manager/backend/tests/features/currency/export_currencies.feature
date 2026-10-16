@@ -2,11 +2,7 @@ Feature: Currency export
 
   Background:
     Given a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
 
   Scenario: Active currencies are exported to an Excel file in creation order
     Given the SQL query from file "testdata/currencies.sql" is executed
@@ -31,11 +27,7 @@ Feature: Currency export
   Scenario: Export reflects changes made through the API
     Given the SQL query from file "testdata/currencies.sql" is executed
     And a PATCH HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c |
-      """
+    And the HTTP request is authorized as "second-admin"
     And the HTTP request contains URL parameters
       """
       updateMask=name
@@ -53,19 +45,11 @@ Feature: Currency export
     And the HTTP request is sent to "/v1/currencies/3"
     And an HTTP response is received with status 200
     And a DELETE HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request is sent to "/v1/currencies/2"
     And an HTTP response is received with status 200
     And a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     When the HTTP request is sent to "/v1/currencies/export"
     Then an HTTP response is received with status 200
     And the HTTP response contains an Excel sheet "Currencies" with rows
@@ -89,8 +73,8 @@ Feature: Currency export
     Given a POST HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     When the HTTP request is sent to "/v1/currencies/export"
     Then an HTTP response is received with status 401
@@ -102,6 +86,6 @@ Feature: Currency export
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |

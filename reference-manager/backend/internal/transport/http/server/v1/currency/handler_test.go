@@ -144,6 +144,22 @@ func TestHandlerCreateCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						CreateCurrency(gomock.Any(), currencyModel).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				requestBody: validRequestBody,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -323,6 +339,22 @@ func TestHandlerGetCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrency(gomock.Any(), int64(1), false).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				currencyID: 1,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"unexpected service error": {
@@ -505,6 +537,19 @@ func TestHandlerListCurrencies(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"unexpected service error": {
@@ -724,6 +769,22 @@ func TestHandlerUpdateCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						UpdateCurrency(gomock.Any(), updateRequest).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				requestBody: validRequestBody,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -901,6 +962,19 @@ func TestHandlerDeleteCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						DeleteCurrency(gomock.Any(), int64(1)).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -1076,6 +1150,23 @@ func TestHandlerGetCurrencyRevision(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"malformed stored change": {
@@ -1271,6 +1362,19 @@ func TestHandlerListCurrencyRevisions(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"malformed stored change": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -1406,6 +1510,19 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"unexpected service error": {

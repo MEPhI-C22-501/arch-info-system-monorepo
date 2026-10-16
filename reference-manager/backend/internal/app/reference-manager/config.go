@@ -2,6 +2,7 @@ package app
 
 import (
 	httpconfig "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/keycloak"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/telemetry"
 )
@@ -9,6 +10,7 @@ import (
 type Config struct {
 	Transport TransportConfig  `yaml:"transport"`
 	Databases DatabasesConfig  `yaml:"databases"`
+	Auth      AuthConfig       `yaml:"auth"`
 	Telemetry telemetry.Config `yaml:"telemetry"`
 }
 
@@ -18,4 +20,8 @@ type TransportConfig struct {
 
 type DatabasesConfig struct {
 	Postgres postgres.Config `yaml:"postgres"`
+}
+
+type AuthConfig struct {
+	Keycloak keycloak.Config `yaml:"keycloak"`
 }

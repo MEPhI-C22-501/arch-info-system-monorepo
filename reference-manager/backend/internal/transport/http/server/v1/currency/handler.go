@@ -380,6 +380,8 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 		return currencyv1.Error{Message: "currency was modified concurrently, retry the request"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
+	case errors.Is(err, domains.ErrPermissionDenied):
+		return currencyv1.Error{Message: "permission denied"}, http.StatusForbidden
 	case errors.Is(err, domains.ErrRevisionNotFound):
 		return currencyv1.Error{Message: "currency revision not found"}, http.StatusNotFound
 	case errors.Is(err, domains.ErrNotFound):

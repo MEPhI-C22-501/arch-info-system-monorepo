@@ -6,7 +6,7 @@ info:
   version: 1.0.0
 
 security:
-  - KeycloakOAuth2: [currencies:read]
+  - KeycloakOAuth2: []
 
 paths:
   /v1/currencies/:
@@ -16,8 +16,7 @@ paths:
       description: >
         Create a new currency record in accordance with the ISO 4217 standard.
         The currency will be created with revision number 1 and initial metadata.
-      security:
-        - KeycloakOAuth2: [currencies:write]
+      x-required-roles: [reference-admin]
       requestBody:
         required: true
         content:
@@ -57,6 +56,7 @@ paths:
 
     get:
       operationId: listCurrencies
+      x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
       summary: List currencies with pagination
       parameters:
         - $ref: '#/components/parameters/ListPageSize'
@@ -91,8 +91,7 @@ paths:
       operationId: exportCurrencies
       summary: Export currencies in Excel format
       description: Generates and returns an Excel file containing the list of currencies
-      security:
-        - KeycloakOAuth2: [currencies:export]
+      x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExcelFile'
@@ -118,6 +117,7 @@ paths:
   /v1/currencies/{currencyID}:
     get: 
       operationId: getCurrency
+      x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
       summary: Get currency by ID
       description: >
         Retrieve detailed information about a specific currency by its unique identifier.
@@ -159,8 +159,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CurrencyID"
         - $ref: '#/components/parameters/UpdateMask'
-      security:
-        - KeycloakOAuth2: [currencies:write]
+      x-required-roles: [reference-admin]
       requestBody:
         required: true
         content:
@@ -205,8 +204,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CurrencyID"
         - $ref: '#/components/parameters/Force'
-      security:
-        -  KeycloakOAuth2: [currencies:delete]
+      x-required-roles: [reference-admin]
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpandedCurrency'
@@ -240,6 +238,7 @@ paths:
   /v1/currencies/{currencyID}/revisions:
     get:
       operationId: listCurrencyRevisions
+      x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
       summary: List all revisions for a currency
       description: >
         Retrieve the complete revision history for a specific currency.
@@ -280,6 +279,7 @@ paths:
   /v1/currencies/{currencyID}/revisions/{revisionNumber}:
     get:
       operationId: getCurrencyRevision
+      x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
       summary: Get specific revision of a currency
       description: >
         Retrieve detailed information about a specific revision of a currency.
@@ -318,24 +318,20 @@ components:
     KeycloakOAuth2:
       type: oauth2
       description: >
-        Authentication via Keycloak (OAuth 2.0 / OpenID Connect). 
-        Pass the JWT access token in the Authorization header (Bearer <token>).
+        Authentication via Keycloak (OAuth 2.0 / OpenID Connect), realm arch-info-system.
+        Pass the access token in the Authorization header (Bearer <token>). The token has to be issued
+        for the reference-manager audience. Access is granted by the realm roles (or the roles of the
+        reference-manager client) listed in x-required-roles of each operation, any of them is enough.
+        A request without a valid token gets 401, a token without a required role gets 403.
+        The URLs below point to the local environment.
       flows:
         authorizationCode:
-          authorizationUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/auth
-          tokenUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/token
-          scopes:
-            currencies:read: Read currency data and revision history
-            currencies:write: Create and update currency records
-            currencies:delete: Permanently delete currency records
-            currencies:export: Export currencies to Excel format
+          authorizationUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          scopes: {}
         clientCredentials:
-          tokenUrl: https://keycloak.your-domain.com/realms/your_realm/protocol/openid-connect/token
-          scopes:
-            currencies:read: Read currency data and revision history
-            currencies:write: Create and update currency records
-            currencies:delete: Permanently delete currency records
-            currencies:export: Export currencies to Excel format
+          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          scopes: {}
 
   schemas:
     Error:
