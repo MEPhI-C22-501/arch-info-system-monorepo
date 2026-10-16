@@ -80,6 +80,8 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 	switch {
 	case errors.Is(err, domains.ErrAlreadyExists):
 		return currencyv1.Error{Message: "currency already exists"}, http.StatusConflict
+	case errors.Is(err, domains.ErrUnauthenticated):
+		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
 	case errors.Is(err, domains.ErrNotFound):
 		return currencyv1.Error{Message: "currency not found"}, http.StatusNotFound
 	default:

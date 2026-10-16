@@ -123,6 +123,22 @@ func TestHandlerCreateCurrency(t *testing.T) {
 				responseBody:   `{"message": "currency already exists"}`,
 			},
 		},
+		"unauthenticated": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						CreateCurrency(gomock.Any(), currencyModel).
+						Return(nil, domains.ErrUnauthenticated)
+				},
+			},
+			args: args{
+				requestBody: validRequestBody,
+			},
+			want: want{
+				responseStatus: http.StatusUnauthorized,
+				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
