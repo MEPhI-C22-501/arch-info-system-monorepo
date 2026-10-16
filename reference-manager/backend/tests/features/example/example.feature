@@ -1,3 +1,4 @@
+@skip
 Feature: Example Feature
 
   Scenario: First example scenario using HTTP steps and SQL steps

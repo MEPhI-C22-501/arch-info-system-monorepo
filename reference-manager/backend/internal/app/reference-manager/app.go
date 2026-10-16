@@ -7,6 +7,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	currencyrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres/currency"
+	currencysrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/currency"
 	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
@@ -36,10 +38,18 @@ func NewApp(cfg *Config) (*App, error) {
 
 	readinessManager := ready.NewManager(log, postgresClient.ReadinessCheck())
 
+	currencyService := currencysrv.NewService(
+		postgres.NewTxManager(postgresClient),
+		currencyrepo.NewCurrencyRepository(postgresClient),
+		currencyrepo.NewCurrencyRevisionRepository(postgresClient),
+		currencyrepo.NewExpandedCurrencyRepository(postgresClient),
+	)
+
 	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
 	httpServer.RegisterRouter(httptr.NewRouter(
 		log,
 		readinessManager,
+		currencyService,
 	))
 
 	log.Info("application initialized successfully")
