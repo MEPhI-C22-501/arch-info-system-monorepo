@@ -8,11 +8,7 @@ Feature: Currency retrieval
       VALUES (1, 1, '[{"op": "add", "path": "/code", "value": "USD"}]', '3fa85f64-5717-4562-b3fc-2c963f66afa6', '2026-10-05 07:54:00+00');
       """
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 200
     And the HTTP response contains headers
@@ -45,11 +41,7 @@ Feature: Currency retrieval
         (1, 2, '[{"op": "replace", "path": "/is_deleted", "value": true}]', '9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c', '2026-10-06 07:54:00+00');
       """
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       allowDeleted=<allow_deleted>
@@ -69,22 +61,14 @@ Feature: Currency retrieval
       INSERT INTO currencies (code, number, name, decimals, is_deleted) VALUES ('USD', '840', 'US Dollar', 2, TRUE);
       """
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 404
     And the HTTP response contains a body from file "testdata/not_found"
 
   Scenario: Missing currency is not found
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 404
     And the HTTP response contains a body from file "testdata/not_found"
@@ -97,8 +81,8 @@ Feature: Currency retrieval
     And a GET HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     When the HTTP request is sent to "/v1/currencies/1"
     Then an HTTP response is received with status 401
@@ -110,17 +94,13 @@ Feature: Currency retrieval
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |
 
   Scenario Outline: Currency is not returned for invalid parameters (<case>)
     Given a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     And the HTTP request contains URL parameters
       """
       allowDeleted=<allow_deleted>

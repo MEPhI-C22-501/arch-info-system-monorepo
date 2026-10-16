@@ -10,8 +10,8 @@ import (
 	"github.com/wI2L/jsondiff"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
-	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/actor"
 )
 
 //go:generate go tool mockgen -source=service.go -destination=mocks/service.go -package=mocks
@@ -58,9 +58,9 @@ func NewService(
 }
 
 func (s *Service) CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error) {
-	changer, ok := actor.UserIDFromContext(ctx)
-	if !ok {
-		return nil, domains.ErrUnauthenticated
+	changer, err := s.authorize(ctx, access.LevelCreate)
+	if err != nil {
+		return nil, err
 	}
 
 	change, err := creationPatch(currency)
@@ -100,16 +100,16 @@ func (s *Service) CreateCurrency(ctx context.Context, currency *currencydmn.Curr
 }
 
 func (s *Service) GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {
-	if _, ok := actor.UserIDFromContext(ctx); !ok {
-		return nil, domains.ErrUnauthenticated
+	if _, err := s.authorize(ctx, access.LevelRead); err != nil {
+		return nil, err
 	}
 
 	return s.getCurrency(ctx, currencyID, allowDeleted)
 }
 
 func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error) {
-	if _, ok := actor.UserIDFromContext(ctx); !ok {
-		return nil, domains.ErrUnauthenticated
+	if _, err := s.authorize(ctx, access.LevelRead); err != nil {
+		return nil, err
 	}
 
 	query, token, err := listQuery(request)
@@ -133,6 +133,21 @@ func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListR
 	return page, nil
 }
 
+// ExportCurrencies returns all active currencies in creation order.
+func (s *Service) ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error) {
+	if _, err := s.authorize(ctx, access.LevelExecute); err != nil {
+		return nil, err
+	}
+
+	// The query has no limit: the currency reference is small enough to be exported at once.
+	currencies, err := s.expandedCurrencyRepository.ListExpandedCurrencies(ctx, &currencydmn.ListQuery{})
+	if err != nil {
+		return nil, fmt.Errorf("list expanded currencies: %w", err)
+	}
+
+	return currencies, nil
+}
+
 // GetCurrencyRevision returns a revision of a currency, revisions of deleted currencies are hidden unless allowed.
 func (s *Service) GetCurrencyRevision(
 	ctx context.Context,
@@ -140,8 +155,8 @@ func (s *Service) GetCurrencyRevision(
 	revisionNumber int32,
 	allowDeleted bool,
 ) (*currencydmn.CurrencyRevision, error) {
-	if _, ok := actor.UserIDFromContext(ctx); !ok {
-		return nil, domains.ErrUnauthenticated
+	if _, err := s.authorize(ctx, access.LevelRead); err != nil {
+		return nil, err
 	}
 
 	if _, err := s.getCurrency(ctx, currencyID, allowDeleted); err != nil {
@@ -165,8 +180,8 @@ func (s *Service) ListCurrencyRevisions(
 	ctx context.Context,
 	request *currencydmn.RevisionListRequest,
 ) (*currencydmn.RevisionListPage, error) {
-	if _, ok := actor.UserIDFromContext(ctx); !ok {
-		return nil, domains.ErrUnauthenticated
+	if _, err := s.authorize(ctx, access.LevelRead); err != nil {
+		return nil, err
 	}
 
 	query, token, err := revisionListQuery(request)
@@ -195,9 +210,9 @@ func (s *Service) ListCurrencyRevisions(
 }
 
 func (s *Service) UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error) {
-	changer, ok := actor.UserIDFromContext(ctx)
-	if !ok {
-		return nil, domains.ErrUnauthenticated
+	changer, err := s.authorize(ctx, access.LevelUpdate)
+	if err != nil {
+		return nil, err
 	}
 
 	fields, err := parseUpdateMask(request.UpdateMask)
@@ -228,13 +243,13 @@ func (s *Service) UpdateCurrency(ctx context.Context, request *currencydmn.Updat
 
 // DeleteCurrency soft-deletes a currency, the deletion is recorded as a revision.
 func (s *Service) DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error) {
-	changer, ok := actor.UserIDFromContext(ctx)
-	if !ok {
-		return nil, domains.ErrUnauthenticated
+	changer, err := s.authorize(ctx, access.LevelDelete)
+	if err != nil {
+		return nil, err
 	}
 
 	var deleted *currencydmn.ExpandedCurrency
-	err := s.txManager.Do(ctx, func(ctx context.Context) error {
+	err = s.txManager.Do(ctx, func(ctx context.Context) error {
 		current, err := s.getCurrency(ctx, currencyID, false)
 		if err != nil {
 			return err
@@ -256,8 +271,8 @@ func (s *Service) DeleteCurrency(ctx context.Context, currencyID int64) (*curren
 
 // PurgeCurrency permanently removes a currency together with its revisions, deleted currencies included.
 func (s *Service) PurgeCurrency(ctx context.Context, currencyID int64) error {
-	if _, ok := actor.UserIDFromContext(ctx); !ok {
-		return domains.ErrUnauthenticated
+	if _, err := s.authorize(ctx, access.LevelDelete); err != nil {
+		return err
 	}
 
 	if err := s.currencyRepository.DeleteCurrency(ctx, currencyID); err != nil {
@@ -265,6 +280,16 @@ func (s *Service) PurgeCurrency(ctx context.Context, currencyID int64) error {
 	}
 
 	return nil
+}
+
+// authorize checks that the caller may perform an operation of the level on currencies and returns its user ID.
+func (s *Service) authorize(ctx context.Context, level access.Level) (uuid.UUID, error) {
+	a, err := access.Authorize(ctx, access.GroupClassifiers, level)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	return a.UserID, nil
 }
 
 func (s *Service) getCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error) {

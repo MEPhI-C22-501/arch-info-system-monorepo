@@ -261,6 +261,23 @@ func TestExpandedCurrencyRepositoryListExpandedCurrencies(t *testing.T) {
 				result: []*currencydmn.ExpandedCurrency{},
 			},
 		},
+		"all currencies without a limit": {
+			fields: fields{
+				setupPgxMock: func(m pgxmock.PgxConnIface, query string) {
+					m.ExpectQuery(query + "\nWHERE is_deleted = FALSE\nORDER BY id").
+						WillReturnRows(pgxmock.NewRows(columns).AddRow(
+							int64(2), "EUR", "978", "Euro", int8(2), false,
+							nil, nil, nil, nil, nil,
+						))
+				},
+			},
+			args: args{
+				query: &currencydmn.ListQuery{},
+			},
+			want: want{
+				result: []*currencydmn.ExpandedCurrency{eur},
+			},
+		},
 		"filter field without a column": {
 			fields: fields{
 				setupPgxMock: noPgxCalls,

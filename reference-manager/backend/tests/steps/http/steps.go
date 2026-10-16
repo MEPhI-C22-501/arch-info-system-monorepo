@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,15 +16,20 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/wI2L/jsondiff"
+	"github.com/xuri/excelize/v2"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/internal/gherkin"
 )
 
 var fileBodyExts = []string{".json"}
 
+// defaultClientID is the Keycloak client the tokens are issued to unless a scenario names another one.
+const defaultClientID = "reference-manager-ui"
+
 type Steps struct {
 	baseURL string
 	client  *http.Client
+	tokens  *Tokens
 
 	featureURI string
 
@@ -36,7 +42,7 @@ type Steps struct {
 	responseBody []byte
 }
 
-func New(baseURL string, client *http.Client) *Steps {
+func New(baseURL string, client *http.Client, tokens *Tokens) *Steps {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -44,6 +50,7 @@ func New(baseURL string, client *http.Client) *Steps {
 	return &Steps{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		client:  client,
+		tokens:  tokens,
 	}
 }
 
@@ -58,6 +65,8 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the HTTP request contains URL parameter "([^"]*)" from the HTTP response value at "([^"]*)"$`,
 		s.requestContainsURLParameterFromResponse)
 	sc.Step(`^the HTTP request contains headers$`, s.requestContainsHeaders)
+	sc.Step(`^the HTTP request is authorized as "([^"]*)"$`, s.requestIsAuthorizedAs)
+	sc.Step(`^the HTTP request is authorized as "([^"]*)" through the client "([^"]*)"$`, s.requestIsAuthorizedThroughClient)
 	sc.Step(`^the HTTP request contains a body$`, s.requestContainsBody)
 	sc.Step(`^the HTTP request contains a body from file "([^"]*)"$`, s.requestContainsBodyFromFile)
 	sc.Step(`^the HTTP request is sent to "([^"]*)"$`, s.requestIsSentTo)
@@ -66,6 +75,7 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the HTTP response contains a body$`, s.responseContainsBody)
 	sc.Step(`^the HTTP response contains a body from file "([^"]*)"$`, s.responseContainsBodyFromFile)
 	sc.Step(`^the HTTP response contains a value at "([^"]*)"$`, s.responseContainsValueAt)
+	sc.Step(`^the HTTP response contains an Excel sheet "([^"]*)" with rows$`, s.responseContainsExcelSheet)
 }
 
 func (s *Steps) reset(featureURI string) {
@@ -132,6 +142,26 @@ func (s *Steps) requestContainsHeaders(headers *godog.DocString) error {
 	for _, row := range table.Rows {
 		s.headers.Add(row[0], row[1])
 	}
+
+	return nil
+}
+
+func (s *Steps) requestIsAuthorizedAs(ctx context.Context, username string) error {
+	return s.requestIsAuthorizedThroughClient(ctx, username, defaultClientID)
+}
+
+// requestIsAuthorizedThroughClient adds an access token of the Keycloak user issued to the client.
+func (s *Steps) requestIsAuthorizedThroughClient(ctx context.Context, username, clientID string) error {
+	if s.tokens == nil {
+		return errors.New("tokens of keycloak users are not configured")
+	}
+
+	token, err := s.tokens.Token(ctx, username, clientID)
+	if err != nil {
+		return err
+	}
+
+	s.headers.Set("Authorization", "Bearer "+token)
 
 	return nil
 }
@@ -323,6 +353,62 @@ func (s *Steps) responseContainsValueAt(pointer string, expected *godog.DocStrin
 
 	if err := compareJSON([]byte(expected.Content), actual); err != nil {
 		return fmt.Errorf("response value at %q mismatch: %w\nactual: %s", pointer, err, actual)
+	}
+
+	return nil
+}
+
+// responseContainsExcelSheet compares a sheet of the Excel workbook in the response body with the table.
+// The first row of the sheet is its header, table columns are matched to sheet columns by it, so the table
+// may list only some of the columns in any order. Data rows are compared in order, cells as they are displayed.
+func (s *Steps) responseContainsExcelSheet(sheet string, rows *godog.DocString) error {
+	if s.response == nil {
+		return fmt.Errorf("HTTP request was not sent")
+	}
+
+	table, err := gherkin.ParseTable(rows.Content)
+	if err != nil {
+		return fmt.Errorf("parse rows table: %w", err)
+	}
+
+	f, err := excelize.OpenReader(bytes.NewReader(s.responseBody))
+	if err != nil {
+		return fmt.Errorf("response body is not an Excel workbook: %w", err)
+	}
+	defer f.Close()
+
+	sheetRows, err := f.GetRows(sheet)
+	if err != nil {
+		return fmt.Errorf("read sheet %q of %q: %w", sheet, f.GetSheetList(), err)
+	}
+
+	if len(sheetRows) == 0 {
+		return fmt.Errorf("sheet %q has no header row", sheet)
+	}
+
+	indexes := make([]int, len(table.Columns))
+	for i, column := range table.Columns {
+		indexes[i] = slices.Index(sheetRows[0], column)
+		if indexes[i] < 0 {
+			return fmt.Errorf("sheet %q has no column %q, header: %q", sheet, column, sheetRows[0])
+		}
+	}
+
+	actual := make([][]string, 0, len(sheetRows)-1)
+	for _, sheetRow := range sheetRows[1:] {
+		row := make([]string, len(indexes))
+		for i, index := range indexes {
+			// Trailing empty cells are not returned by the library.
+			if index < len(sheetRow) {
+				row[i] = sheetRow[index]
+			}
+		}
+
+		actual = append(actual, row)
+	}
+
+	if !slices.EqualFunc(table.Rows, actual, slices.Equal) {
+		return fmt.Errorf("sheet %q mismatch in columns %q:\nexpected: %q\nactual:   %q", sheet, table.Columns, table.Rows, actual)
 	}
 
 	return nil

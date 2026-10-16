@@ -1,6 +1,7 @@
 # test environment of the integration tests, it is started by testcontainers from tests/infra
 # host ports are ephemeral, the tests read them from the started containers, so several runs do not conflict
 # the database has no volume, so every run starts with a clean state
+# the users of the Keycloak realm are the actors of the scenarios
 name: reference-manager-tests
 
 services:
@@ -23,6 +24,8 @@ services:
     depends_on:
       reference-manager-migrations:
         condition: service_completed_successfully
+      reference-manager-keycloak:
+        condition: service_healthy
 
     healthcheck:
       test: [ "CMD", "/app/healthcheck", "-url", "http://127.0.0.1:8080/v1/health/readyz" ]
@@ -44,6 +47,32 @@ services:
         condition: service_healthy
 
     restart: "no"
+
+  # dev mode with the realm imported on startup, the realm is shared with the local environment
+  reference-manager-keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+
+    command: [ "start-dev", "--import-realm" ]
+
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # the issuer stays the same as in the local environment, whatever host port the tests get tokens from
+      KC_HOSTNAME: http://localhost:8180
+      KC_HEALTH_ENABLED: "true"
+
+    ports:
+      - "8080"
+
+    volumes:
+      - ../../deployments/configs/keycloak/arch-info-system-realm.json:/opt/keycloak/data/import/arch-info-system-realm.json:ro
+
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3" ]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
 
   reference-manager-database:
     image: postgres:18-alpine

@@ -19,6 +19,8 @@ const (
 	servicePort  = "8080/tcp"
 	databaseName = "reference-manager-database"
 	databasePort = "5432/tcp"
+	keycloakName = "reference-manager-keycloak"
+	keycloakPort = "8080/tcp"
 
 	startupTimeout = 5 * time.Minute
 )
@@ -31,6 +33,7 @@ type Infra struct {
 
 	BaseURL     string
 	PostgresDSN string
+	KeycloakURL string
 }
 
 func Up(ctx context.Context, composeFile string) (*Infra, error) {
@@ -112,6 +115,16 @@ func (i *Infra) resolveEndpoints(ctx context.Context) error {
 		Path:     env["POSTGRES_DB"],
 		RawQuery: "sslmode=disable",
 	}).String()
+
+	keycloak, err := i.stack.ServiceContainer(ctx, keycloakName)
+	if err != nil {
+		return fmt.Errorf("get %s container: %w", keycloakName, err)
+	}
+
+	i.KeycloakURL, err = keycloak.PortEndpoint(ctx, keycloakPort, "http")
+	if err != nil {
+		return fmt.Errorf("get %s endpoint: %w", keycloakName, err)
+	}
 
 	return nil
 }

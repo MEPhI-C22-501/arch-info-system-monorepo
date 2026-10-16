@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"uuid"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/xuri/excelize/v2"
+	"go.uber.org/mock/gomock"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
 	currencyhndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/currency"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/currency/mocks"
 	currencyv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/currency"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestHandlerCreateCurrency(t *testing.T) {
@@ -138,6 +142,22 @@ func TestHandlerCreateCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						CreateCurrency(gomock.Any(), currencyModel).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				requestBody: validRequestBody,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"unexpected service error": {
@@ -321,6 +341,22 @@ func TestHandlerGetCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrency(gomock.Any(), int64(1), false).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				currencyID: 1,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -501,6 +537,19 @@ func TestHandlerListCurrencies(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"unexpected service error": {
@@ -720,6 +769,22 @@ func TestHandlerUpdateCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						UpdateCurrency(gomock.Any(), updateRequest).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				requestBody: validRequestBody,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -897,6 +962,19 @@ func TestHandlerDeleteCurrency(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						DeleteCurrency(gomock.Any(), int64(1)).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"unexpected service error": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -1072,6 +1150,23 @@ func TestHandlerGetCurrencyRevision(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusUnauthorized,
 				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						GetCurrencyRevision(gomock.Any(), int64(1), int32(2), false).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			args: args{
+				currencyID:     1,
+				revisionNumber: 2,
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
 			},
 		},
 		"malformed stored change": {
@@ -1267,6 +1362,19 @@ func TestHandlerListCurrencyRevisions(t *testing.T) {
 				responseBody:   `{"message": "unauthenticated"}`,
 			},
 		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencyRevisions(gomock.Any(), gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
 		"malformed stored change": {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
@@ -1314,6 +1422,159 @@ func TestHandlerListCurrencyRevisions(t *testing.T) {
 
 			assert.Equal(t, tc.want.responseStatus, rec.Code)
 			assert.JSONEq(t, tc.want.responseBody, rec.Body.String())
+		})
+	}
+}
+
+func TestHandlerExportCurrencies(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupServiceMock func(m *mocks.MockService)
+		}
+		want struct {
+			responseStatus int
+			// rows are the expected rows of the exported sheet, header included, when the export succeeds.
+			rows [][]string
+			// responseBody is the expected JSON error when the export fails.
+			responseBody string
+		}
+	)
+
+	var (
+		changer   = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		createdAt = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
+		updatedAt = time.Date(2026, 10, 6, 8, 30, 15, 0, time.UTC)
+
+		header = []string{"Code", "Number", "Name", "Decimals", "Revision", "Last changer", "Created at", "Updated at"}
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		want   want
+	}{
+		"currencies": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return([]*currencydmn.ExpandedCurrency{
+							{
+								ID: 1, Code: "USD", Number: "840", Name: "US Dollar", Decimals: 2,
+								Revision: 1, LastChanger: changer, CreatedAt: createdAt, UpdatedAt: createdAt,
+							},
+							{
+								ID: 2, Code: "BHD", Number: "048", Name: "Bahraini Dinar", Decimals: 3,
+								Revision: 2, LastChanger: changer, CreatedAt: createdAt, UpdatedAt: updatedAt,
+							},
+						}, nil)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				rows: [][]string{
+					header,
+					{
+						"USD", "840", "US Dollar", "2", "1", "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"2026-10-05 07:54:00", "2026-10-05 07:54:00",
+					},
+					{
+						"BHD", "048", "Bahraini Dinar", "3", "2", "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"2026-10-05 07:54:00", "2026-10-06 08:30:15",
+					},
+				},
+			},
+		},
+		"no currencies": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return([]*currencydmn.ExpandedCurrency{}, nil)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				rows:           [][]string{header},
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return(nil, domains.ErrUnauthenticated)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusUnauthorized,
+				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"permission denied": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusForbidden,
+				responseBody:   `{"message": "permission denied"}`,
+			},
+		},
+		"unexpected service error": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ExportCurrencies(gomock.Any()).
+						Return(nil, errors.New("connection refused"))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			mockService := mocks.NewMockService(ctrl)
+			tc.fields.setupServiceMock(mockService)
+
+			handler := currencyhndl.NewHandler(mockService)
+
+			r := httptest.NewRequest(http.MethodPost, "/v1/currencies/export", nil)
+			rec := httptest.NewRecorder()
+
+			handler.ExportCurrencies(rec, r)
+
+			assert.Equal(t, tc.want.responseStatus, rec.Code)
+
+			if tc.want.rows == nil {
+				assert.JSONEq(t, tc.want.responseBody, rec.Body.String())
+				return
+			}
+
+			assert.Equal(t, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", rec.Header().Get("Content-Type"))
+			assert.Equal(t, `attachment; filename=currencies.xlsx`, rec.Header().Get("Content-Disposition"))
+			assert.Equal(t, strconv.Itoa(rec.Body.Len()), rec.Header().Get("Content-Length"))
+
+			f, err := excelize.OpenReader(rec.Body)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = f.Close() })
+
+			assert.Equal(t, []string{"Currencies"}, f.GetSheetList())
+
+			rows, err := f.GetRows("Currencies")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want.rows, rows)
 		})
 	}
 }

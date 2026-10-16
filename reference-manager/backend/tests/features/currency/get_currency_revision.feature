@@ -3,11 +3,7 @@ Feature: Currency revision retrieval
   Background:
     Given the SQL query from file "testdata/currency_revisions.sql" is executed
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
 
   Scenario: Revision is returned with its change
     When the HTTP request is sent to "/v1/currencies/1/revisions/2"
@@ -21,11 +17,7 @@ Feature: Currency revision retrieval
 
   Scenario: Revision created through the API is returned
     Given a POST HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c |
-      """
+    And the HTTP request is authorized as "second-admin"
     And the HTTP request contains a body
       """
       {
@@ -39,11 +31,7 @@ Feature: Currency revision retrieval
     And the HTTP request is sent to "/v1/currencies/"
     And an HTTP response is received with status 201
     And a GET HTTP request
-    And the HTTP request contains headers
-      """
-      | Header    | Value                                |
-      | X-User-ID | 3fa85f64-5717-4562-b3fc-2c963f66afa6 |
-      """
+    And the HTTP request is authorized as "admin"
     When the HTTP request is sent to "/v1/currencies/3/revisions/1"
     Then an HTTP response is received with status 200
     And the HTTP response contains a body
@@ -97,8 +85,8 @@ Feature: Currency revision retrieval
     Given a GET HTTP request
     And the HTTP request contains headers
       """
-      | Header    | Value     |
-      | X-User-ID | <user_id> |
+      | Header        | Value           |
+      | Authorization | <authorization> |
       """
     When the HTTP request is sent to "/v1/currencies/1/revisions/1"
     Then an HTTP response is received with status 401
@@ -110,9 +98,9 @@ Feature: Currency revision retrieval
       """
 
     Examples:
-      | case             | user_id  |
-      | header is absent |          |
-      | invalid UUID     | not-uuid |
+      | case               | authorization    |
+      | token is absent    |                  |
+      | token is not a JWT | Bearer not-a-jwt |
 
   Scenario Outline: Revision is not returned for invalid parameters (<case>)
     Given the HTTP request contains URL parameters

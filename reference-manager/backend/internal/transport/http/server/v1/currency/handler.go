@@ -1,16 +1,20 @@
 package currencyhndl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
+	"strconv"
+
+	"github.com/go-chi/render"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
 	currencyv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/currency"
-	"github.com/go-chi/render"
 )
 
 //go:generate go tool mockgen -source=handler.go -destination=mocks/service.go -package=mocks
@@ -18,6 +22,7 @@ type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
 	GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error)
 	ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error)
+	ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error)
 	UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error)
 	DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error)
 	PurgeCurrency(ctx context.Context, currencyID int64) error
@@ -98,6 +103,36 @@ func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params 
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, listPageToAPI(page))
+}
+
+// ExportCurrencies responds with an Excel file of all active currencies.
+func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request) {
+	currencies, err := h.service.ExportCurrencies(r.Context())
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	// The file is built in memory first, so that a failure still gets a proper error response.
+	var file bytes.Buffer
+	if err := writeCurrenciesExcel(&file, currencies); err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", excelContentType)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": exportFileName}))
+	w.Header().Set("Content-Length", strconv.Itoa(file.Len()))
+	w.WriteHeader(http.StatusOK)
+	_, _ = file.WriteTo(w)
 }
 
 func (h *Handler) UpdateCurrency(
@@ -345,6 +380,8 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 		return currencyv1.Error{Message: "currency was modified concurrently, retry the request"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
+	case errors.Is(err, domains.ErrPermissionDenied):
+		return currencyv1.Error{Message: "permission denied"}, http.StatusForbidden
 	case errors.Is(err, domains.ErrRevisionNotFound):
 		return currencyv1.Error{Message: "currency revision not found"}, http.StatusNotFound
 	case errors.Is(err, domains.ErrNotFound):
