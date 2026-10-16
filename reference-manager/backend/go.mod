@@ -10,9 +10,11 @@ require (
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/oapi-codegen/runtime v1.7.0
+	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/sdk v1.46.0
 	go.uber.org/goleak v1.3.0
+	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/time v0.16.0
 )
@@ -53,4 +55,7 @@ require (
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )
 
-tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+tool (
+	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+	go.uber.org/mock/mockgen
+)

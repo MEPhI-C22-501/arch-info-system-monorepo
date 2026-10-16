@@ -6,7 +6,7 @@ package currencyv1
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Currency Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
@@ -18,7 +18,7 @@ type Currency struct {
 	Decimals int8 `json:"decimals"`
 
 	// IsDeleted Indicates whether the currency record has been soft-deleted.
-	IsDeleted *bool `json:"is_deleted,omitempty"`
+	IsDeleted bool `json:"is_deleted"`
 
 	// Name Official name of the currency in Russian or English.
 	Name string `json:"name"`
@@ -77,11 +77,11 @@ type ExpandedCurrency struct {
 	// Decimals The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
 	Decimals int8 `json:"decimals"`
 
-	// DeletedAt The date and time when the currency record was soft-deleted. Null if the record is active.
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	// DeletedAt The date and time when the currency record was soft-deleted. Zero value (0001-01-01T00:00:00Z) if the record has never been deleted.
+	DeletedAt time.Time `json:"deleted_at"`
 
 	// IsDeleted Indicates whether the currency record has been soft-deleted.
-	IsDeleted *bool `json:"is_deleted,omitempty"`
+	IsDeleted bool `json:"is_deleted"`
 
 	// LastChanger UUID of the user or system component that performed the latest change.
 	LastChanger uuid.UUID `json:"last_changer"`

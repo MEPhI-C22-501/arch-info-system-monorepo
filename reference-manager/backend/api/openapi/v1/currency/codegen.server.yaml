@@ -11,9 +11,9 @@ output-options:
       formats:
         uuid:
           type: uuid.UUID
-          import: github.com/google/uuid
+          import: uuid
 
 additional-imports:
-  - package: github.com/google/uuid
+  - package: uuid
   
 output: pkg/api/v1/currency/server.gen.go
