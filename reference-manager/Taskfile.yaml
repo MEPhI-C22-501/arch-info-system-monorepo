@@ -7,10 +7,13 @@ version: '3'
 vars:
   BACKEND_DIR: backend
   FRONTEND_DIR: frontend
-  BACKEND_DOCKERFILE: deployments/docker/reference-manager.dockerfile
-  BACKEND_IMAGE: erp/reference-manager:latest
-  FRONTEND_DOCKERFILE: deployments/docker/reference-manager-ui.dockerfile
-  FRONTEND_IMAGE: erp/reference-manager-ui:latest
+  DOCKERFILES_DIR: deployments/docker
+  IMAGE_REGISTRY: erp
+  IMAGE_TAG: latest
+  IMAGES:
+    map:
+      reference-manager: '{{.BACKEND_DIR}}'
+      reference-manager-ui: '{{.FRONTEND_DIR}}'
 
 tasks:
   generate:
@@ -45,10 +48,10 @@ tasks:
       - golangci-lint run ./... {{.CLI_ARGS}}
 
   lint:docker:
-    desc: Run hadolint on the Dockerfiles of the backend and the frontend
+    desc: Run hadolint on the Dockerfiles of all images
     cmds:
-      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.BACKEND_DOCKERFILE}}
-      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.FRONTEND_DOCKERFILE}}
+      - for: { var: IMAGES }
+        cmd: docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.DOCKERFILES_DIR}}/{{.KEY}}.dockerfile
 
   tests:
     desc: Run all tests
@@ -73,20 +76,24 @@ tasks:
       - migrate create -ext sql -dir deployments/migrations -seq {{.CLI_ARGS}}
 
   build:
-    desc: Build Docker images of the module
+    desc: Build all Docker images of the module (pass extra 'docker build' flags after '--', e.g., 'task build -- --no-cache')
     cmds:
-      - task: build:backend
-      - task: build:frontend
+      - for: { var: IMAGES }
+        task: build:{{.KEY}}
 
-  build:backend:
-    desc: Build the backend Docker image
+  build:*:
+    desc: Build one Docker image by its name, e.g., 'task build:reference-manager-ui'
+    vars:
+      NAME: '{{index .MATCH 0}}'
+    preconditions:
+      - sh: '{{if hasKey .IMAGES .NAME}}true{{else}}false{{end}}'
+        msg: 'unknown image "{{.NAME}}", available: {{.IMAGES | keys | sortAlpha | join ", "}}'
     cmds:
-      - docker build -f {{.BACKEND_DOCKERFILE}} -t {{.BACKEND_IMAGE}} {{.BACKEND_DIR}}
-
-  build:frontend:
-    desc: Build the frontend Docker image (nginx with the admin panel under /admin/)
-    cmds:
-      - docker build -f {{.FRONTEND_DOCKERFILE}} -t {{.FRONTEND_IMAGE}} .
+      - >-
+        docker build {{.CLI_ARGS}}
+        -f {{.DOCKERFILES_DIR}}/{{.NAME}}.dockerfile
+        -t {{.IMAGE_REGISTRY}}/{{.NAME}}:{{.IMAGE_TAG}}
+        {{index .IMAGES .NAME}}
 
   up:
     desc: Start the local development environment using Docker Compose
