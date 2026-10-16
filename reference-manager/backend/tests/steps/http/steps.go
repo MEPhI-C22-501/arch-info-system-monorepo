@@ -53,6 +53,8 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 
 	sc.Step(`^a (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) HTTP request$`, s.aRequest)
 	sc.Step(`^the HTTP request contains URL parameters$`, s.requestContainsURLParameters)
+	sc.Step(`^the HTTP request contains URL parameter "([^"]*)" from the HTTP response value at "([^"]*)"$`,
+		s.requestContainsURLParameterFromResponse)
 	sc.Step(`^the HTTP request contains headers$`, s.requestContainsHeaders)
 	sc.Step(`^the HTTP request contains a body$`, s.requestContainsBody)
 	sc.Step(`^the HTTP request contains a body from file "([^"]*)"$`, s.requestContainsBodyFromFile)
@@ -61,6 +63,7 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the HTTP response contains headers$`, s.responseContainsHeaders)
 	sc.Step(`^the HTTP response contains a body$`, s.responseContainsBody)
 	sc.Step(`^the HTTP response contains a body from file "([^"]*)"$`, s.responseContainsBodyFromFile)
+	sc.Step(`^the HTTP response contains a value at "([^"]*)"$`, s.responseContainsValueAt)
 }
 
 func (s *Steps) reset(featureURI string) {
@@ -73,8 +76,14 @@ func (s *Steps) reset(featureURI string) {
 	s.responseBody = nil
 }
 
+// aRequest starts a new request, the previous response stays available until the new request is sent,
+// so that the new request can use values from it.
 func (s *Steps) aRequest(method string) error {
 	s.method = method
+	s.query = url.Values{}
+	s.headers = http.Header{}
+	s.body = nil
+
 	return nil
 }
 
@@ -92,6 +101,22 @@ func (s *Steps) requestContainsURLParameters(params *godog.DocString) error {
 
 		s.query.Add(strings.TrimSpace(key), strings.TrimSpace(value))
 	}
+
+	return nil
+}
+
+func (s *Steps) requestContainsURLParameterFromResponse(key, pointer string) error {
+	value, err := s.responseValueAt(pointer)
+	if err != nil {
+		return err
+	}
+
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("response value at %q is not a string: %v", pointer, value)
+	}
+
+	s.query.Add(key, str)
 
 	return nil
 }
@@ -243,18 +268,67 @@ func (s *Steps) compareResponseBody(expected []byte) error {
 		return fmt.Errorf("response body is not valid JSON: %s", s.responseBody)
 	}
 
-	ignored, err := anyValuePointers(expected, s.responseBody)
+	if err := compareJSON(expected, s.responseBody); err != nil {
+		return fmt.Errorf("response body mismatch: %w\nactual: %s", err, s.responseBody)
+	}
+
+	return nil
+}
+
+func (s *Steps) responseContainsValueAt(pointer string, expected *godog.DocString) error {
+	value, err := s.responseValueAt(pointer)
 	if err != nil {
 		return err
 	}
 
-	patch, err := jsondiff.CompareJSON(expected, s.responseBody, jsondiff.Ignores(ignored...))
+	actual, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("compare response body: %w", err)
+		return fmt.Errorf("encode response value at %q: %w", pointer, err)
+	}
+
+	if err := compareJSON([]byte(expected.Content), actual); err != nil {
+		return fmt.Errorf("response value at %q mismatch: %w\nactual: %s", pointer, err, actual)
+	}
+
+	return nil
+}
+
+func (s *Steps) responseValueAt(pointer string) (any, error) {
+	if s.response == nil {
+		return nil, fmt.Errorf("HTTP request was not sent")
+	}
+
+	var doc any
+	if err := json.Unmarshal(s.responseBody, &doc); err != nil {
+		return nil, fmt.Errorf("response body is not valid JSON: %s", s.responseBody)
+	}
+
+	value, err := resolvePointer(doc, pointer)
+	if err != nil {
+		return nil, fmt.Errorf("response value at %q: %w, body: %s", pointer, err, s.responseBody)
+	}
+
+	return value, nil
+}
+
+// compareJSON compares JSON documents semantically, AnyValue placeholders in expected match any value.
+func compareJSON(expected, actual []byte) error {
+	if !json.Valid(expected) {
+		return fmt.Errorf("expected value is not valid JSON: %s", expected)
+	}
+
+	ignored, err := anyValuePointers(expected, actual)
+	if err != nil {
+		return err
+	}
+
+	patch, err := jsondiff.CompareJSON(expected, actual, jsondiff.Ignores(ignored...))
+	if err != nil {
+		return fmt.Errorf("compare JSON: %w", err)
 	}
 
 	if len(patch) > 0 {
-		return fmt.Errorf("response body mismatch:\ndiff: %s\nactual: %s", patch, s.responseBody)
+		return fmt.Errorf("diff: %s", patch)
 	}
 
 	return nil

@@ -1,0 +1,29 @@
+{
+  "currencies": [
+    {
+      "code": "USD",
+      "number": "840",
+      "name": "US Dollar",
+      "decimals": 2,
+      "is_deleted": false,
+      "revision": 1,
+      "last_changer": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "deleted_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "code": "EUR",
+      "number": "978",
+      "name": "Euro",
+      "decimals": 2,
+      "is_deleted": false,
+      "revision": 1,
+      "last_changer": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "created_at": "2026-10-02T10:00:00Z",
+      "updated_at": "2026-10-02T10:00:00Z",
+      "deleted_at": "0001-01-01T00:00:00Z"
+    }
+  ],
+  "nextPageToken": "{{any}}"
+}

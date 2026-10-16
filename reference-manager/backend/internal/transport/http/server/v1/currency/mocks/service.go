@@ -70,3 +70,18 @@ func (mr *MockServiceMockRecorder) GetCurrency(ctx, currencyID, allowDeleted any
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrency", reflect.TypeOf((*MockService)(nil).GetCurrency), ctx, currencyID, allowDeleted)
 }
+
+// ListCurrencies mocks base method.
+func (m *MockService) ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCurrencies", ctx, request)
+	ret0, _ := ret[0].(*currencydmn.ListPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCurrencies indicates an expected call of ListCurrencies.
+func (mr *MockServiceMockRecorder) ListCurrencies(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCurrencies", reflect.TypeOf((*MockService)(nil).ListCurrencies), ctx, request)
+}

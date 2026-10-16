@@ -170,3 +170,18 @@ func (mr *MockExpandedCurrencyRepositoryMockRecorder) GetExpandedCurrency(ctx, c
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExpandedCurrency", reflect.TypeOf((*MockExpandedCurrencyRepository)(nil).GetExpandedCurrency), ctx, currencyID)
 }
+
+// ListExpandedCurrencies mocks base method.
+func (m *MockExpandedCurrencyRepository) ListExpandedCurrencies(ctx context.Context, query *currencydmn.ListQuery) ([]*currencydmn.ExpandedCurrency, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListExpandedCurrencies", ctx, query)
+	ret0, _ := ret[0].([]*currencydmn.ExpandedCurrency)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListExpandedCurrencies indicates an expected call of ListExpandedCurrencies.
+func (mr *MockExpandedCurrencyRepositoryMockRecorder) ListExpandedCurrencies(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListExpandedCurrencies", reflect.TypeOf((*MockExpandedCurrencyRepository)(nil).ListExpandedCurrencies), ctx, query)
+}

@@ -373,3 +373,168 @@ func TestHandlerHandleParamError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.JSONEq(t, `{"message": "invalid request parameters"}`, rec.Body.String())
 }
+
+func TestHandlerListCurrencies(t *testing.T) {
+	t.Parallel()
+
+	type (
+		fields struct {
+			setupServiceMock func(m *mocks.MockService)
+		}
+		args struct {
+			params currencyv1.ListCurrenciesParams
+		}
+		want struct {
+			responseStatus int
+			responseBody   string
+		}
+	)
+
+	var (
+		changer   = uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+		createdAt = time.Date(2026, 10, 5, 7, 54, 0, 0, time.UTC)
+
+		pageSize     int32 = 1
+		pageToken          = "token"
+		filter             = `code = "USD"`
+		orderBy            = "code desc"
+		allowDeleted       = true
+
+		usd = &currencydmn.ExpandedCurrency{
+			ID:          1,
+			Code:        "USD",
+			Number:      "840",
+			Name:        "US Dollar",
+			Decimals:    2,
+			Revision:    1,
+			LastChanger: changer,
+			CreatedAt:   createdAt,
+			UpdatedAt:   createdAt,
+		}
+		usdBody = `{
+			"code": "USD",
+			"number": "840",
+			"name": "US Dollar",
+			"decimals": 2,
+			"is_deleted": false,
+			"revision": 1,
+			"last_changer": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+			"created_at": "2026-10-05T07:54:00Z",
+			"updated_at": "2026-10-05T07:54:00Z",
+			"deleted_at": "0001-01-01T00:00:00Z"
+		}`
+	)
+
+	testCases := map[string]struct {
+		fields fields
+		args   args
+		want   want
+	}{
+		"page with a next page token": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), &currencydmn.ListRequest{
+							PageSize:     1,
+							PageToken:    "token",
+							Filter:       `code = "USD"`,
+							OrderBy:      "code desc",
+							AllowDeleted: true,
+						}).
+						Return(&currencydmn.ListPage{
+							Currencies:    []*currencydmn.ExpandedCurrency{usd},
+							NextPageToken: "next",
+						}, nil)
+				},
+			},
+			args: args{
+				params: currencyv1.ListCurrenciesParams{
+					PageSize:     &pageSize,
+					PageToken:    &pageToken,
+					Filter:       &filter,
+					OrderBy:      &orderBy,
+					AllowDeleted: &allowDeleted,
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   `{"currencies": [` + usdBody + `], "nextPageToken": "next"}`,
+			},
+		},
+		"empty last page": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), &currencydmn.ListRequest{}).
+						Return(&currencydmn.ListPage{}, nil)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusOK,
+				responseBody:   `{"currencies": []}`,
+			},
+		},
+		"invalid argument": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, &domains.InvalidArgumentError{
+							Argument: "filter",
+							Err:      errors.New("undeclared identifier 'status'"),
+						})
+				},
+			},
+			want: want{
+				responseStatus: http.StatusBadRequest,
+				responseBody:   `{"message": "invalid filter: undeclared identifier 'status'"}`,
+			},
+		},
+		"unauthenticated": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, domains.ErrUnauthenticated)
+				},
+			},
+			want: want{
+				responseStatus: http.StatusUnauthorized,
+				responseBody:   `{"message": "unauthenticated"}`,
+			},
+		},
+		"unexpected service error": {
+			fields: fields{
+				setupServiceMock: func(m *mocks.MockService) {
+					m.EXPECT().
+						ListCurrencies(gomock.Any(), gomock.Any()).
+						Return(nil, errors.New("connection refused"))
+				},
+			},
+			want: want{
+				responseStatus: http.StatusInternalServerError,
+				responseBody:   `{"message": "internal server error"}`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			mockService := mocks.NewMockService(ctrl)
+			tc.fields.setupServiceMock(mockService)
+
+			handler := currencyhndl.NewHandler(mockService)
+
+			r := httptest.NewRequest(http.MethodGet, "/v1/currencies/", nil)
+			rec := httptest.NewRecorder()
+
+			handler.ListCurrencies(rec, r, tc.args.params)
+
+			assert.Equal(t, tc.want.responseStatus, rec.Code)
+			assert.JSONEq(t, tc.want.responseBody, rec.Body.String())
+		})
+	}
+}

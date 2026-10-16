@@ -15,6 +15,7 @@ import (
 type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
 	GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error)
+	ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error)
 }
 
 type Handler struct {
@@ -58,9 +59,7 @@ func (h *Handler) GetCurrency(
 	currencyID currencyv1.CurrencyID,
 	params currencyv1.GetCurrencyParams,
 ) {
-	allowDeleted := params.AllowDeleted != nil && *params.AllowDeleted
-
-	currency, err := h.service.GetCurrency(r.Context(), currencyID, allowDeleted)
+	currency, err := h.service.GetCurrency(r.Context(), currencyID, valueOrZero(params.AllowDeleted))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
 
@@ -72,6 +71,21 @@ func (h *Handler) GetCurrency(
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, expandedCurrencyToAPI(currency))
+}
+
+func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params currencyv1.ListCurrenciesParams) {
+	page, err := h.service.ListCurrencies(r.Context(), listParamsToModel(&params))
+	if err != nil {
+		apiErr, status := errorToAPI(err)
+
+		render.Status(r, status)
+		render.JSON(w, r, apiErr)
+
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, listPageToAPI(page))
 }
 
 // HandleParamError responds to requests whose path or query parameters could not be parsed.
@@ -90,6 +104,30 @@ func currencyToModel(c *currencyv1.Currency) *currencydmn.Currency {
 	}
 }
 
+func listParamsToModel(p *currencyv1.ListCurrenciesParams) *currencydmn.ListRequest {
+	return &currencydmn.ListRequest{
+		PageSize:     valueOrZero(p.PageSize),
+		PageToken:    valueOrZero(p.PageToken),
+		Filter:       valueOrZero(p.Filter),
+		OrderBy:      valueOrZero(p.OrderBy),
+		AllowDeleted: valueOrZero(p.AllowDeleted),
+	}
+}
+
+func listPageToAPI(p *currencydmn.ListPage) *currencyv1.SuccessWithExpandedCurrencies {
+	currencies := make([]currencyv1.ExpandedCurrency, 0, len(p.Currencies))
+	for _, c := range p.Currencies {
+		currencies = append(currencies, *expandedCurrencyToAPI(c))
+	}
+
+	resp := &currencyv1.SuccessWithExpandedCurrencies{Currencies: &currencies}
+	if p.NextPageToken != "" {
+		resp.NextPageToken = &p.NextPageToken
+	}
+
+	return resp
+}
+
 func expandedCurrencyToAPI(c *currencydmn.ExpandedCurrency) *currencyv1.ExpandedCurrency {
 	return &currencyv1.ExpandedCurrency{
 		Code:        c.Code,
@@ -106,7 +144,11 @@ func expandedCurrencyToAPI(c *currencydmn.ExpandedCurrency) *currencyv1.Expanded
 }
 
 func errorToAPI(err error) (currencyv1.Error, int) {
+	var invalidArgErr *domains.InvalidArgumentError
+
 	switch {
+	case errors.As(err, &invalidArgErr):
+		return currencyv1.Error{Message: invalidArgErr.Error()}, http.StatusBadRequest
 	case errors.Is(err, domains.ErrAlreadyExists):
 		return currencyv1.Error{Message: "currency already exists"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
@@ -116,4 +158,13 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 	default:
 		return currencyv1.Error{Message: "internal server error"}, http.StatusInternalServerError
 	}
+}
+
+func valueOrZero[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+
+	return *v
 }

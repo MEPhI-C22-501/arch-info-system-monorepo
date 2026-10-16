@@ -27,6 +27,7 @@ type CurrencyVersionRepository interface {
 
 type ExpandedCurrencyRepository interface {
 	GetExpandedCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error)
+	ListExpandedCurrencies(ctx context.Context, query *currencydmn.ListQuery) ([]*currencydmn.ExpandedCurrency, error)
 }
 
 type Service struct {
@@ -108,6 +109,35 @@ func (s *Service) GetCurrency(ctx context.Context, currencyID int64, allowDelete
 	}
 
 	return currency, nil
+}
+
+func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error) {
+	if _, ok := actor.UserIDFromContext(ctx); !ok {
+		return nil, domains.ErrUnauthenticated
+	}
+
+	query, token, err := listQuery(request)
+	if err != nil {
+		return nil, err
+	}
+
+	pageSize := query.Limit
+
+	// One extra currency is requested to find out whether there is a next page.
+	query.Limit++
+
+	currencies, err := s.expandedCurrencyRepository.ListExpandedCurrencies(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list expanded currencies: %w", err)
+	}
+
+	page := &currencydmn.ListPage{Currencies: currencies}
+	if len(currencies) > int(pageSize) {
+		page.Currencies = currencies[:pageSize]
+		page.NextPageToken = pageToken{Offset: token.Offset + int64(pageSize), Checksum: token.Checksum}.String()
+	}
+
+	return page, nil
 }
 
 // creationPatch describes a newly created currency as a JSON Patch (RFC 6902) against an empty document.
