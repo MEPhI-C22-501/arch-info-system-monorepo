@@ -20,7 +20,7 @@ go test -v -tags integration -count=1 ./tests
 ## Окружение
 
 Окружение описано в `docker-compose.test.yaml`: сервис (собирается из Dockerfile), миграции, Postgres без volume
-и Keycloak с realm из `deployments/configs/keycloak/arch-info-system-realm.json`.
+Keycloak с realm из `deployments/configs/keycloak/arch-info-system-realm.json` и OpenTelemetry Collector, который только печатает полученную телеметрию (Elasticsearch и Kibana в тестах не поднимаются).
 Его поднимает и останавливает сам тест через testcontainers (`infra/`), вручную ничего запускать не нужно.
 
 - Состав окружения задаётся только compose-файлом. Тест знает лишь имена сервисов и их внутренние порты.

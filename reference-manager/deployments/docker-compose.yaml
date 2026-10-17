@@ -19,6 +19,8 @@ services:
         condition: service_completed_successfully
       reference-manager-keycloak:
         condition: service_healthy
+      reference-manager-otel-collector:
+        condition: service_started
 
     restart: unless-stopped
 
@@ -98,6 +100,98 @@ services:
       retries: 30
       start_period: 10s
 
+  # local collector, it stores the received traces, metrics and logs in Elasticsearch,
+  # on the shared stand the collector and the storage are provided by Infra
+  reference-manager-otel-collector:
+    container_name: reference_manager_otel_collector
+    image: otel/opentelemetry-collector-contrib:0.161.0
+
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
+    ports:
+      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+
+    volumes:
+      - ./configs/otel-collector/local/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    depends_on:
+      reference-manager-elasticsearch:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  # single node without security, for local development only
+  reference-manager-elasticsearch:
+    container_name: reference_manager_elasticsearch
+    image: elasticsearch:9.5.5
+
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.license.self_generated.type: basic
+      ES_JAVA_OPTS: "-Xms${ELASTICSEARCH_HEAP:-1g} -Xmx${ELASTICSEARCH_HEAP:-1g}"
+
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+
+    volumes:
+      - reference_manager_elasticsearch_data:/usr/share/elasticsearch/data
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null" ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  reference-manager-kibana:
+    container_name: reference_manager_kibana
+    image: kibana:9.5.5
+
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://reference-manager-elasticsearch:9200"]'
+      SERVER_PUBLICBASEURL: http://localhost:${KIBANA_PORT:-5601}
+
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+
+    depends_on:
+      reference-manager-elasticsearch:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://127.0.0.1:5601/api/status | grep -q '\"level\":\"available\"'" ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  # creates the data views of the logs, traces and metrics once Kibana is up
+  reference-manager-kibana-setup:
+    container_name: reference_manager_kibana_setup
+    image: kibana:9.5.5
+
+    entrypoint: [ "bash", "/setup/setup-data-views.sh" ]
+
+    volumes:
+      - ./configs/kibana/local/setup-data-views.sh:/setup/setup-data-views.sh:ro
+
+    depends_on:
+      reference-manager-kibana:
+        condition: service_healthy
+
+    restart: "no"
+
   reference-manager-ui:
     container_name: reference_manager_ui
     image: erp/reference-manager-ui:dev
@@ -122,3 +216,4 @@ services:
 
 volumes:
   reference_manager_database_data:
+  reference_manager_elasticsearch_data:

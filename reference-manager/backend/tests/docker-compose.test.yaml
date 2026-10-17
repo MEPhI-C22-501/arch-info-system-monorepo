@@ -26,6 +26,8 @@ services:
         condition: service_completed_successfully
       reference-manager-keycloak:
         condition: service_healthy
+      reference-manager-otel-collector:
+        condition: service_started
 
     healthcheck:
       test: [ "CMD", "/app/healthcheck", "-url", "http://127.0.0.1:8080/v1/health/readyz" ]
@@ -73,6 +75,15 @@ services:
       timeout: 5s
       retries: 60
       start_period: 10s
+
+  # the service exports its telemetry here, the collector only prints it, Elasticsearch is not started for the tests
+  reference-manager-otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
+    volumes:
+      - ../../deployments/configs/otel-collector/test/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
 
   reference-manager-database:
     image: postgres:18-alpine

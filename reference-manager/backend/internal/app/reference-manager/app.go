@@ -118,5 +118,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("failed to shutdown application: %w", err)
 	}
 
+	// the last one, so the telemetry of the shutdown itself is flushed to the collector
+	a.log.Info("telemetry shutdown")
+	if err := a.telemetry.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown telemetry: %w", err)
+	}
+
 	return nil
 }
