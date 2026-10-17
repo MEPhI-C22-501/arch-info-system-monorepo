@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,6 +51,8 @@ func NewClient(cfg *Config, log *slog.Logger) (*Client, error) {
 	poolConfig.MaxConnLifetime = cfg.Pool.MaxConnLifetime
 	poolConfig.MaxConnIdleTime = cfg.Pool.MaxConnIdleTime
 	poolConfig.HealthCheckPeriod = cfg.Pool.HealthCheckPeriod
+	// spans and metrics of the queries go to the global providers, the query parameters are not recorded
+	poolConfig.ConnConfig.Tracer = otelpgx.NewTracer()
 
 	return &Client{
 		config:       poolConfig,
@@ -75,6 +78,11 @@ func (c *Client) Startup(ctx context.Context) error {
 	if err := c.ping(ctx, pool); err != nil {
 		pool.Close()
 		return err
+	}
+
+	if err := otelpgx.RecordStats(pool); err != nil {
+		pool.Close()
+		return fmt.Errorf("record postgres pool metrics: %w", err)
 	}
 
 	c.mu.Lock()

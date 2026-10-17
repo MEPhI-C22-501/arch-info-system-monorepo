@@ -31,7 +31,7 @@ Configuration is split into separate files by responsibility:
 | File             | Description                                         |
 | ---------------- | --------------------------------------------------- |
 | `transport.yaml` | HTTP transport configuration                        |
-| `log.yaml`       | Logging configuration                               |
+| `telemetry.yaml` | Logs, traces and metrics, export to the collector   |
 | `databases.yaml` | Database connections, retries, and connection pools |
 | `auth.yaml`      | Verification of Keycloak access tokens              |
 
@@ -148,6 +148,26 @@ Token verification is configured under `auth.keycloak`.
 | `jwks.unknown_key_refresh_interval` | `duration` | Minimal period between refreshes caused by unknown keys, `1m` by default                          |
 | `jwks.request_timeout`              | `duration` | Timeout of a request for the keys, `5s` by default                                                |
 
+### Telemetry
+
+Logs are written to stdout and, together with traces and metrics, sent over OTLP gRPC to the OpenTelemetry Collector. Every HTTP request except `/v1/health/*` gets a span named after its route with child spans of the database queries (query parameters are not recorded); an incoming `traceparent` is continued and the trace ID is returned in the `X-Trace-Id` header. Metrics cover HTTP requests, database queries, the connection pool and the Go runtime. The exporters connect lazily, so an unavailable collector neither blocks the startup nor affects requests: export errors are logged to stdout and the data is dropped.
+
+Telemetry is configured under `telemetry`.
+
+| Parameter                  | Type       | Description                                                                      |
+| -------------------------- | ---------- | -------------------------------------------------------------------------------- |
+| `resource.service_name`    | `string`   | `service.name` of the telemetry                                                  |
+| `resource.service_version` | `string`   | `service.version` of the telemetry, `0.0.0` by default                           |
+| `resource.environment`     | `string`   | `deployment.environment.name` of the telemetry                                   |
+| `exporter.enabled`         | `bool`     | Send telemetry to the collector, `false` by default: logs go to stdout only      |
+| `exporter.endpoint`        | `string`   | Collector OTLP gRPC address `host:port`, `localhost:4317` by default             |
+| `exporter.insecure`        | `bool`     | Connect without TLS, `false` by default                                          |
+| `exporter.timeout`         | `duration` | Timeout of one export, `10s` by default                                          |
+| `traces.sampling_ratio`    | `float`    | Share of the sampled root traces from 0 to 1, `1` by default                     |
+| `metrics.export_interval`  | `duration` | Period of the metrics export, `15s` by default                                   |
+| `log.level`                | `string`   | `debug`, `info`, `warn` or `error`, applies to stdout and the exported logs      |
+| `log.format`               | `string`   | Format of the stdout logs: `text` or `json`                                      |
+
 ## Run local environment
 
 The local development environment is managed using [Task](https://taskfile.dev/) and Docker Compose.
@@ -161,6 +181,18 @@ task up
 The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`. The admin panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`).
 
 The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+
+The environment also includes the telemetry stack:
+
+| Service                 | Address                 | Purpose                                                                                     |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------- |
+| OpenTelemetry Collector | `localhost:4317` (gRPC), `localhost:4318` (HTTP) | Receives OTLP from the service and writes it to Elasticsearch, config `deployments/configs/otel-collector/local/otel-collector.yaml` |
+| Elasticsearch           | `http://localhost:9200` | Stores logs, traces and metrics in the data streams `logs-*.otel-*`, `traces-*.otel-*`, `metrics-*.otel-*` |
+| Kibana                  | `http://localhost:5601` | Browsing the telemetry                                                                      |
+
+Elasticsearch runs as a single node without security and is meant for local development only. Ports and the heap size are set by `ELASTICSEARCH_PORT`, `ELASTICSEARCH_HEAP` and `KIBANA_PORT` in `deployments/.env`. Logstash is not used: the collector writes to Elasticsearch directly.
+
+On startup `reference-manager-kibana-setup` creates the data views `reference-manager logs`, `reference-manager traces` and `reference-manager metrics`, open them in Kibana under **Discover**. A trace of a request is found by the `X-Trace-Id` of the response: filter `trace_id : "<id>"` in the traces or the logs data view. On the shared stand the collector and the storage are provided by Infra and only `telemetry.exporter.endpoint` changes.
 
 Get a token and call the API:
 

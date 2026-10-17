@@ -16,6 +16,7 @@ import (
 	logmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/log"
 	ratelimitmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/ratelimit"
 	recoverymw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/recovery"
+	telemetrymw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/telemetry"
 	timeoutmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/timeout"
 )
 
@@ -28,6 +29,8 @@ func NewRouter(
 	r := chi.NewRouter()
 
 	r.Use(
+		// first, so the logs and the spans of the storage belong to the request trace
+		telemetrymw.NewMiddleware("reference-manager", "/v1/health"),
 		logmw.NewMiddleware(log),
 		recoverymw.NewMiddleware(log),
 		ratelimitmw.NewMiddleware(10, 100),     // TODO: implement middleware init via special configuration

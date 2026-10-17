@@ -13,9 +13,10 @@ var (
 )
 
 type options struct {
-	format Format
-	level  slog.Level
-	attrs  []slog.Attr
+	format   Format
+	level    slog.Level
+	attrs    []slog.Attr
+	handlers []slog.Handler
 }
 
 func defaultOptions() *options {
@@ -60,6 +61,14 @@ func WithResource(res *resource.Resource) Option {
 		}
 
 		o.attrs = attrs
+		return nil
+	}
+}
+
+// WithHandlers adds handlers the records are written to besides stdout, the configured level applies to them.
+func WithHandlers(handlers ...slog.Handler) Option {
+	return func(o *options) error {
+		o.handlers = append(o.handlers, handlers...)
 		return nil
 	}
 }
