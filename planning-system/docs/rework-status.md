@@ -19,7 +19,7 @@
 | UI и диаграммы | Browser E2E сервера и мобильный вид; 47 Mermaid-диаграмм отрисованы | Общий сценарий с соседями ещё не выполнен |
 | Minikube | Deployment/StatefulSet/ConfigMap/Secret/PVC/Service/Ingress; отдельный повторяемый smoke | Локальный dev-кластер, не инфраструктурный staging |
 | Восстановление | pg_dump восстановлен в новую БД, проверены snapshots/audit/requests и baseline trigger | RPO/RTO и S3 restore общего стенда ещё открыты |
-| Согласования | Подготовлены запросы Infra/RM/TT/QA/Reports; статусы и ссылки — в реестре | Ответы владельцев и реальные T-INT не подменяются локальными тестами |
+| Согласования | Опубликованы пять Issues Infra/RM/TT/QA/Reports; статусы и ссылки — в реестре | Ответы владельцев и реальные T-INT не подменяются локальными тестами |
 
 ## Воспроизводимые доказательства
 
@@ -58,3 +58,13 @@ TECH-04/05 имеют локальные security/minikube доказатель�
 принимается отдельно. Файлы манифестов и локальный passed не закрывают T-INT.
 Порядок и владельцы — [160](160.integration-plan.md), [165](165.deployment-diagram.md),
 [рабочий план](../work-plan.md), [GitHub](../github-actions.md).
+
+Новая поставка находится в [PR #144](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/144).
+Публикация PR не означает merge или приёмку; старый PR #21 закрыт.
+
+
+[GitHub CI от 18.10](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/actions/runs/39156392909)
+успешно проверил коммит 79dad2d: PostgreSQL, Compose/browser, restore, документы,
+генераторы и Mermaid. Выпуск GHCR выполняется после merge на main;
+ручной minikube job не запускался в этом CI, его доказательство — локальный отчёт.
+Запросы #142/#143/#145/#146/#147 опубликованы, ответы ещё ожидаются.

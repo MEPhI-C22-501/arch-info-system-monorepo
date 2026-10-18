@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-18",
+  "issues": [
+    {
+      "team": "infra",
+      "number": 142,
+      "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142",
+      "state": "open",
+      "requestedAt": "2026-10-18T18:56:40Z"
+    },
+    {
+      "team": "reference-manager",
+      "number": 143,
+      "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143",
+      "state": "open",
+      "requestedAt": "2026-10-18T18:56:41Z"
+    },
+    {
+      "team": "task-tracker",
+      "number": 145,
+      "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/145",
+      "state": "open",
+      "requestedAt": "2026-10-18T18:56:42Z"
+    },
+    {
+      "team": "qa",
+      "number": 146,
+      "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/146",
+      "state": "open",
+      "requestedAt": "2026-10-18T18:56:43Z"
+    },
+    {
+      "team": "reports",
+      "number": 147,
+      "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147",
+      "state": "open",
+      "requestedAt": "2026-10-18T18:56:43Z"
+    }
+  ],
+  "pullRequest": {
+    "number": 144,
+    "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/144",
+    "draft": false,
+    "state": "open"
+  }
+}

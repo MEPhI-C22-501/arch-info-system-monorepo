@@ -1,19 +1,20 @@
 # Реестр межкомандного принятия
 
 Обновлено 18.10.2026. База сверки main f5eb235. Описанный контракт и письменное принятие
-версии — разные доказательства. Запросы ниже подготовлены, но не отправлены;
-отправка на GitHub — [ручные действия](../github-actions.md). В ответе нужны
+версии — разные доказательства. Пять запросов опубликованы 18.10.2026 в GitHub Issues;
+номера и даты — [coordination-issues.json](../artifacts/coordination-issues.json).
+Отправка запроса не является принятием версии второй командой. В ответе нужны
 дата, представитель второй команды, версия/hash, выбранный вариант и ссылка.
 
-| Связь / вопрос | Текущее доказательство | Ответ второй стороны с датой | Статус |
-| --- | --- | --- | --- |
-| INT-01, Infra access | Infra vision, набор среды в PR #128 | Нет ссылки на выдачу client/JWKS/audience | pending |
-| INT-02, D-02/03 | HR-мастер заявлен обеими командами; контракт чтения RM 130 | Нет принятия rename/норм и fixture smoke | pending |
-| INT-03, D-01/07 | TT 130 и OpenAPI теперь имеют PUT/facts; форматы различаются | Нет двустороннего mapping/версии | pending |
-| INT-04, D-04 | Асинхронные схемы PS 135/140 | Поставщик и receipt не приняты | pending |
-| INT-05/08, D-05 | Reports 160 описывает projection/партии и Q-REP-05 | Нет принятия полей/TTL/расписания | pending |
-| INT-06, S3 | Infra называет arch-dev-planning-system | Нет выдачи credentials/ACL и smoke | pending |
-| INT-07, D-09 | QA 130/160 от 12.10 уже ссылается на release-context, Q-10 закрыт | Q-03/Q-04 остаются; источник итераций не выбран | pending |
+| Связь / вопрос | Текущее доказательство | Запрос 18.10 | Ответ второй стороны с датой | Статус |
+| --- | --- | --- | --- | --- |
+| INT-01, Infra access | Infra vision, набор среды в PR #128 | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142) | Нет ссылки на выдачу client/JWKS/audience | pending |
+| INT-02, D-02/03 | HR-мастер заявлен обеими командами; контракт чтения RM 130 | [#143](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143) | Нет принятия rename/норм и fixture smoke | pending |
+| INT-03, D-01/07 | TT 130 и OpenAPI теперь имеют PUT/facts; форматы различаются | [#145](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/145) | Нет двустороннего mapping/версии | pending |
+| INT-04, D-04 | Асинхронные схемы PS 135/140 | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142) | Поставщик и receipt не приняты | pending |
+| INT-05/08, D-05 | Reports 160 описывает projection/партии и Q-REP-05 | [#147](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147) | Нет принятия полей/TTL/расписания | pending |
+| INT-06, S3 | Infra называет arch-dev-planning-system | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142) | Нет выдачи credentials/ACL и smoke | pending |
+| INT-07, D-09 | QA 130/160 от 12.10 уже ссылается на release-context, Q-10 закрыт | [#146](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/146) | Q-03/Q-04 остаются; источник итераций не выбран | pending |
 
 ## Task Tracker D-01
 

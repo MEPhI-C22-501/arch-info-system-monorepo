@@ -1,6 +1,6 @@
 {
   "baseMain": "f5eb2353e9f6e036730739f9fb8ba269390ae255",
-  "checkoutHead": "cfb2df5c24a1e351d2e861f3c2d743b600d20527",
+  "checkoutHead": "79dad2d7d7b17fe9215c451c683e48ec5fb24d01",
   "workingTreeInputs": true,
   "requirements": 45,
   "coverage": {
@@ -249,8 +249,8 @@
     "planning-system/docs/contracts/openapi.json": "09458569aca627cd143e3179751827b9096a9e824314951f755506f8b1c1a253",
     "planning-system/docs/contracts/runtime.openapi.json": "911f50529343d26730e740e3d2271076836b6f4b2ef71580ebfe541f93845310",
     "planning-system/docs/contracts/task-tracker-receiver.openapi.json": "d8a48742d88d40d1d4b063471d77ec74fe03f8f82eed81286438f7c18a8853d0",
-    "planning-system/docs/integration-agreements.md": "56eeb5411ec72398712a5f1e9599d296dfdd44b7922631b024ac9440054563ec",
-    "planning-system/docs/rework-status.md": "a4d0bb67a7850b3aeaa5e55cdbd246e40255c4e557af79443f70c1b1bdbcb692",
+    "planning-system/docs/integration-agreements.md": "a2efdba1cfaa5f2bb129939f663a83a4d72c5f946694f8a4c6f8b2555aba6f86",
+    "planning-system/docs/rework-status.md": "990f6cb56f3355afe5b0e3f0000c3fd46e5490df97e3afece58277add7ccf162",
     "planning-system/docs/security-report.md": "cfa553dd30eee8e90d9d38e24e8943dcbe0c035666f4204f29e889fe8a571224",
     "planning-system/docs/system-landscape.md": "d418673e5bde8cba6566051bae54f508bc73edcde11e4605196d319bc32b7fd3",
     "planning-system/docs/technical-specification.md": "b303429fe0d16ee51cf4d25d10c681de20e9a704059c43375ae6a1af8b7a5afd",
@@ -289,8 +289,8 @@
     "planning-system/README.md": "bf9dc70535d9de9b271bfcd560887ef5fa25d29bb4fe5e199bfdf7c1204221db",
     "planning-system/compose.yaml": "91d30d01c98ab5bb008bad40306ed4f1dee6b4879cfc971c5af23100ea0caf96",
     "planning-system/development.md": "9f47c6a426845b448c2e2a07377cdc41f6889cf311a04a655983dc190af4029f",
-    "planning-system/github-actions.md": "a6241e3a483fc50dc6b7f02295f2ef0811bce0a1288aa223e498c1f3d8c378f4",
-    "planning-system/work-plan.md": "ac00691d803862a9f53036d35c2990c5a8f51ca99b0795aae2d22a6d66184fc1",
+    "planning-system/github-actions.md": "1d60e3f769da4cd71e44e91d46c26df4209c15d22c3c9077432fb1e9ca9467dc",
+    "planning-system/work-plan.md": "982a429e80eb0d5d3bcdd7b6d1cf4f82d0d0d262b6b69f3ac5fff33755aec589",
     ".github/workflows/planning-system-checks.yaml": "e4f0c43b4d0c21e1029599ff09571869bc38e97b73aadf799b6aba0417680855"
   },
   "errors": [],

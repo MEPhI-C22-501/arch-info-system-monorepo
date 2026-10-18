@@ -61,7 +61,7 @@
     "apiVersion": "1.1.0"
   },
   "notVerified": [
-    "GitHub CI execution and registry publication",
+    "GHCR publication after merge to main",
     "real external services and written agreements",
     "full NFR and shared-stand security checklist",
     "shared-stand restore/S3 and telemetry",
@@ -109,5 +109,24 @@
     "backupBytes": 15243,
     "errors": []
   },
-  "generatorsReproducible": true
+  "generatorsReproducible": true,
+  "githubCI": {
+    "runId": 39156392909,
+    "url": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/actions/runs/39156392909",
+    "headSha": "79dad2d7d7b17fe9215c451c683e48ec5fb24d01",
+    "event": "push",
+    "conclusion": "success",
+    "scope": "verify; minikube tested locally; image publication waits for main"
+  },
+  "coordination": {
+    "issues": [
+      142,
+      143,
+      145,
+      146,
+      147
+    ],
+    "pullRequest": 144,
+    "state": "requests published; awaiting dated agreements"
+  }
 }
