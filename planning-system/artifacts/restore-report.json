@@ -1,0 +1,13 @@
+{
+  "mode": "local synthetic Compose; not shared-stand RPO/RTO acceptance",
+  "checks": {
+    "dumpRestored": true,
+    "sameSnapshotsAuditAndRequests": true,
+    "baselineTriggerRestored": true
+  },
+  "backupSeconds": 0.151,
+  "restoreSeconds": 0.16,
+  "backupSha256": "7a4d86f0a683209301956666ba0e1d71639424f2bd4d04b49f0a5061686f9243",
+  "backupBytes": 15243,
+  "errors": []
+}

@@ -1,7 +1,7 @@
 # Фактическая локальная проверка безопасности
 
-13.10.2026. Область: модуль Planning System текущей рабочей ветки на базе
-main 27864b5, синтетический stand/тестовая БД. Это локальная регрессия, не полный
+Обновлено 18.10.2026. Область: модуль Planning System текущей рабочей ветки на базе
+main f5eb235, синтетический stand/тестовая БД. Это локальная регрессия, не полный
 пентест общего стенда. Версии входов фиксирует document-audit.json; результаты
 серверного прогона — [postgres-tests.xml](../artifacts/postgres-tests.xml),
 браузерные проверки — [browser-report.json](../artifacts/browser-report.json).
@@ -17,7 +17,7 @@ main 27864b5, синтетический stand/тестовая БД. Это л�
 | Upload | Реальная TXT-загрузка/чтение; ровно 20 MiB приняты, +1 байт отклонён; поддельный PDF MIME отклонён 422; admin не читает | test_attachments_security_origin_and_no_injection | Полный набор MIME/вредоносных файлов и антивирус не испытывались |
 | Baseline | Изменение APPROVED/ACTIVE запрещено API; PostgreSQL-триггер запрещает прямой UPDATE | test_postgres_baseline_trigger | Привилегии DB/service account общего стенда принимает Infra |
 | Replay | Повтор команды/event не дублирует бизнес-эффект; конфликт payload отклонён | idempotency/event tests | Реальная Kafka/DLQ и окно replay ещё не приняты |
-| Restore / RPO/RTO | Протокол подготовлен в 165 | planned | Фактический restore/бэкапы общего стенда не выполнены |
+| Restore / RPO/RTO | Локальный pg_dump восстановлен в отдельную БД; сверены snapshots/audit/request_results и восстановленный триггер baseline | [restore-report.json](../artifacts/restore-report.json), 0 ошибок | RPO/RTO и резервирование БД/S3 общего стенда ещё не приняты |
 
 Локальные исправления: обязательный If-Match при удалении вложения; повтор команды
 повторно проверяет права/область; signed cursor связан с фильтрами и scope;
@@ -29,3 +29,16 @@ storage запрещены вне development. В Git нет выданных ru
 включая масштабный IDOR-перебор, scanner, restore и повтор после
 обнаруженных дефектов. Результат каждого — commit/image digest, среда, expected/
 actual, логи, passed/failed/blocked. Отсутствующий сервис не переводится в passed.
+
+
+Проверка 18.10: 26 тестов на PostgreSQL/Python 3.12 прошли без пропусков;
+на Python 3.14/SQLite — 25 passed, один PostgreSQL-тест пропущен. Добавлены
+регрессии обязательной схемы Bearer, нормализации issuer, безопасного ответа
+400/422 на неверный JSON в четырёх ресурсных API и защитных заголовков при
+отклонённом Origin. QA получает активную версию по умолчанию, но не DRAFT;
+исторический запрос с planVersionId продолжает работать. Версия контракта 1.1.0.
+
+Отдельный minikube-прогон проверяет seed, Bound PVC, данные и файл после
+перезапуска API/PostgreSQL, а также Ingress. Это не проверка изоляции со стороны
+чужого namespace и не замена общего checklist. Результаты —
+[minikube-report.json](../artifacts/minikube-report.json).

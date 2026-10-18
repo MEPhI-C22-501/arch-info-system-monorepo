@@ -42,6 +42,7 @@ def test_cycle_projection_batch_and_baseline(client):
     v=activate(client);assert v['status']=='ACTIVE'
     qa=call(client,'GET',f'projects/{PID}/release-context?planVersionId={VID}',role='S-07')
     assert qa['iterations'] is None and qa['quality']=='PARTIAL'
+    assert qa==call(client,'GET',f'projects/{PID}/release-context',role='S-07')
     op=call(client,'POST',f'versions/{VID}/forecasts',{'contentRevision':v['contentRevision']},expected=202)
     status=call(client,'GET','operations/'+op['operationId']);assert status['status']=='SUCCEEDED'
     f=call(client,'GET','forecasts/'+op['resultId']);assert f['estimatedTotalCost']==20000 and f['budgetAdjustment']==2000
@@ -158,6 +159,8 @@ def test_oidc_signature_issuer_audience_expiry(client,monkeypatch):
     def request(value,key=private):
         token=jwt.encode(value,key,algorithm='RS256');return client.get('/api/v1/projects/'+PID,headers={'Authorization':'Bearer '+token})
     assert request(claims).status_code==200
+    monkeypatch.setenv('OIDC_ISSUER','https://issuer.test/realm/')
+    assert request(claims).status_code==200
     for field,value in [('iss','https://other.test'),('aud','other-api'),('exp',int(time.time())-60)]:assert request({**claims,field:value}).status_code==401
     assert request(claims,rsa.generate_private_key(public_exponent=65537,key_size=2048)).status_code==401
 
@@ -208,3 +211,40 @@ def test_resource_idempotency_and_audit(client):
     assert saved==repeated
     with db.engine.connect() as c:
         assert len(list(c.execute(select(db.audit).where(db.audit.c.action.like('%availability%')))))==1
+
+
+@pytest.mark.parametrize('path,role,method',[
+    ('availability/'+stable('employees/demo-15'),'R-04','PUT'),
+    ('versions/'+VID+'/forecast-inputs','R-02','PUT'),
+    ('integrations/task-events','S-03','POST'),
+    ('portfolios/'+PORT+'/programs','R-01','POST'),
+])
+def test_runtime_invalid_json_returns_structured_error(client,path,role,method):
+    for body,expected in [('{',400),('[1,2]',422),('null',422)]:
+        response=client.request(method,'/api/v1/'+path,content=body,
+                                headers={**headers(role),'Content-Type':'application/json'})
+        assert response.status_code==expected,response.text
+        assert response.json()['correlationId']==response.headers['X-Correlation-Id']
+        assert response.headers['X-Content-Type-Options']=='nosniff'
+
+
+def test_bearer_scheme_and_security_headers_on_rejection(client):
+    assert client.get('/api/v1/projects',headers={'Authorization':'demo-R-02'}).status_code==401
+    assert client.get('/api/v1/projects',headers={'Authorization':'bearer demo-R-02'}).status_code==200
+    response=client.patch('/api/v1/projects/'+PID,json={'name':'forged'},
+                          headers={**headers(revision=1),'Origin':'https://attacker.invalid'})
+    assert response.status_code==403
+    assert response.headers['Cache-Control']=='no-store'
+    assert response.headers['X-Content-Type-Options']=='nosniff'
+    assert response.json()['correlationId']==response.headers['X-Correlation-Id']
+
+
+def test_qa_default_version_and_historical_projection(client):
+    call(client,'GET',f'projects/{PID}/release-context',role='S-07',expected=409)
+    activate(client)
+    active=call(client,'GET',f'projects/{PID}/release-context',role='S-07')
+    scenario=call(client,'POST',f'projects/{PID}/versions',
+                  {'baseVersionId':VID,'kind':'SCENARIO','name':'Ещё не утверждён'},expected=201)
+    assert call(client,'GET',f'projects/{PID}/release-context',role='S-07')==active
+    call(client,'GET',f'projects/{PID}/release-context?planVersionId='+scenario['id'],role='S-07',expected=404)
+    assert call(client,'GET',f'projects/{PID}/release-context?planVersionId={VID}',role='S-07')==active

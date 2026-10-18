@@ -121,6 +121,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata: {name: planning, namespace: arch-planning-system}
 spec:
+  ingressClassName: nginx
   rules:
     - host: planning.local
       http:

@@ -25,12 +25,15 @@ for story in stories:
  if not stories[story]:errors.append(story+' is untraced')
 counts=Counter(re.findall(r'^\| (?:FR|INT|NFR|TECH)-\d+ \|.*?\| (covered|partial|missing) \|',matrix,re.M))
 # Hash exact review inputs; exclude this generated audit and execution outputs.
-inputs={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for folder in [docs,module/'scripts',module/'server',module/'ui'] for f in sorted(folder.rglob('*')) if f.is_file() and '__pycache__' not in f.parts and f.suffix not in {'.pyc'}}
+source_suffixes={'.md','.py','.mjs','.js','.css','.html','.json','.txt','.yaml','.yml','.sql'}
+inputs={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for folder in [docs,module/'scripts',module/'server',module/'ui',module/'migrations',module/'deploy'] for f in sorted(folder.rglob('*')) if f.is_file() and '__pycache__' not in f.parts and f.suffix in source_suffixes}
 for f in sorted(module.glob('*')):
- if f.is_file():inputs[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()
+ if f.is_file() and (f.suffix in {'.md','.yaml','.yml'} or f.name in {'Dockerfile','.env.example','Dockerfile.dockerignore'}):inputs[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()
 for f in sorted((root/'.github/workflows').glob('planning*')):inputs[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()
 head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
-report={'baseMain':'27864b5e707a77b922cb4fb7db5df68be4271fe3','checkoutHead':head,'workingTreeInputs':True,
+base=re.search(r'База повторной сверки: `main` на коммите `([0-9a-f]{40})`',matrix)
+if not base:errors.append('095 must name the exact main base commit')
+report={'baseMain':base.group(1) if base else None,'checkoutHead':head,'workingTreeInputs':True,
         'requirements':len(rows),'coverage':dict(counts),'stories':stories,'inputSha256':inputs,'errors':errors,
         'meaning':'Document traceability; not runtime or integration acceptance'}
 out=module/'artifacts/document-audit.json';out.parent.mkdir(exist_ok=True);out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')

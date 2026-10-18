@@ -18,7 +18,10 @@ class Actor:
     employees: set
 
 def actor(request: Request):
-    token = request.headers.get('Authorization', '').removeprefix('Bearer ')
+    credentials = request.headers.get('Authorization', '').split()
+    if len(credentials)!=2 or credentials[0].lower()!='bearer':
+        raise HTTPException(401,'Нужен Bearer-токен')
+    token = credentials[1]
     mode = os.environ.get('AUTH_MODE', 'oidc')
     if mode == 'demo':
         if os.environ.get('APP_ENV') != 'development':
@@ -32,7 +35,7 @@ def actor(request: Request):
         scopes |= {'qa.read'} if role == 'S-07' else set()
         return Actor('demo-'+role, {role}, scopes, {DEMO_PORTFOLIO}, {DEMO_PROJECT}, {'employees/demo-1','employees/demo-2'} if role=='R-04' else {'employees/demo-1'})
     try:
-        issuer = os.environ['OIDC_ISSUER']; audience = os.environ['OIDC_AUDIENCE']
+        issuer = os.environ['OIDC_ISSUER'].rstrip('/'); audience = os.environ['OIDC_AUDIENCE']
         if not issuer.startswith('https://'): raise ValueError('HTTPS issuer required')
         client = request.app.state.jwks
         key = client.get_signing_key_from_jwt(token).key

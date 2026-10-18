@@ -14,7 +14,8 @@ FastAPI + PostgreSQL, контрактные snapshots, idempotency/ETag, CRUD �
 QA iterations=null/PARTIAL до D-09. Расчёт денег не подменяет отсутствующую
 методику и ставку; плановая дата до реализации полного рабочего календаря
 помечается WORKING_CALENDAR_FINISH/PARTIAL. Нагрузочные NFR, централизованная
-телеметрия, Kafka mapping/DLQ и backup/restore требуют общего стенда/следующей итерации.
+телеметрия, Kafka mapping/DLQ и backup/restore общего стенда требуют следующей
+итерации. Локальные PostgreSQL restore и minikube/PVC проверяются отдельно ниже.
 
 ## Docker Compose
 
@@ -120,3 +121,33 @@ kubectl -n arch-planning-system port-forward service/planning-api 8080:8000
 имён на IP minikube. Readiness проверяет миграции/БД; liveness не зависит от соседей.
 PostgreSQL PVC сохраняется после перезапуска pod. Фактический minikube/restore
 прогон фиксируется отдельно, наличие YAML не считается passed.
+
+Повторяемая проверка отдельного dev-кластера после развёртывания:
+
+```sh
+python planning-system/scripts/check-minikube.py --context <имя-dev-кластера> --restart --ingress
+```
+
+Нужен включённый addon ingress и доступный kubectl того же minor Kubernetes.
+При отдельном kubeconfig задайте KUBECONFIG. Скрипт принимает только
+APP_ENV=development/AUTH_MODE=demo, использует собственные синтетические проект
+и файл, проверяет Bound PVC, повтор seed, перезапуск postgres-0/API и маршрут
+planning.local через ingress-nginx. Порт открывается только на 127.0.0.1 и
+закрывается после проверки. JSON-доказательство — artifacts/minikube-report.json.
+Инструкция установки — [официальная документация minikube](https://minikube.sigs.k8s.io/docs/start/).
+
+## Локальная резервная копия и восстановление
+
+После browser test, когда уже есть ACTIVE baseline:
+
+```sh
+python planning-system/scripts/check-restore.py --project <имя-compose-набора>
+```
+
+Проверка требует отдельный синтетический dev-набор. На время сравнения
+останавливается только его worker; pg_dump восстанавливается в новую временную
+БД. Сверяются records/audit/request_results и неизменяемость baseline, затем
+клон удаляется и worker возвращается в исходное состояние. Исходная БД не
+заменяется. Отчёт содержит хеш копии и измеренные длительности, без секретов
+или содержимого данных. Это проверка локального восстановления; RPO/RTO и
+копии S3 на общем стенде принимаются отдельно с Infra.

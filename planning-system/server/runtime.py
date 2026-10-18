@@ -12,7 +12,7 @@ from .domain import fail, hours, check_resources
 
 
 def register(app):
-    from .app import allowed,get,project,version,save,changed,resource_inputs,money_filter,validate,ROOT
+    from .app import allowed,get,project,version,save,changed,resource_inputs,money_filter,validate,read_json,ROOT
 
     @contextmanager
     def command_tx(req,a,b):
@@ -86,7 +86,7 @@ def register(app):
 
     @app.put('/api/v1/availability/{availabilityId}')
     async def availability(req:Request):
-        a=actor(req);allowed(a,['R-04']);b=await req.json()
+        a=actor(req);allowed(a,['R-04']);b=await read_json(req)
         validate(json.loads((ROOT/'docs/contracts/openapi.json').read_text())['components']['schemas']['Availability'],b)
         if b['id']!=req.path_params['availabilityId'] or b['employeeId'] not in a.employees:fail(403,'Чужой ресурс')
         if hours(b['nominalHours'])-hours(b['absenceHours'])!=hours(b['availableHours']):fail(422,'Норма минус отсутствие не равна доступности')
@@ -130,7 +130,7 @@ def register(app):
 
     @app.put('/api/v1/versions/{versionId}/forecast-inputs')
     async def forecast_inputs(req:Request):
-        a=actor(req);allowed(a,['R-02','R-03']);b=await req.json()
+        a=actor(req);allowed(a,['R-02','R-03']);b=await read_json(req)
         if set(b)-{'etc','rate','currencyCode'}:fail(422,'Неизвестные поля')
         if any(not isinstance(b.get(k),(int,float)) or b[k]<0 for k in ['etc']):fail(422,'ETC >= 0')
         validate(json.loads((ROOT/'docs/contracts/runtime.openapi.json').read_text())['paths']['/api/v1/versions/{versionId}/forecast-inputs']['put']['requestBody']['content']['application/json']['schema'],b)
@@ -148,7 +148,7 @@ def register(app):
     async def task_events(req:Request):
         a=actor(req);allowed(a,['S-03'])
         if 'facts.write' not in a.scopes:fail(403,'Нужен facts.write')
-        b=await req.json();name=b.get('eventType')
+        b=await read_json(req);name=b.get('eventType')
         if name not in {'TaskCreated','TaskChanged','TimeLogged','TaskDeleted'}:fail(422,'Неверный тип события')
         schema=json.loads((ROOT/f'docs/contracts/events/{name}.schema.json').read_text());validate(schema,b)
         fingerprint=hashlib.sha256(json.dumps(b,sort_keys=True).encode()).hexdigest()
@@ -175,7 +175,7 @@ def register(app):
 
     @app.post('/api/v1/portfolios/{portfolioId}/programs',status_code=201)
     async def create_program(req:Request):
-        a=actor(req);allowed(a,['R-01']);b=await req.json()
+        a=actor(req);allowed(a,['R-01']);b=await read_json(req)
         if set(b)!={'code','name','goal'} or any(not isinstance(x,str) or not x.strip() for x in b.values()):fail(422,'Нужны code/name/goal')
         with command_tx(req,a,b) as (c,cached,complete):
             if cached:return cached

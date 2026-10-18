@@ -53,14 +53,18 @@ app.openapi=lambda:{**SPEC,'paths':{**SPEC['paths'],**json.loads((ROOT/'docs/con
 @app.middleware('http')
 async def protections(req, call_next):
     req.state.correlation=db.uid()
+    rejection=None
     if req.method not in {'GET','HEAD','OPTIONS'}:
         origin=req.headers.get('Origin')
         permitted=set(os.environ.get('ALLOWED_ORIGINS','http://localhost:8080,http://127.0.0.1:8080').split(','))
         if origin and origin not in permitted:
-            return error(403,'Запрос из чужого origin отклонён',req)
-        if int(req.headers.get('content-length','0')) > 21*1024*1024:
-            return error(413,'Тело запроса слишком большое',req)
-    r=await call_next(req)
+            rejection=error(403,'Запрос из чужого origin отклонён',req)
+        length=req.headers.get('content-length','0')
+        if not length.isdecimal():
+            rejection=error(400,'Неверный Content-Length',req)
+        elif int(length) > 21*1024*1024:
+            rejection=error(413,'Тело запроса слишком большое',req)
+    r=rejection if rejection is not None else await call_next(req)
     issuer_url=urlparse(os.environ.get('OIDC_ISSUER',''))
     issuer=f'{issuer_url.scheme}://{issuer_url.netloc}' if issuer_url.netloc else ''
     r.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; connect-src 'self' "+issuer
@@ -142,6 +146,14 @@ def plan_public(v):
 def validate(schema,data):
     errs=list(Draft202012Validator({**schema,'components':SPEC['components']},format_checker=FormatChecker()).iter_errors(data))
     if errs:fail(422,errs[0].message[:250])
+
+async def read_json(req):
+    try:
+        value=await req.json()
+    except (ValueError, UnicodeError):
+        fail(400,'Неверный JSON')
+    if not isinstance(value,dict):fail(422,'Ожидается JSON-объект')
+    return value
 
 def page(values,req,a,binding):
     size=int(req.query_params.get('pageSize','50'))
@@ -303,7 +315,7 @@ def dispatch(c,op,req,a,b):
         allowed(a,[role])
         if scope not in a.scopes:fail(403,'Нужна сервисная область')
         p=project(c,pp['projectId'],a,[role])
-        vid=req.query_params.get('planVersionId') if role=='S-07' else p['activePlanVersionId']
+        vid=(req.query_params.get('planVersionId') or p['activePlanVersionId']) if role=='S-07' else p['activePlanVersionId']
         if not vid:fail(409,'Нет активного плана')
         v=version(c,vid,a,[role])
         if v['projectId']!=p['id'] or v['status'] not in {'APPROVED','ACTIVE','SUPERSEDED','ARCHIVED'}:fail(404,'Утверждённая версия не найдена')

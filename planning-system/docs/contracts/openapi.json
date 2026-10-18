@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Planning System — proposed contract",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Проект контракта. Наличие схем не означает согласование и реализацию."
   },
   "servers": [
@@ -8413,7 +8413,7 @@
           {
             "name": "planVersionId",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
               "minLength": 1,
@@ -8423,7 +8423,7 @@
               ],
               "format": "uuid"
             },
-            "description": "Точная APPROVED/ACTIVE/SUPERSEDED/ARCHIVED после утверждения версия; DRAFT запрещён"
+            "description": "Без параметра — активная версия; явный ID выбирает APPROVED/ACTIVE/SUPERSEDED/ARCHIVED после утверждения. DRAFT запрещён"
           }
         ],
         "responses": {
