@@ -1,0 +1,58 @@
+name: planning-system
+x-runtime: &runtime
+  DATABASE_URL: postgresql+psycopg://planning:${PS_DB_PASSWORD:-planning-local}@postgres:5432/planning
+  APP_ENV: development
+  AUTH_MODE: demo
+  INTEGRATION_MODE: mock
+  DEMO_SEED: "false"
+  STORAGE_MODE: local
+  LOCAL_FILES: /data/files
+  CURSOR_SECRET: ${PS_CURSOR_SECRET:-local-demo-cursor-key-change-for-shared-stand}
+  ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_DB: planning
+      POSTGRES_USER: planning
+      POSTGRES_PASSWORD: ${PS_DB_PASSWORD:-planning-local}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planning -d planning"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: planning-system:local
+    pull_policy: never
+    command: ["python", "-m", "server.manage", "seed"]
+    environment: *runtime
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+  api:
+    image: planning-system:local
+    pull_policy: build
+    build: {context: .., dockerfile: planning-system/Dockerfile}
+    environment: *runtime
+    ports: ["127.0.0.1:8080:8000"]
+    volumes: ["files:/data/files"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  worker:
+    image: planning-system:local
+    pull_policy: never
+    command: ["python", "-m", "server.worker"]
+    environment: *runtime
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  files:

@@ -1,0 +1,173 @@
+
+'use strict';
+const initial=()=>({name:'ERP · планирование ресурсов',role:'R-02',status:'DRAFT',revision:1,version:1,scenario:false,demand:6,allocation:6,availability:4,confirmed:false,reviewRound:0,baseline:null,publication:'FAILED',events:['Создан демонстрационный черновик'],attachment:false,date:'2026-10-09'});
+let state=initial(), token='', authMode='demo', plan=null, projectId='10000000-0000-4000-8000-000000000002', pending=false;
+const screens=[['portfolio','Портфель и проекты','01'],['structure','Декомпозиция','02'],['demand','Потребность','03'],['resources','Доступность и назначения','04'],['gantt','Диаграмма Ганта','05'],['conflicts','Конфликты ресурсов','06'],['scenarios','Сравнение сценариев','07'],['approval','Согласование версии','08'],['calendar','Личный календарь','09'],['attachments','Вложения','10'],['forecast','План-факт и прогноз','11'],['exchange','Журнал обмена','12']];
+let screen=location.hash.slice(1)||'portfolio', mode='normal',timer;
+const $=id=>document.getElementById(id), escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const editable=()=>state.status==='DRAFT'&&['R-02','R-03'].includes(state.role);
+const roleScreens=()=>state.role==='R-06'?['exchange']:state.role==='R-05'?['calendar','attachments']:state.role==='R-04'?['resources','conflicts','gantt','approval','attachments']:screens.map(x=>x[0]).filter(x=>x!=='exchange');
+const overload=()=>Math.max(state.allocation-state.availability,0), deficit=()=>Math.max(state.demand-state.allocation,0);
+function save(message){$('saved').textContent='Сохранено на сервере · редакция '+state.revision;if(message)toast(message)}
+function toast(text){$('toast').textContent=text;clearTimeout(timer);timer=setTimeout(()=>{$('toast').textContent=''},5500)}
+function change(message){state.revision++;state.events.push(message);save(message);render()}
+function confirmAction(title,text,fn){$('confirm-title').textContent=title;$('confirm-text').textContent=text;$('confirm').showModal();$('confirm-yes').onclick=()=>{$('confirm').close();fn()};$('confirm-no').onclick=()=>$('confirm').close()}
+const link=(id,text)=>`<a href="#${id}">${text}</a>`, button=(action,text,primary=false,disabled=false)=>`<button data-action="${action}" ${primary?'class="primary"':''} ${disabled?'disabled':''}>${text}</button>`;
+const badge=()=>`<span class="badge ${state.status==='ACTIVE'?'good':''}">${state.status} · V${state.version}</span>`;
+function nav(){const visible=roleScreens();if(!visible.includes(screen))screen=visible[0];$('nav').innerHTML=screens.filter(s=>visible.includes(s[0])).map(([id,title,no])=>`<a href="#${id}" ${screen===id?'aria-current="page"':''}><span style="opacity:.5;margin-right:8px">${no}</span>${title}</a>`).join('');$('role').value=state.role}
+function render(){nav();const title=screens.find(s=>s[0]===screen)[1];$('main').innerHTML=`<div class="notice"><strong>Planning System.</strong> Данные сохраняются на сервере. ${authMode==='demo'?'Учебный вход и локальные интеграционные заглушки; переключение ролей разрешено только в этой среде.':'Вход через Keycloak.'}</div><div class="page-top"><div><div class="eyebrow">Портфель ERP / ${escape(state.name)}</div><h1>${title}</h1><span class="muted">Версия ${state.version}${state.scenario?' · сценарий «Что если»':''} · срез 05.10.2026</span></div><div>${badge()}<div class="status-line">Редакция ${state.revision}</div></div></div><div class="tools" style="margin-bottom:20px"><label for="view-state">Проверка состояния экрана</label><select id="view-state"><option value="normal">Обычный экран</option><option value="loading">Загрузка</option><option value="empty">Нет данных</option><option value="error">Ошибка</option></select></div><div id="content"></div><footer>Planning System · серверная версия · контракты 110–165.</footer>`;$('view-state').value=mode;$('view-state').onchange=e=>{mode=e.target.value;render()};if(mode!=='normal'){$('content').innerHTML=`<div class="card empty" role="status"><h2>${{loading:'Загрузка данных…',empty:'Пока нет данных',error:'Не удалось загрузить данные'}[mode]}</h2><p>${mode==='loading'?'Подождите завершения запроса. Это демонстрационное состояние.':mode==='empty'?'Данные появятся после создания плана или назначения.':'Последний сохранённый план не изменён. Проверьте соединение и повторите.'}</p>${button('normal',mode==='error'?'Повторить':'Вернуться к данным',true)}</div>`;return}
+const cards={
+ portfolio:()=>`<div class="grid"><div class="card"><div class="eyebrow">Проект в портфеле</div><div class="stat">01</div><span class="muted">ERP · годовой план</span></div><div class="card"><div class="eyebrow">Оценка до завершения</div><div class="stat">8 <small>ч</small></div><span class="muted">Ручная оценка планировщика</span></div><div class="card"><div class="eyebrow">Ресурсный конфликт</div><div class="stat">${overload()} <small>ч</small></div><span class="muted">Перегрузка · 5 октября</span></div></div><div class="card"><h2>Проекты</h2><div class="scroll"><table><thead><tr><th>Проект</th><th>Владелец</th><th>План</th><th>Следующий шаг</th></tr></thead><tbody><tr><td><strong>${escape(state.name)}</strong><br><span class="muted">ERP-A · приоритет 1</span></td><td>Демо-руководитель</td><td>${badge()}</td><td>${link('structure','Открыть структуру →')}</td></tr></tbody></table></div></div><div class="card"><h3>Три демонстрационных маршрута</h3><p>${link('structure','Годовое планирование')} → ${link('resources','Ресурсы')} → ${link('approval','Согласование')}.</p><p>${link('conflicts','Конфликт')} → ресурсный руководитель подтверждает доступность → планировщик отправляет версию.</p><p>${link('scenarios','Сценарий')} → сравнение с baseline → новое согласование.</p></div>`,
+ structure:()=>`<div class="card"><h2>Структура плана</h2><label class="field">Название проекта<input id="project-name" value="${escape(state.name)}" ${editable()?'':'disabled'} maxlength="120"></label><p class="muted">Название черновика сохраняется автоматически. Для изменения утверждённого плана создайте сценарий.</p><div class="scroll"><table><thead><tr><th>Элемент</th><th>Тип</th><th>Срок</th><th>План</th></tr></thead><tbody><tr><td>Релиз ERP 1.0</td><td>RELEASE</td><td>05.10 — ${escape(state.date)}</td><td>${state.demand} ч</td></tr><tr><td>↳ Планирование</td><td>EPIC</td><td>05.10 — ${escape(state.date)}</td><td>${state.demand} ч</td></tr><tr><td>　↳ Интерфейс</td><td>FEATURE</td><td>05.10</td><td>${state.demand} ч</td></tr><tr><td>　↳ Приёмка</td><td>MILESTONE</td><td>${escape(state.date)}</td><td>0 ч</td></tr></tbody></table></div><div class="actions">${link('demand','Далее: потребность →')}</div></div>`,
+ demand:()=>`<div class="card"><h2>Потребность по ролям и грейдам</h2><p>Интерфейс · FEATURE · 05.10.2026</p><table><thead><tr><th>Роль</th><th>Грейд</th><th>Часы</th></tr></thead><tbody><tr><td>Разработчик</td><td>Middle</td><td><label><span class="sr-only">Часы потребности</span><input id="demand-hours" type="number" min="1" max="24" value="${state.demand}" ${editable()?'':'disabled'}></label></td></tr></tbody></table><p class="muted">Оценка задаётся листу. Родитель суммирует листья и не добавляет часы повторно.</p><div class="actions">${link('resources','Далее: доступность и назначения →')}</div></div>`,
+ resources:()=>`<div class="grid two"><div class="card"><h2>Доступность · 5 октября</h2><p>Демо-сотрудник · employees/demo-1</p><label class="field">Доступно часов<input id="available-hours" type="number" min="0" max="24" value="${state.availability}" ${state.role==='R-04'?'':'disabled'}></label><p class="muted">В исходном примере: 8 часов нормы − 4 часа отсутствия. Изменение здесь моделирует подтверждённую плановую предпосылку.</p>${button('confirm-resource','Подтвердить доступность и назначение',true,state.role!=='R-04'||state.status!=='DRAFT'||overload()>0||deficit()>0)}<p>${state.confirmed?'<span class="badge good">Подтверждено</span>':'Ожидает ресурсного руководителя'}</p></div><div class="card"><h2>Назначение на работу</h2><label class="field">Назначено часов<input id="allocation-hours" type="number" min="1" max="24" value="${state.allocation}" ${editable()?'':'disabled'}></label><p>Потребность: ${state.demand} ч</p><p>Перегрузка: <strong>${overload()} ч</strong> · дефицит: <strong>${deficit()} ч</strong></p><div class="actions">${link('conflicts','Проверить конфликты →')}</div></div></div>`,
+ gantt:()=>`<div class="card"><h2>Гант проекта</h2><div class="scroll"><div class="gantt"><div>Работа / октябрь</div><div>05 пн</div><div>06 вт</div><div>07 ср</div><div>08 чт</div><div>09 пт</div><div>Интерфейс</div><div class="task" style="grid-column:span 2">${state.demand} ч · FEATURE</div><div></div><div></div><div></div><div>Приёмка</div><div style="grid-column:span 5">◆ ${escape(state.date)} · веха</div></div></div><p class="muted">Даты и FS-зависимости проверяются сервером при сохранении плана.</p></div>`,
+ conflicts:()=>`<div class="card"><h2>${overload()||deficit()?'Нужно уточнить ресурсы':'Блокирующих конфликтов нет'}</h2><p>${overload()?`Назначено ${state.allocation} ч при доступных ${state.availability} ч: перегрузка ${overload()} ч.`:'Перегрузка: 0 ч.'}</p><p>Дефицит потребности: ${deficit()} ч. ${state.allocation>state.demand?'Есть превышение назначения над потребностью.':''}</p><p>Для демо переключитесь на R-04, установите доступность 6 ч и подтвердите назначение. Затем R-02 отправляет план на согласование.</p><div class="actions">${link('resources','Исправить ресурсы →')} ${link('approval','Перейти к согласованию →')}</div></div>`,
+ scenarios:()=>`<div class="grid two"><div class="card"><h2>Действующая baseline</h2><p>${state.baseline?`Версия ${state.baseline.version} · ${state.baseline.demand} ч · веха ${escape(state.baseline.date)}`:'Пока нет. Сначала утвердите и активируйте первоначальный план.'}</p><span class="badge good">Содержимое не редактируется</span></div><div class="card"><h2>Вариант «Что если»</h2><p>Копия сохраняет связь с исходной версией. Изменения не затрагивают baseline.</p>${button('scenario','Создать сценарий',true,!state.baseline||!['R-02','R-03'].includes(state.role)||state.scenario&&state.status==='DRAFT')}<label class="field">Веха сценария<input id="scenario-date" type="date" min="2026-10-05" max="2026-12-31" value="${escape(state.date)}" ${state.scenario&&editable()?'':'disabled'}></label><p>${state.scenario&&state.baseline?`Вариант V${state.version}: ${state.date===state.baseline.date?'срок не изменён':'срок изменён, требуется новое согласование'}`:''}</p>${link('approval','Согласовать вариант →')}</div></div>`,
+ approval:()=>`<div class="card"><div class="steps">${['DRAFT','ON_REVIEW','APPROVED','ACTIVE'].map(x=>`<span class="step ${x===state.status?'done':''}">${x}</span>`).join('')}</div><h2 style="margin-top:24px">Решение по версии ${state.version}</h2><p>Раунд ${state.reviewRound} · перегрузка ${overload()} ч · дефицит ${deficit()} ч · ресурсы ${state.confirmed?'подтверждены':'не подтверждены'}.</p><p class="muted">Отправка: R-02/R-03. Финальное решение и активация: R-01. Возврат открывает новый цикл редактирования.</p><div class="actions">${button('submit','Отправить на согласование',true,!editable()||!state.confirmed||overload()>0||deficit()>0||state.allocation>state.demand)}${button('approve','Утвердить',true,state.role!=='R-01'||state.status!=='ON_REVIEW')}${button('return','Вернуть на доработку',false,state.role!=='R-01'||state.status!=='ON_REVIEW')}${button('activate','Активировать',true,state.role!=='R-01'||state.status!=='APPROVED')}</div><label class="field">Комментарий для возврата<input id="return-comment" placeholder="Укажите причину"></label></div>`,
+ calendar:()=>`<div class="card"><h2>Мои назначения</h2><p>Демо-сотрудник · рабочая неделя 05–09 октября</p><div class="grid"><div class="card"><h3>Понедельник · 05</h3><div class="stat">${state.baseline?state.baseline.allocation:0} ч</div><p>ERP-A · Интерфейс</p></div><div class="card"><h3>Вторник · 06</h3><div class="stat">0 ч</div><p>Назначений нет</p></div><div class="card"><h3>Оповещения</h3><p>${state.baseline?'Опубликована версия V'+state.baseline.version:'Активного плана ещё нет'}</p></div></div><p class="muted">Показаны назначения активной baseline. Факт работы вводится в Task Tracker.</p></div>`,
+ attachments:()=>`<div class="card"><h2>Обоснования проекта</h2><p>Файл загружается на сервер; размер и MIME проверяются.</p>${state.attachment?'<p>Загруженные файлы перечислены ниже.</p>':'<p class="muted">Вложений пока нет.</p>'}<div class="actions">${['R-02','R-03'].includes(state.role)?button('attachment','Загрузить вложение',true):''}</div></div>`,
+ forecast:()=>`<div class="grid"><div class="card"><div class="eyebrow">Факт</div><div class="stat">12 ч</div><p>Абсолютный срез Task Tracker </p></div><div class="card"><div class="eyebrow">Остаток ETC</div><div class="stat">8 ч</div><p>Явная оценка планировщика</p></div><div class="card"><div class="eyebrow">Полная трудоёмкость</div><div class="stat">20 ч</div><p>Факт + ETC</p></div></div><div class="card"><h2>Качество прогноза <span class="badge bad">PARTIAL</span></h2><p>Нет подтверждённой ставки. Денежный итог не рассчитан. Арифметический остаток задачи не подменяет оценку будущей работы.</p>${link('scenarios','Создать сценарий по отклонению →')}</div>`,
+ exchange:()=>`<div class="card"><h2>Публикация плана · Task Tracker</h2><p>Состояние: <strong>${state.publication}</strong> </p><p>Ключ: ERP-A / версия ${state.baseline?.version||1}. В локальной среде ответ приёмника — заглушка.</p>${button('retry','Повторить доставку',true,state.publication==='SUCCEEDED'||!state.baseline)}<p class="muted">Повтор не меняет baseline и сохраняет ключ. Без активного плана отправка недоступна.</p></div><div class="card"><h2>Журнал действий</h2><div class="timeline">${state.events.slice(-10).map(x=>`<p>${escape(x)}</p>`).join('')}</div></div>`
+};$('content').innerHTML=cards[screen]();bindFields()}
+async function api(path,method='GET',body=null,revision=null){
+ const headers={Authorization:'Bearer '+token};
+ if(method!=='GET'){headers['Idempotency-Key']=crypto.randomUUID();if(revision!==null)headers['If-Match']='"'+revision+'"'}
+ if(body!==null && !(body instanceof FormData))headers['Content-Type']='application/json';
+ const response=await fetch(path,{method,headers,body:body===null?null:body instanceof FormData?body:JSON.stringify(body)});
+ if(!response.ok){const error=await response.json().catch(()=>({message:'Ошибка сервера'}));throw Error(error.message||error.detail||'Ошибка '+response.status)}
+ return response.headers.get('content-type')?.includes('json')?response.json():response;
+}
+async function refresh(){
+ const next=await api('/api/v1/workspace?projectId='+encodeURIComponent(projectId));
+ state={...initial(),...next};state.identity=await api('/api/v1/me');
+ if(['R-01','R-02','R-03'].includes(state.role) && state.versionId)plan=await api('/api/v1/versions/'+state.versionId);else plan=null;
+ if(state.role==='R-04'){const rows=await api('/api/v1/availability');state.availabilityRecord=rows.find(x=>x.data.id===state.availabilityId)}
+ render();save();
+}
+async function command(fn){
+ if(pending)return;pending=true;
+ try{await fn();await refresh()}catch(e){toast(e.message);await refresh().catch(()=>{})}finally{pending=false}
+}
+function draft(){return Object.fromEntries(['name','planningMode','horizonStart','horizonEnd','items','dependencies','demands','allocations'].map(k=>[k,structuredClone(plan[k])]))}
+async function saveDraft(next){await api('/api/v1/versions/'+plan.id+'/draft','PUT',next,plan.revision)}
+function bindFields(){
+ for(const[id,field]of [['demand-hours','demand'],['allocation-hours','allocation'],['available-hours','availability']])if($(id))$(id).onchange=e=>command(async()=>{
+  const n=Number(e.target.value);if(!Number.isFinite(n)||n<0||n>24)throw Error('Введите часы 0–24');
+  if(field==='availability'){
+   const row=state.availabilityRecord;if(!row)throw Error('Нет кадрового входа');
+   await api('/api/v1/availability/'+row.data.id,'PUT',{...row.data,nominalHours:n+row.data.absenceHours,availableHours:n},row.revision);
+  }else{
+   const d=draft();
+   if(field==='demand'&&!d.demands.length)throw Error('Сначала создайте потребность');
+   if(field==='allocation'&&!d.allocations.length)throw Error('Сначала создайте назначение');
+   if(field==='demand'){d.demands[0].hours=n;const item=d.items.find(x=>x.id===d.demands[0].planItemId);item.plannedHours=n;for(const p of d.items.filter(x=>['EPIC','RELEASE'].includes(x.type)))p.plannedHours=n}
+   else d.allocations[0].hours=n;
+   await saveDraft(d);
+  }
+ });
+ if($('project-name'))$('project-name').onchange=e=>command(()=>api('/api/v1/projects/'+projectId,'PATCH',{name:e.target.value.trim(),goal:'Демонстрация планирования'},state.projectRevision));
+ if($('scenario-date'))$('scenario-date').onchange=e=>command(async()=>{const d=draft();for(const x of d.items){if(['MILESTONE','EPIC','RELEASE'].includes(x.type))x.finish=e.target.value;if(x.type==='MILESTONE')x.start=e.target.value}await saveDraft(d)});
+ if(screen==='attachments'){
+  const content=$('content');content.insertAdjacentHTML('beforeend','<div class="card"><label class="field">Выбрать файл<input type="file" id="upload-file" accept=".txt,.pdf,.png,.jpg"></label><div id="file-list"></div></div>');
+  $('file-list').innerHTML=(state.attachments||[]).map(x=>`<p>${escape(x.fileName)} · ${x.sizeBytes} байт <button data-download="${escape(x.id)}">Скачать</button></p>`).join('');
+ }
+ if(screen==='forecast'){
+  $('content').innerHTML=`<div class="grid"><div class="card"><h2>Факт</h2><div class="stat">${state.actualHours??'—'} ч</div></div><div class="card"><h2>Остаток ETC</h2><div class="stat">${state.forecast?.remainingHours??'—'} ч</div></div><div class="card"><h2>Прогноз стоимости</h2><div class="stat">${state.forecast?.estimatedTotalCost??'—'} ${escape(state.forecast?.currencyCode||'')}</div></div></div><div class="card"><h2>${escape(state.forecast?.quality||'Не рассчитан')}</h2><p>${escape((state.forecast?.missingInputs||[]).join(', '))}</p><button data-action="forecast">Пересчитать прогноз</button></div>`;
+ }
+ if(screen==='calendar' && state.role==='R-05')$('content').innerHTML='<div class="card"><h2>Мои назначения</h2>'+(state.allocations||[]).map(x=>`<p>${escape(x.date)} · ${x.hours} ч · ${escape(x.employeeId)}</p>`).join('')+'</div>';
+}
+document.addEventListener('click',e=>{
+ const download=e.target.closest('[data-download]');if(download){command(async()=>{const response=await api('/api/v1/attachments/'+download.dataset.download+'/content');const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download='attachment';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});return}
+ const button=e.target.closest('[data-action]');if(!button||button.disabled)return;
+ const action=button.dataset.action;if(action==='normal'){mode='normal';render();return}
+ const execute=()=>command(async()=>{
+  const prefix='/api/v1/versions/'+state.versionId;
+  if(action==='confirm-resource')await api(prefix+'/confirm-resources','POST',{},state.revision);
+  if(action==='submit')await api(prefix+'/submit','POST',{reviewers:[{subject:state.finalApprover,role:'FINAL_APPROVER',resourceScope:[]}]},state.revision);
+  if(['approve','return'].includes(action))await api(prefix+'/decisions','POST',{reviewRound:state.reviewRound,contentRevision:state.contentRevision,decision:action==='approve'?'APPROVE':'RETURN',comment:action==='return'?$('return-comment').value.trim():null},state.revision);
+  if(action==='activate')await api(prefix+'/activate','POST',{projectRevision:state.projectRevision},state.revision);
+  if(action==='scenario')await api('/api/v1/projects/'+projectId+'/versions','POST',{baseVersionId:state.versionId,kind:'SCENARIO',name:'Сценарий «Что если»'});
+  if(action==='attachment'){
+   const file=$('upload-file')?.files[0];if(!file)throw Error('Выберите файл');
+   const data=new FormData();data.set('ownerType','PROJECT');data.set('ownerId',projectId);data.set('file',file);
+   await api('/api/v1/attachments','POST',data);
+  }
+  if(action==='retry')await api('/api/v1/publications/'+state.publicationId+'/retry','POST',{reason:'Повтор из интерфейса'});
+  if(action==='forecast')await api(prefix+'/forecasts','POST',{contentRevision:state.contentRevision});
+ });
+ if(action==='activate')confirmAction('Активировать план?','Утверждённая версия станет действующей.',execute);else execute();
+});
+$('role').onchange=async e=>{if(authMode!=='demo')return;token='demo-'+e.target.value;await refresh().catch(e=>toast(e.message))};
+$('reset').hidden=true;
+window.addEventListener('hashchange',()=>{screen=location.hash.slice(1);mode='normal';render();$('main').focus()});
+async function start(){
+ const config=await (await fetch('/auth/config')).json();authMode=config.mode;
+ if(authMode==='demo'){token='demo-R-02';await refresh();return}
+ $('role').hidden=true;
+ const url=new URL(location.href);const code=url.searchParams.get('code');
+ if(code){
+  if(url.searchParams.get('state')!==sessionStorage.getItem('oidc-state'))throw Error('Неверный state входа');
+  const verifier=sessionStorage.getItem('oidc-verifier');sessionStorage.removeItem('oidc-state');sessionStorage.removeItem('oidc-verifier');
+  const r=await fetch(config.tokenEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:config.clientId,redirect_uri:location.origin+'/',code,code_verifier:verifier})});
+  if(!r.ok)throw Error('Не удалось завершить вход');token=(await r.json()).access_token;history.replaceState({},'',location.origin+'/');
+  const me=await api('/api/v1/me');if(me.projects.length)projectId=me.projects[0];else{const list=await api('/api/v1/projects');if(list.items.length)projectId=list.items[0].id;}await refresh();return;
+ }
+ const bytes=crypto.getRandomValues(new Uint8Array(32));const encode=b=>btoa(String.fromCharCode(...b)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
+ const verifier=encode(bytes),stateId=crypto.randomUUID(),challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
+ sessionStorage.setItem('oidc-verifier',verifier);sessionStorage.setItem('oidc-state',stateId);
+ const login=new URL(config.authorizationEndpoint);login.search=new URLSearchParams({client_id:config.clientId,response_type:'code',scope:'openid',redirect_uri:location.origin+'/',state:stateId,code_challenge:challenge,code_challenge_method:'S256'});
+ location.assign(login);
+}
+start().catch(e=>{$('main').innerHTML='<div class="card"><h1>Не удалось загрузить рабочее пространство</h1><p>'+escape(e.message)+'</p></div>'});
+async function portfolioScreen(){
+ try{
+  const params=new URLSearchParams({pageSize:'50'});if(state.projectFilter)params.set('q',state.projectFilter);
+  const list=await api('/api/v1/projects?'+params);if(screen!=='portfolio')return;
+  const container=document.createElement('div');container.className='card';container.innerHTML=`<h2>Реестр проектов</h2><label class="field">Поиск по названию<input id="project-filter" value="${escape(state.projectFilter||'')}"></label><div class="scroll"><table><thead><tr><th>Код</th><th>Название</th><th>Состояние</th><th></th></tr></thead><tbody>${list.items.map(x=>`<tr><td>${escape(x.code)}</td><td>${escape(x.name)}</td><td>${escape(x.status)}</td><td><button data-project="${x.id}">Открыть</button></td></tr>`).join('')}</tbody></table></div>${list.nextCursor?'<p>Показаны первые 50 проектов. Уточните поиск.</p>':''}<details><summary>Создать проект</summary><label class="field">Код<input id="new-code" maxlength="40"></label><label class="field">Название<input id="new-name" maxlength="120"></label><label class="field">Цель<input id="new-goal" maxlength="500"></label><label class="field">Идентификатор руководителя<input id="new-manager" value="${escape(authMode==='demo'?'demo-R-03':state.identity?.subject||'')}"></label><button data-extra="new-project" class="primary">Создать</button></details>`;
+  $('content').appendChild(container);
+  $('project-filter').onchange=()=>{state.projectFilter=$('project-filter').value;render()};
+ }catch(e){toast(e.message)}
+}
+function structureScreen(){
+ if(!plan){$('content').innerHTML='<div class="card"><h2>План ещё не создан</h2>'+(['R-02','R-03'].includes(state.role)?'<button data-extra="first-plan">Создать первый план</button>':'<p>План создаёт планировщик или руководитель проекта.</p>')+'</div>';return;}
+ const itemRows=plan.items.map(x=>`<tr><td><input data-item="${x.id}" data-field="name" value="${escape(x.name)}" ${editable()?'':'disabled'} aria-label="Название работы"></td><td>${escape(x.type)}</td><td><input type="date" data-item="${x.id}" data-field="start" value="${x.start}" ${editable()?'':'disabled'} aria-label="Начало работы"></td><td><input type="date" data-item="${x.id}" data-field="finish" value="${x.finish}" ${editable()?'':'disabled'} aria-label="Окончание работы"></td><td><input type="number" data-item="${x.id}" data-field="plannedHours" value="${x.plannedHours}" ${editable()?'':'disabled'} min="0" step="0.01" aria-label="Плановые часы"></td><td>${editable()?`<button data-remove-item="${x.id}">Удалить</button>`:''}</td></tr>`).join('');
+ $('content').innerHTML=`<div class="card"><h2>Структура плана</h2><label class="field">Название проекта<input id="project-name" value="${escape(state.name)}" ${editable()?'':'disabled'}></label><div class="scroll"><table><thead><tr><th>Работа</th><th>Тип</th><th>Начало</th><th>Окончание</th><th>Часы</th><th></th></tr></thead><tbody>${itemRows}</tbody></table></div>${editable()?`<details><summary>Добавить работу</summary><label class="field">Название<input id="new-item-name"></label><label class="field">Тип<select id="new-item-type">${['RELEASE','STAGE','EPIC','FEATURE','MILESTONE'].map(x=>'<option>'+x+'</option>').join('')}</select></label><label class="field">Родитель<select id="new-item-parent"><option value="">Без родителя</option>${plan.items.map(x=>`<option value="${x.id}">${escape(x.name)}</option>`).join('')}</select></label><button data-extra="new-item">Добавить</button></details>`:''}<div class="actions">${link('demand','Далее: потребность →')}</div></div>`;
+ for(const input of document.querySelectorAll('[data-item]'))input.onchange=()=>command(async()=>{const d=draft();const item=d.items.find(x=>x.id===input.dataset.item);item[input.dataset.field]=input.dataset.field==='plannedHours'?Number(input.value):input.value;if(item.type==='MILESTONE'){if(input.dataset.field!=='plannedHours'){item.start=input.value;item.finish=input.value;}item.plannedHours=0}await saveDraft(d)});
+ $('project-name').onchange=e=>command(()=>api('/api/v1/projects/'+projectId,'PATCH',{name:e.target.value.trim(),goal:state.goal||'Планирование проекта'},state.projectRevision));
+}
+// Keep the prototype's twelve screens, substituting live records in its cards.
+const originalBind=bindFields;
+bindFields=function(){
+ originalBind();if(screen==='portfolio')void portfolioScreen();if(screen==='structure')structureScreen();
+ if(screen==='demand' && plan && !plan.demands.length){
+  $('content').innerHTML=`<div class="card"><h2>Потребность</h2><p>Выберите листовую работу и задайте роль, грейд и часы.</p><label class="field">Работа<select id="new-demand-item">${plan.items.filter(x=>x.type!=='MILESTONE'&&!plan.items.some(i=>i.parentItemId===x.id)).map(x=>`<option value="${x.id}">${escape(x.name)}</option>`).join('')}</select></label><label class="field">Код роли<input id="new-demand-role" value="developer"></label><label class="field">Код грейда<input id="new-demand-grade" value="middle"></label><label class="field">Часы<input id="new-demand-hours" type="number" min="0" step="0.01" value="6"></label><button data-extra="new-demand">Добавить потребность</button></div>`;
+ }
+ if(screen==='resources' && plan && !plan.allocations.length)$('content').insertAdjacentHTML('beforeend','<div class="card"><p>Назначить сотрудника на первую потребность</p><label class="field">HR resource name<input id="new-allocation-employee" value="employees/demo-1"></label><button data-extra="new-allocation">Создать назначение</button></div>');
+ if(screen==='forecast' && ['R-02','R-03'].includes(state.role))$('content').insertAdjacentHTML('beforeend','<div class="card"><label class="field">Оценка до завершения, ч<input id="etc-hours" type="number" min="0" step="0.01" value="8"></label><button data-extra="save-etc">Сохранить оценку</button></div>');
+};
+document.addEventListener('click',e=>{
+ const selected=e.target.closest('[data-project]');if(selected){projectId=selected.dataset.project;command(()=>Promise.resolve());return}
+ const removed=e.target.closest('[data-remove-item]');if(removed){command(async()=>{const d=draft(),id=removed.dataset.removeItem;if(d.items.some(x=>x.parentItemId===id))throw Error('Сначала удалите дочерние работы');const demands=d.demands.filter(x=>x.planItemId===id).map(x=>x.id);d.items=d.items.filter(x=>x.id!==id);d.dependencies=d.dependencies.filter(x=>x.predecessorId!==id&&x.successorId!==id);d.demands=d.demands.filter(x=>x.planItemId!==id);d.allocations=d.allocations.filter(x=>!demands.includes(x.demandId));await saveDraft(d)});return}
+ const extra=e.target.closest('[data-extra]');if(!extra)return;
+ command(async()=>{
+  if(extra.dataset.extra==='new-project'){
+   const created=await api('/api/v1/projects','POST',{portfolioId:state.portfolioId,programId:null,code:$('new-code').value.trim(),name:$('new-name').value.trim(),goal:$('new-goal').value.trim(),managerSubject:$('new-manager').value.trim()});projectId=created.id;
+   if(['R-02','R-03'].includes(state.role))await api('/api/v1/projects/'+created.id+'/versions','POST',{baseVersionId:null,kind:'PLAN',name:'Первый план'});
+  }
+  if(extra.dataset.extra==='first-plan')await api('/api/v1/projects/'+projectId+'/versions','POST',{baseVersionId:null,kind:'PLAN',name:'Первый план'});
+  if(extra.dataset.extra==='new-item'){
+   const d=draft(),type=$('new-item-type').value,parentId=$('new-item-parent').value||null,parent=d.items.find(x=>x.id===parentId),start=parent?.start||d.horizonStart,finish=type==='MILESTONE'?parent?.finish||d.horizonEnd:parent?.finish||d.horizonEnd;
+   d.items.push({id:crypto.randomUUID(),logicalItemId:crypto.randomUUID(),parentItemId:parentId,type,name:$('new-item-name').value.trim(),start:type==='MILESTONE'?finish:start,finish,plannedHours:0});await saveDraft(d);
+  }
+  if(extra.dataset.extra==='new-demand'){
+   const d=draft(),item=d.items.find(x=>x.id===$('new-demand-item').value);if(!item)throw Error('Добавьте листовую работу');
+   const h=Number($('new-demand-hours').value);d.demands.push({id:crypto.randomUUID(),planItemId:item.id,roleCode:$('new-demand-role').value.trim(),gradeCode:$('new-demand-grade').value.trim(),periodStart:item.start,periodEnd:item.finish,hours:h});item.plannedHours=h;await saveDraft(d);
+  }
+  if(extra.dataset.extra==='new-allocation'){
+   const d=draft(),dem=d.demands[0];if(!dem)throw Error('Сначала создайте потребность');
+   d.allocations.push({id:crypto.randomUUID(),demandId:dem.id,employeeId:$('new-allocation-employee').value.trim(),date:dem.periodStart,hours:dem.hours,status:'PROPOSED'});await saveDraft(d);
+  }
+  if(extra.dataset.extra==='save-etc')await api('/api/v1/versions/'+state.versionId+'/forecast-inputs','PUT',{etc:Number($('etc-hours').value)});
+ });
+});

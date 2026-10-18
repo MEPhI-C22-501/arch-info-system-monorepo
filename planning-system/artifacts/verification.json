@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-18",
+  "timezone": "Europe/Moscow",
+  "baseMain": "f5eb2353e9f6e036730739f9fb8ba269390ae255",
+  "documentation": {
+    "checks": {
+      "links": 755,
+      "markdown": 41,
+      "events": 35,
+      "http_examples": 275,
+      "operations": 36
+    },
+    "requirements": {
+      "covered": 17,
+      "partial": 28
+    },
+    "stories": 20,
+    "errors": 0
+  },
+  "postgres": {
+    "python": "3.12",
+    "image": "postgres:16.6-alpine",
+    "tests": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sqlite": {
+    "python": "3.14.3",
+    "passed": 25,
+    "skipped": 1,
+    "reason": "PostgreSQL trigger requires PostgreSQL"
+  },
+  "browser": {
+    "app": "http://127.0.0.1:8080",
+    "checks": [
+      "server persistence",
+      "resource conflict and confirmation",
+      "review and activation",
+      "scenario isolation",
+      "review return",
+      "forecast",
+      "file upload",
+      "XSS escaping",
+      "role navigation",
+      "personal calendar",
+      "mobile"
+    ],
+    "errors": []
+  },
+  "codeCheck": "ruff E9,F63,F7,F82 passed; JS syntax passed",
+  "stand": {
+    "composeProject": "planning-review-20261018",
+    "api": "healthy",
+    "postgres": "healthy",
+    "migration": "exit 0",
+    "worker": "running",
+    "url": "http://localhost:8080",
+    "imageId": "sha256:fb3a3665650e04ad1aee786458f6acb4d71d6bddb3f59ace412af5852c20807e",
+    "mode": "development, synthetic seed, mock receipts",
+    "apiVersion": "1.1.0"
+  },
+  "notVerified": [
+    "GitHub CI execution and registry publication",
+    "real external services and written agreements",
+    "full NFR and shared-stand security checklist",
+    "shared-stand restore/S3 and telemetry",
+    "Kafka/notification DLQ"
+  ],
+  "prototype": {
+    "diagrams": 47,
+    "errors": [],
+    "mermaid": "11.12.0",
+    "playwright": "1.58.2"
+  },
+  "minikube": {
+    "context": "planning-review-20261018",
+    "namespace": "arch-planning-system",
+    "mode": "development / synthetic / mock",
+    "checks": {
+      "readiness": true,
+      "pvcBound": true,
+      "seedIdempotent": true,
+      "postgresAndApiRestart": true,
+      "projectPersisted": true,
+      "filePersisted": true,
+      "samePvcIds": true,
+      "ingressRouting": true
+    },
+    "fileSha256": "d87af9ec004ffa0a08575f91c94275f86e0c585bb7f47c4b2b254195ae174f3c",
+    "pvcNames": [
+      "database-postgres-0",
+      "planning-files"
+    ],
+    "errors": [],
+    "minikubeVersion": "1.39.0",
+    "kubernetesVersion": "1.37.0"
+  },
+  "restore": {
+    "mode": "local synthetic Compose; not shared-stand RPO/RTO acceptance",
+    "checks": {
+      "dumpRestored": true,
+      "sameSnapshotsAuditAndRequests": true,
+      "baselineTriggerRestored": true
+    },
+    "backupSeconds": 0.151,
+    "restoreSeconds": 0.16,
+    "backupSha256": "7a4d86f0a683209301956666ba0e1d71639424f2bd4d04b49f0a5061686f9243",
+    "backupBytes": 15243,
+    "errors": []
+  },
+  "generatorsReproducible": true
+}

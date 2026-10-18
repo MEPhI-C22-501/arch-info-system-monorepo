@@ -1,0 +1,21 @@
+{
+  "context": "planning-review-20261018",
+  "namespace": "arch-planning-system",
+  "mode": "development / synthetic / mock",
+  "checks": {
+    "readiness": true,
+    "pvcBound": true,
+    "seedIdempotent": true,
+    "postgresAndApiRestart": true,
+    "projectPersisted": true,
+    "filePersisted": true,
+    "samePvcIds": true,
+    "ingressRouting": true
+  },
+  "fileSha256": "d87af9ec004ffa0a08575f91c94275f86e0c585bb7f47c4b2b254195ae174f3c",
+  "pvcNames": [
+    "database-postgres-0",
+    "planning-files"
+  ],
+  "errors": []
+}

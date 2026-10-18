@@ -266,7 +266,7 @@
           "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
         },
         "body": {
-          "baseVersionId": "10000000-0000-4000-8000-000000000001",
+          "baseVersionId": null,
           "kind": "PLAN",
           "name": "Сценарий 2"
         }
@@ -303,7 +303,7 @@
           "Authorization": "Bearer <token-of-other-scope>"
         },
         "body": {
-          "baseVersionId": "10000000-0000-4000-8000-000000000001",
+          "baseVersionId": null,
           "kind": "PLAN",
           "name": "Сценарий 2"
         }
