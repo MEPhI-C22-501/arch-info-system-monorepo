@@ -1,0 +1,12 @@
+{
+  "code": "USD",
+  "number": "840",
+  "name": "US Dollar",
+  "decimals": 2,
+  "is_deleted": false,
+  "revision": 1,
+  "last_changer": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "created_at": "{{any}}",
+  "updated_at": "{{any}}",
+  "deleted_at": "0001-01-01T00:00:00Z"
+}
