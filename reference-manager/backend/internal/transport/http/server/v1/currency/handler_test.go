@@ -102,7 +102,7 @@ func TestHandlerCreateCurrency(t *testing.T) {
 		},
 		"malformed request body": {
 			fields: fields{
-				setupServiceMock: func(m *mocks.MockService) {},
+				setupServiceMock: func(_ *mocks.MockService) {},
 			},
 			args: args{
 				requestBody: `{"code": `,
