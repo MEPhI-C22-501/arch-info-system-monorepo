@@ -87,9 +87,9 @@ func TestServiceCreateCurrency(t *testing.T) {
 					return fn(ctx)
 				})
 		}
-		noTxManagerCalls                  = func(m *mocks.MockTxManager) {}
-		noCurrencyRepositoryCalls         = func(m *mocks.MockCurrencyRepository) {}
-		noCurrencyVersionRepositoryCalls  = func(m *mocks.MockCurrencyVersionRepository) {}
+		noTxManagerCalls                  = func(_ *mocks.MockTxManager) {}
+		noCurrencyRepositoryCalls         = func(_ *mocks.MockCurrencyRepository) {}
+		noCurrencyVersionRepositoryCalls  = func(_ *mocks.MockCurrencyVersionRepository) {}
 		noExpandedCurrencyRepositoryCalls = func(_ *mocks.MockExpandedCurrencyRepository) {}
 	)
 
