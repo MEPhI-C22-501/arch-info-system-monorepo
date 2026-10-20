@@ -45,8 +45,10 @@ func NewApp(cfg *Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize keycloak token verifier: %w", err)
 	}
 
+	txManager := postgres.NewTxManager(postgresClient)
+
 	currencyService := currencysrv.NewService(
-		postgres.NewTxManager(postgresClient),
+		txManager,
 		currencyrepo.NewCurrencyRepository(postgresClient),
 		currencyrepo.NewCurrencyRevisionRepository(postgresClient),
 		currencyrepo.NewExpandedCurrencyRepository(postgresClient),
@@ -58,6 +60,7 @@ func NewApp(cfg *Config) (*App, error) {
 		readinessManager,
 		verifier,
 		currencyService,
+		catalogMounts(txManager, postgresClient)...,
 	))
 
 	log.Info("application initialized successfully")

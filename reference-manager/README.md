@@ -8,11 +8,27 @@ The service is the single source of reference data and HR master data: employees
 
 | Path | Contents |
 | --- | --- |
-| `backend/` | Go service: `cmd/`, `internal/`, `pkg/`, OpenAPI specs in `api/openapi/`, integration tests in `tests/`, `go.mod`, lint and Docker ignore files |
+| `backend/` | Go service: `cmd/`, `internal/`, `pkg/`, OpenAPI specs in `api/openapi/`, the catalog generator in `tools/gencatalog/`, integration tests in `tests/`, `go.mod`, lint and Docker ignore files |
 | `frontend/` | Administration interface: `frontend/admin/` is the step 1 admin panel on mock data (see its README), `frontend/prototype/index.html` is the original single-file prototype |
 | `deployments/` | Dockerfiles, Docker Compose, configuration examples and database migrations of both parts |
 | `documents/` | Requirements and design documents (in Russian) |
 | `Taskfile.yaml` | Entry point for every command below. Run `task` from this directory, it switches into `backend/` where needed |
+
+## Catalogs
+
+Every catalog is a collection under `/v1/` with the same methods: create, list, get, patch, delete (soft, or permanent with `force=true`), `POST .../export` to an `.xlsx` file and the revision history under `.../revisions`. Currencies are implemented by hand (`internal/domains/currency`, `internal/services/currency`, `internal/repositories/postgres/currency`, `internal/transport/http/server/v1/currency`). The other catalogs share one generic implementation and are described in `backend/tools/gencatalog/defs.go`:
+
+| Collection | Group | Changed by |
+| --- | --- | --- |
+| `currencies`, `countries`, `project_roles`, `grades` | classifiers | `reference-admin` |
+| `employees`, `org_units`, `positions`, `assignments` | HR | `reference-hr-admin` |
+| `salaries`, `absences` | restricted HR, read by `reference-hr-reader` and `reference-hr-admin` only | `reference-hr-admin` |
+
+`task generate` runs the generator before oapi-codegen. For each definition it writes the OpenAPI spec and the codegen configs under `api/openapi/v1/<catalog>/`, the fields struct and the descriptor in `internal/domains/<catalog>/<catalog>.gen.go`, the HTTP adapter in `internal/transport/http/server/v1/<catalog>/handler.gen.go` and the migration pair in `deployments/migrations/`. Generated files carry a `DO NOT EDIT` header. Catalog rules (references, periods, hierarchy) live next to them in hand-written `rules.go` files. Catalog-specific methods, such as the employee dismissal, have their own service and handler files.
+
+To add a catalog: append a definition to `defs.go`, run `task generate`, write `rules.go` when the catalog has cross-field rules, register the service in `internal/app/reference-manager/catalogs.go` and add feature files under `tests/features/`.
+
+Employees carry `employment_state` and `dismissal_date`, both set by the service. `POST /v1/employees/{employeeID}/dismiss` closes the assignment and the salary in effect with the dismissal date. The unit and the position of an employee are computed from the assignment in effect today (migration `000011`). Keycloak accounts for employees are not implemented yet.
 
 ## Requirements
 
@@ -130,7 +146,7 @@ PostgreSQL connection pool settings are configured under `databases.postgres.poo
 
 ### Authentication and authorization
 
-Every API request except `/v1/health/*` needs a Keycloak access token in the `Authorization: Bearer <token>` header. The service verifies the token signature with the realm keys (JWKS), its issuer, audience, lifetime and type, and takes the actor from it: the user ID from `sub` and the roles from `realm_access.roles` together with `resource_access.<client_id>.roles`. A request without a valid token gets `401`, an operation the roles do not grant gets `403`. Roles are checked by the matrix "role - reference group - access level" from [documents/070.role-matrix.md](documents/070.role-matrix.md): currencies are read and exported by every role of the service and changed by `reference-admin` only.
+Every API request except `/v1/health/*` needs a Keycloak access token in the `Authorization: Bearer <token>` header. The service verifies the token signature with the realm keys (JWKS), its issuer, audience, lifetime and type, and takes the actor from it: the user ID from `sub` and the roles from `realm_access.roles` together with `resource_access.<client_id>.roles`. A request without a valid token gets `401`, an operation the roles do not grant gets `403`. Roles are checked by the matrix "role - reference group - access level" from [documents/070.role-matrix.md](documents/070.role-matrix.md): classifiers are read and exported by every role of the service and changed by `reference-admin` only, HR catalogs are changed by `reference-hr-admin`, salaries and absences are hidden from `reference-reader` and `reference-admin` (see [Catalogs](#catalogs)).
 
 The keys are cached and refreshed in the background and when a token is signed by an unknown key, so key rotation needs no restart and requests keep working while Keycloak is unavailable. The service starts without Keycloak as well.
 

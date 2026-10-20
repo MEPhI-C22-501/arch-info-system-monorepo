@@ -20,11 +20,15 @@ import (
 	timeoutmw "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/middleware/timeout"
 )
 
+// Mount registers the handlers of one catalog on the authenticated router.
+type Mount func(r chi.Router)
+
 func NewRouter(
 	log *slog.Logger,
 	readinessChecker health.ReadinessChecker,
 	authenticator authmw.Authenticator,
 	currencyService currencyhndl.Service,
+	mounts ...Mount,
 ) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -48,6 +52,10 @@ func NewRouter(
 			BaseRouter:       r,
 			ErrorHandlerFunc: currencyHandler.HandleParamError,
 		})
+
+		for _, mount := range mounts {
+			mount(r)
+		}
 	})
 
 	return r
