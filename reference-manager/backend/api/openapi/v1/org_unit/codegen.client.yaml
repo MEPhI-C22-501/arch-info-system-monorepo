@@ -1,0 +1,18 @@
+package: orgunitv1
+
+generate:
+  client: true
+
+output-options:
+  skip-prune: false
+  type-mapping:
+    string:
+      formats:
+        uuid:
+          type: uuid.UUID
+          import: uuid
+
+additional-imports:
+  - package: uuid
+
+output: pkg/api/v1/org_unit/client.gen.go

@@ -14,6 +14,8 @@ var (
 	ErrInvalidArgument  = errors.New("invalid argument")
 	// ErrConflict means the resource was changed concurrently, the client can retry the request.
 	ErrConflict = errors.New("conflict")
+	// ErrFailedPrecondition means the operation is not allowed in the current state of the resource.
+	ErrFailedPrecondition = errors.New("failed precondition")
 	// ErrRevisionNotFound means the resource exists, but has no revision with the requested number.
 	ErrRevisionNotFound = fmt.Errorf("revision %w", ErrNotFound)
 )

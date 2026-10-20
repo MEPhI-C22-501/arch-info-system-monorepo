@@ -17,9 +17,10 @@ vars:
 
 tasks:
   generate:
-    desc: Generate backend artifacts from the OpenAPI specs (server, models, client)
+    desc: Generate the catalog specs, domains, handlers and migrations, then the API code from every OpenAPI spec
     dir: '{{.BACKEND_DIR}}'
     cmds:
+      - go run ./tools/gencatalog
       - |
         find api/openapi -name "openapi.yaml" -type f | while read file; do
           dir=$(dirname "$file")
