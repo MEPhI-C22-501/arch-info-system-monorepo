@@ -66,7 +66,35 @@ def transform_time_logs(logs, work_items):
     return rows
 
 
-def load(db, source, extract):
+PLANNING_TABLES = {'plan': 'plan_version', 'demand': 'fact_demand', 'allocation': 'fact_allocation',
+                   'availability': 'fact_availability', 'forecast': 'fact_forecast'}
+
+
+def planning_scope(entities):
+    portfolios = {r.get('portfolioId') for rows in entities.values() for r in rows}
+    return portfolios.pop() if len(portfolios) == 1 else None
+
+
+def prune_planning(db, scope, entities):
+    """A Planning batch is a full snapshot of one portfolio: an entity of that
+    portfolio missing from a READY batch is closed. Daily observations in
+    dwh.source_snapshot keep its history; other portfolios are untouched."""
+    present = {(entity, str(row['id'])) for entity, rows in entities.items() for row in rows}
+    stale = [(entity, eid) for entity, eid, payload in
+             db.execute("SELECT entity,entity_id,payload FROM dwh.source_record WHERE source='planning'").fetchall()
+             if (entity, eid) not in present and json.loads(payload).get('portfolioId', scope) == scope]
+    for entity, eid in stale:
+        db.execute("DELETE FROM dwh.source_record WHERE source='planning' AND entity=? AND entity_id=?", (entity, eid))
+        if entity == 'plan':
+            db.execute('DELETE FROM dwh.fact_plan_item WHERE plan_version_id=?', (eid,))
+        if entity == 'forecast':
+            db.execute("DELETE FROM ops.project_projection WHERE source='planning' AND id=?", (eid,))
+        if entity in PLANNING_TABLES:
+            db.execute(f'DELETE FROM dwh.{PLANNING_TABLES[entity]} WHERE id=?', (eid,))
+    return len(stale)
+
+
+def load(db, source, extract, scope=None):
     batch_id, started = str(uuid.uuid4()), now()
     with db.transaction():
         db.execute("INSERT INTO etl.batch(id,source,status,started_at) VALUES (?,?,?,?)",
@@ -84,9 +112,19 @@ def load(db, source, extract):
             if not db.sqlite:
                 db.execute("SELECT pg_advisory_xact_lock(hashtext('reports-star-refresh'))")
             data_as_of = timestamp(data_as_of)
-            previous = db.execute('SELECT data_as_of FROM etl.source_state WHERE source=?', (source,)).fetchone()
-            if previous and data_as_of < timestamp(previous[0]):
-                raise Rejected('OUT_OF_ORDER_BATCH')
+            if source == 'planning':
+                scope = scope or planning_scope(entities)
+            if source == 'planning' and scope:
+                # Order is checked per portfolio: batches of different
+                # portfolios are independent snapshots.
+                previous = db.execute('SELECT value FROM etl.checkpoint WHERE source=?',
+                                      ('planning:' + scope,)).fetchone()
+                if previous and data_as_of < timestamp(json.loads(previous[0])['dataAsOf']):
+                    raise Rejected('OUT_OF_ORDER_BATCH')
+            else:
+                previous = db.execute('SELECT data_as_of FROM etl.source_state WHERE source=?', (source,)).fetchone()
+                if previous and data_as_of < timestamp(previous[0]):
+                    raise Rejected('OUT_OF_ORDER_BATCH')
             snapshot_date = started[:10]  # First successful observed state per UTC day.
             take_snapshot = db.execute('SELECT 1 FROM etl.snapshot_batch WHERE snapshot_date=? AND source=?',
                                        (snapshot_date, source)).fetchone() is None
@@ -120,17 +158,28 @@ def load(db, source, extract):
                         ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id,
                         project_id=excluded.project_id,work_item_id=excluded.work_item_id,
                         logged_date=excluded.logged_date,hours_cents=excluded.hours_cents""", row)
+            if source == 'planning' and scope:
+                prune_planning(db, scope, entities)
             from star import refresh
             refresh(db,data_as_of,batch_id)
             from maintenance import reconcile
-            reconcile(db,source,entities)
+            reconcile(db,source,entities,scope=scope if source == 'planning' else None)
             completed = now()
+            # Planning freshness does not move back when an older batch of
+            # another portfolio is replayed later in the same slot.
             db.execute('''INSERT INTO etl.source_state VALUES (?,?,?)
-                ON CONFLICT(source) DO UPDATE SET data_as_of=excluded.data_as_of,loaded_at=excluded.loaded_at''',
+                ON CONFLICT(source) DO UPDATE SET data_as_of=CASE WHEN etl.source_state.source='planning'
+                AND etl.source_state.data_as_of>excluded.data_as_of THEN etl.source_state.data_as_of
+                ELSE excluded.data_as_of END,loaded_at=excluded.loaded_at''',
                        (source, data_as_of, completed))
             db.execute("""INSERT INTO etl.checkpoint VALUES (?,?,?)
                 ON CONFLICT(source) DO UPDATE SET value=excluded.value,loaded_at=excluded.loaded_at""",
                        (source, checkpoint, completed))
+            if source == 'planning' and scope:
+                # Checkpoint (portfolioId, batchId, dataAsOf) only after the whole batch.
+                db.execute("""INSERT INTO etl.checkpoint VALUES (?,?,?)
+                    ON CONFLICT(source) DO UPDATE SET value=excluded.value,loaded_at=excluded.loaded_at""",
+                           ('planning:' + scope, json.dumps({'batchId': checkpoint, 'dataAsOf': data_as_of}), completed))
             db.execute("UPDATE etl.batch SET status='LOADED',completed_at=? WHERE id=?", (completed, batch_id))
             # Payloads live in source_record; staging is not retained indefinitely.
             db.execute("DELETE FROM stg.record WHERE batch_id=?", (batch_id,))
@@ -170,13 +219,32 @@ def tracker_extract(client):
             'history': history, 'statuses': statuses}, started, started, facts
 
 
-def planning_extract(client, portfolio_id):
-    manifest, rows = planning(client, portfolio_id)
-    entities = {}
+def planning_extract(client, portfolio_id, slot=None):
+    manifest, rows = planning(client, portfolio_id, slot)
+    # Only top-level rows are used. Arrays nested in plan.data (demands,
+    # allocations) repeat the same entities and are never counted again.
+    entities = {kind: [] for kind in PLANNING_TABLES}
     for row in rows:
-        entities.setdefault(row["entityType"], []).append({"id": row["entityId"], "data": row["data"],
-                                                        "batchId": manifest["batchId"]})
+        entities[row["entityType"]].append({"id": row["entityId"], "data": row["data"],
+                                            "batchId": manifest["batchId"], "portfolioId": portfolio_id})
     return entities, manifest["batchId"], manifest["dataAsOf"], None
+
+
+def pending_planning_requests(db):
+    return db.execute("SELECT aggregate_id,requested_at FROM etl.reload_request "
+                      "WHERE source='planning' AND status='PENDING'").fetchall()
+
+
+def complete_planning_requests(db, data_as_of, pending):
+    """A signal is served only by a batch observed after it; otherwise it stays
+    PENDING and the next hourly slot creates a newer batch."""
+    projects = {json.loads(p).get('data', {}).get('projectId') for (p,) in
+                db.execute("SELECT payload FROM dwh.source_record WHERE source='planning' AND entity='plan'")}
+    with db.transaction():
+        for aggregate, requested in pending:
+            if (aggregate in projects or aggregate == '*') and timestamp(requested) <= data_as_of:
+                db.execute("UPDATE etl.reload_request SET status='COMPLETED' WHERE source='planning' "
+                           "AND aggregate_id=? AND requested_at=?", (aggregate, requested))
 
 
 def catalog_extract(client, source):
@@ -196,7 +264,21 @@ def run_once(args):
     try:
         db.initialize()
         if args.source == "planning":
-            extract = lambda: planning_extract(client, args.portfolio_id)
+            pending = pending_planning_requests(db)
+            if getattr(args, 'only_if_requested', False) and not pending:
+                return {"status": "SKIPPED", "reason": "NO_PLANNING_SIGNAL"}
+            extract = lambda: planning_extract(client, args.portfolio_id, getattr(args, 'export_slot', None))
+            try:
+                result = load(db, args.source, extract, scope=args.portfolio_id)
+            except Rejected as error:
+                if str(error) != 'OUT_OF_ORDER_BATCH':
+                    raise
+                # The slot replayed a batch older than one already loaded
+                # (for example after a manual run): nothing newer to merge.
+                return {"status": "SKIPPED", "reason": "SUPERSEDED_BATCH"}
+            if pending:
+                complete_planning_requests(db, result["dataAsOf"], pending)
+            return result
         elif args.source == "tracker":
             extract = lambda: tracker_extract(client)
         else:
@@ -213,6 +295,9 @@ def main():
     parser.add_argument('--source', choices=['tracker', 'planning', 'reference', 'qa'], default='tracker')
     parser.add_argument('--url', required=True)
     parser.add_argument('--portfolio-id')
+    parser.add_argument('--only-if-requested', action='store_true',
+                        help='Planning: run only when a Planning signal is pending (hourly CronJob)')
+    parser.add_argument('--export-slot', help='Planning: Idempotency-Key slot, default is the current UTC hour')
     parser.add_argument('--allow-http', action='store_true', help='Only for an isolated local stand')
     parser.add_argument('--every', type=float, help='Repeat at this interval in seconds; skip missed ticks')
     parser.add_argument('--runs', type=int, default=0, help='Stop after N runs; 0 repeats until SIGTERM')
@@ -233,7 +318,7 @@ def main():
     except Exception:
         result = {'status': 'REJECTED', 'error': 'DEPENDENCY_UNAVAILABLE'}
     print(json.dumps(result))
-    return 0 if result['status'] == 'LOADED' else 1
+    return 0 if result['status'] in ('LOADED', 'SKIPPED') else 1
 
 
 if __name__ == "__main__":

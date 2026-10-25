@@ -256,16 +256,22 @@ class Engine:
         result=[]
         plans=self.records('planning','plan')
         item_projects={i.get('id'):p['data'].get('projectId') for p in plans for i in p['data'].get('items',[])}
+        # Planning exports ACTIVE, APPROVED and SUPERSEDED versions; each has
+        # its own demands/allocations. The version is known via planItemId.
+        item_versions={i.get('id'):p['id'] for p in plans for i in p['data'].get('items',[])}
+        version_status={p['id']:p['data'].get('status') for p in plans}
         demand_by_id={d['id']:d['data'] for d in self.records('planning','demand')}
         for record in self.records('planning',entity):
             item=record.get('data',{})
             demand=demand_by_id.get(item.get('demandId'),{})
+            version=item.get('planVersionId') or item_versions.get(item.get('planItemId') or demand.get('planItemId'))
             pid=item.get('projectId') or item_projects.get(item.get('planItemId') or demand.get('planItemId'))
             if not pid and entity=='plan': pid=item.get('projectId')
             if not pid and item.get('planVersionId'):
                 plan=next((p['data'] for p in self.records('planning','plan') if p['id']==item['planVersionId']),{})
                 pid=plan.get('projectId')
-            result.append(dict(item,record=record['id'],project=self.link('planning-project',pid) if pid else None,
+            result.append(dict(item,record=record['id'],planVersion=version,planStatus=version_status.get(version),
+                               project=self.link('planning-project',pid) if pid else None,
                                employee=self.link('planning-employee',item.get('employeeId')) if item.get('employeeId') else None,
                                role=item.get('roleCode') or demand.get('roleCode'),grade=item.get('gradeCode') or demand.get('gradeCode')))
         return result
@@ -328,8 +334,13 @@ class Engine:
                 if start<first or end>last:
                     self.notes.add('PARTIAL_PLANNING_PERIOD_NOT_PRORATED'); return False
                 return True
-            demands=[r for r in visible(self.planning_rows('demand')) if within(r)]
-            allocations=[r for r in visible(self.planning_rows('allocation')) if within(r) and r.get('status')!='CANCELLED']
+            # Only the ACTIVE plan version is current: SUPERSEDED/APPROVED
+            # versions repeat the same work and would double planned hours.
+            def current(row):
+                if row.get('planStatus') in (None,'ACTIVE'): return True
+                self.notes.add('NON_ACTIVE_PLAN_VERSIONS_EXCLUDED'); return False
+            demands=[r for r in visible(self.planning_rows('demand')) if within(r) and current(r)]
+            allocations=[r for r in visible(self.planning_rows('allocation')) if within(r) and current(r) and r.get('status')!='CANCELLED']
             for a in self.planning_rows('availability'):
                 if not within(a) or a.get('status')!='CONFIRMED': continue
                 joins={(r.get('project'),r.get('role'),r.get('grade')) for r in [*allocations,*logs] if r.get('employee')==a.get('employee') and a.get('employee') is not None}

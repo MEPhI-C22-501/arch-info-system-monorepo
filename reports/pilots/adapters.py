@@ -5,8 +5,13 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections import Counter
 from datetime import datetime, timezone
+
+# Fixed namespace: the same portfolio and slot always give the same key, so a
+# retried or repeated POST /exports returns the owner's stored batch.
+EXPORT_KEY_NAMESPACE = uuid.UUID("6f3c2a1e-9b7d-5e4f-8a2c-1d0e9f8b7a65")
 
 
 class Rejected(ValueError):
@@ -29,7 +34,7 @@ class Client:
         self.last_request = 0.0
         self.opener = urllib.request.build_opener(NoRedirect)
 
-    def request(self, path, params=None, body=None):
+    def request(self, path, params=None, body=None, *, idempotency_key=None):
         if not path.startswith("/") or ".." in path or "?" in path:
             raise ValueError("Invalid source path")
         url = self.base + path
@@ -41,9 +46,11 @@ class Client:
         data = None if body is None else json.dumps(body).encode()
         if data is not None:
             headers["Content-Type"] = "application/json"
-        # POST /exports is deliberately not retried: a lost reply may have
-        # created a batch. Safe retry/Idempotency-Key needs the owner's contract.
-        attempts = 1 if body is not None else 4
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        # A POST is retried only with an Idempotency-Key: the owner replays the
+        # stored response, so a lost reply cannot create a second object.
+        attempts = 4 if body is None or idempotency_key else 1
         for attempt in range(attempts):
             time.sleep(max(0, self.last_request + self.interval - time.monotonic()))
             self.last_request = time.monotonic()
@@ -147,14 +154,28 @@ def reference(client, resource):
     raise Rejected("PAGE_LIMIT")
 
 
-def planning(client, portfolio_id):
-    created = client.request("/api/v1/exports", body={"portfolioId": portfolio_id})
+def export_slot(moment=None):
+    """One UTC hour: at most one new Planning batch per portfolio per slot."""
+    return (moment or datetime.now(timezone.utc)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H")
+
+
+def export_key(portfolio_id, slot):
+    return str(uuid.uuid5(EXPORT_KEY_NAMESPACE, f"reports:planning-export:v1:{portfolio_id}:{slot}"))
+
+
+def planning(client, portfolio_id, slot=None):
+    created = client.request("/api/v1/exports", body={"portfolioId": portfolio_id},
+                             idempotency_key=export_key(portfolio_id, slot or export_slot()))
     batch_id = created.get("batchId")
     if not isinstance(batch_id, str) or not batch_id or "/" in batch_id:
         raise Rejected("INVALID_BATCH_ID")
+    if created.get("portfolioId") not in (None, portfolio_id):
+        raise Rejected("FOREIGN_BATCH")
     path = "/api/v1/exports/" + batch_id
     manifest = client.request(path)
     validate_manifest(manifest, batch_id)
+    if manifest.get("portfolioId") not in (None, portfolio_id):
+        raise Rejected("FOREIGN_BATCH")
     rows, cursors, cursor = [], set(), None
     for _ in range(10000):
         params = {"pageSize": 200}

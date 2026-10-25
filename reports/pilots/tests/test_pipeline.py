@@ -55,7 +55,7 @@ class Batch:
                          'counts': [{'entityType': k, 'count': int(k == 'forecast')}
                                     for k in ['plan', 'demand', 'availability', 'allocation', 'forecast']]}
 
-    def request(self, path, params=None, body=None):
+    def request(self, path, params=None, body=None, idempotency_key=None):
         if path.endswith('/rows'):
             return {'batchId': self.manifest['batchId'], 'dataAsOf': self.manifest['dataAsOf'],
                     'items': self.rows, 'nextCursor': None}
@@ -190,7 +190,10 @@ class Pipeline(unittest.TestCase):
         raw = json.loads(self.db.execute('SELECT payload FROM dwh.source_record').fetchone()[0])
         self.assertEqual(raw['data']['quality'], 'PARTIAL')
         self.assertNotIn('rate', raw['data'])
-        self.assertEqual(self.db.execute('SELECT value FROM etl.checkpoint').fetchone()[0], 'batch-1')
+        self.assertEqual(self.db.execute("SELECT value FROM etl.checkpoint WHERE source='planning'").fetchone()[0], 'batch-1')
+        portfolio = json.loads(self.db.execute(
+            "SELECT value FROM etl.checkpoint WHERE source='planning:portfolio'").fetchone()[0])
+        self.assertEqual(portfolio['batchId'], 'batch-1')
 
     def test_expired_unsupported_and_bad_count_batches_rejected(self):
         for field, value in [('expiresAt', '2000-01-01T00:00:00Z'), ('schemaVersion', '2.0.0'), ('status', 'EXPIRED')]:
@@ -206,7 +209,7 @@ class Pipeline(unittest.TestCase):
         with self.assertRaisesRegex(Rejected, 'DUPLICATE'):
             planning(client, 'portfolio')
         class Foreign(Batch):
-            def request(self, path, params=None, body=None):
+            def request(self, path, params=None, body=None, idempotency_key=None):
                 result = super().request(path, params, body)
                 if path.endswith('/rows'): result['batchId'] = 'foreign'
                 return result
@@ -216,7 +219,7 @@ class Pipeline(unittest.TestCase):
     def test_planning_permission_or_expiry_change_before_merge_rejected(self):
         class Expires(Batch):
             reads = 0
-            def request(self, path, params=None, body=None):
+            def request(self, path, params=None, body=None, idempotency_key=None):
                 result = super().request(path, params, body)
                 if path.endswith('/batch-1'):
                     self.reads += 1

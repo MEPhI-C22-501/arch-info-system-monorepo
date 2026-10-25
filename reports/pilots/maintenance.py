@@ -15,7 +15,7 @@ def migrate(db):
     db.execute('''CREATE TABLE IF NOT EXISTS etl.snapshot_gap(day TEXT PRIMARY KEY,status TEXT NOT NULL,detected_at TEXT NOT NULL)''')
 
 
-def reconcile(db,source,entities=None,at=None):
+def reconcile(db,source,entities=None,at=None,scope=None):
     at=at or stamp();result=[]
     if entities is None:
         entities={entity:[{'id':eid} for (eid,) in db.execute('SELECT entity_id FROM dwh.source_record WHERE source=? AND entity=?',(source,entity))]
@@ -27,7 +27,12 @@ def reconcile(db,source,entities=None,at=None):
     for entity,rows in entities.items():
         expected={str(r['id']) for r in rows}
         table=TABLES.get((source,entity))
-        actual={r[0] for r in db.execute(f'SELECT id FROM ops.{table} WHERE source=?',(source,))} if mode=='LOCAL' and table else {r[0] for r in db.execute('SELECT entity_id FROM dwh.source_record WHERE source=? AND entity=?',(source,entity))}
+        if mode=='LOCAL' and table:actual={r[0] for r in db.execute(f'SELECT id FROM ops.{table} WHERE source=?',(source,))}
+        else:
+            # A Planning batch covers one portfolio; records of other
+            # portfolios are not drift of this batch.
+            actual={eid for eid,payload in db.execute('SELECT entity_id,payload FROM dwh.source_record WHERE source=? AND entity=?',(source,entity))
+                    if scope is None or json.loads(payload).get('portfolioId',scope)==scope}
         missing=expected-actual;extra=actual-expected
         status=mode+('_DRIFT' if missing or extra else '_MATCH')
         db.execute('INSERT INTO etl.reconciliation VALUES (?,?,?,?,?,?,?,?,?)',(str(uuid.uuid4()),source,entity,len(expected),len(actual),len(missing),len(extra),at,status))
