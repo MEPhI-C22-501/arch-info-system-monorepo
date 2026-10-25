@@ -1,0 +1,78 @@
+{
+  "captured_at_utc": "2026-10-24T21:49:35.450134+00:00",
+  "context": "colima-reports",
+  "docker_cli": "29.9.2",
+  "docker_engine": "29.5.2",
+  "architecture": "arm64",
+  "runtime": "Colima 0.10.3",
+  "vm_cpus": 6,
+  "vm_memory_gib": 10,
+  "queue_cache_driver": "memory",
+  "sql_push_down": false,
+  "cubestore_verified": false,
+  "services": [
+    {
+      "name": "reports-pilot-superset-1",
+      "image": "reports-pilot-superset",
+      "status": "Up 9 minutes (healthy)",
+      "ports": "127.0.0.1:8088->8088/tcp"
+    },
+    {
+      "name": "reports-pilot-cube-1",
+      "image": "cubejs/cube:v1.6.75",
+      "status": "Up 9 minutes",
+      "ports": "127.0.0.1:4000->4000/tcp"
+    },
+    {
+      "name": "reports-pilot-api-1",
+      "image": "reports-pilot-api",
+      "status": "Up 9 minutes (healthy)",
+      "ports": "127.0.0.1:8081->8081/tcp"
+    },
+    {
+      "name": "reports-pilot-product-jobs-1",
+      "image": "reports-pilot-product-jobs",
+      "status": "Up 9 minutes",
+      "ports": ""
+    },
+    {
+      "name": "reports-pilot-etl-scheduler-1",
+      "image": "reports-pilot-etl-scheduler",
+      "status": "Up 9 minutes (healthy)",
+      "ports": ""
+    },
+    {
+      "name": "reports-pilot-etl-1",
+      "image": "reports-pilot-etl",
+      "status": "Exited (0) 9 minutes ago",
+      "ports": ""
+    },
+    {
+      "name": "reports-pilot-mock-tracker-1",
+      "image": "reports-pilot-mock-tracker",
+      "status": "Up 9 minutes (healthy)",
+      "ports": ""
+    },
+    {
+      "name": "reports-pilot-provision-1",
+      "image": "reports-pilot-provision",
+      "status": "Exited (0) 9 minutes ago",
+      "ports": ""
+    },
+    {
+      "name": "reports-pilot-postgres-1",
+      "image": "postgres:16.13",
+      "status": "Up 10 minutes (healthy)",
+      "ports": "5432/tcp"
+    },
+    {
+      "name": "reports-pilot-keycloak-1",
+      "image": "quay.io/keycloak/keycloak:26.8.1",
+      "status": "Up 10 minutes",
+      "ports": "8443/tcp, 9000/tcp, 127.0.0.1:8180->8080/tcp"
+    }
+  ],
+  "keycloak_persistent_volume": true,
+  "keycloak_container_recreated": true,
+  "access_retested_after_recreation": true
+}

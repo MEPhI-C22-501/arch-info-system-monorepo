@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Reports API
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   description: >-
     API подсистемы отчётности Reports. Контракт описан в reports/docs/130.api-contracts.md.
     Статус draft снимается после согласования Q-REP-04 и Q-REP-05.
@@ -19,6 +19,7 @@ tags:
   - name: etl
   - name: embed
   - name: health
+  - name: audit
 paths:
   /reports:
     get:
@@ -123,6 +124,64 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/Unprocessable'
+  /reports/{reportId}/print:
+    post:
+      tags: [reports]
+      operationId: printReport
+      summary: Escaped HTML print view in the current data scope
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportQuery'
+      responses:
+        '200':
+          description: Print view with restrictive Content-Security-Policy
+          content:
+            text/html:
+              schema: {type: string}
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /audit:
+    get:
+      tags: [audit]
+      operationId: listAudit
+      summary: Admin-only append-only audit, no raw query or token values
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [auditId, actor, action, result, at, correlationId]
+                      properties:
+                        auditId: {type: string, format: uuid}
+                        actor: {type: string}
+                        action: {type: string}
+                        reportId: {type: string, nullable: true}
+                        resourceId: {type: string, nullable: true}
+                        queryHash: {type: string, nullable: true}
+                        result: {type: string}
+                        at: {type: string, format: date-time}
+                        correlationId: {type: string, format: uuid}
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /views:
     get:
       tags: [views]

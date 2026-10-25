@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "checked_at_utc": "2026-10-24T23:42:05.199402+00:00",
+  "checks": [
+    "real_pkce_three_users",
+    "all_eleven_reports_real_app_role",
+    "member_report_and_data_scope",
+    "owned_views",
+    "csv_xlsx_worker_and_owner_download",
+    "live_keycloak_recipient_revocation_and_scoped_delivery",
+    "admin_only_audit",
+    "ui_static_csp"
+  ],
+  "real_keycloak": true,
+  "real_reports_app_database_role": true,
+  "real_worker": true,
+  "browser_rendering_verified": false,
+  "test_subscription_completed": true,
+  "member_role_restored": true,
+  "source_integrations": "synthetic local sources",
+  "source_sha256": {
+    "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
+    "reports/pilots/product_http.py": "81d59f7134e965e518b8ed069a25c801c70bf76056120a62507ca7feafe779d1",
+    "reports/pilots/product_store.py": "4a068c16743523fb6c9c810d67291b001e429fa4ff03bca77b8790ba419a9601",
+    "reports/pilots/report_engine.py": "bdde15063e43abd1ee0716e4fe492f3871c59ca4167a722df4665e78eafcdf2a",
+    "reports/pilots/product_service.py": "c1cd7c3288c2e23701527b8e906030a8d87ef80923f1a0ceed8ca2991289d0a8",
+    "reports/pilots/product_jobs.py": "21afd57f6449ea316860943bebb614b99f37a614f5364554bdebc3fb10ed3433",
+    "reports/pilots/delivery.py": "8b61a16e601041b4ea13c90aaf175f71399bd873b070fbb9cbef3c604a444784",
+    "reports/pilots/product_ui.py": "a0ee4992ee41e1e6c25ab06df0f26488227dd0b52f422b53eed35782f48d66c6",
+    "reports/pilots/product_demo.py": "49dae11ed2ec84d74d038153a063c97543d1c1be46144a31041c4f92175905aa",
+    "reports/pilots/product_fixture.py": "5c88969800358c354ec3842bc957868633d9044bd873bd376da14c90245b9998",
+    "reports/pilots/provision.py": "3a51a825e0cde1e5eb2c16c4a047c015fcffcd454f62c9c540b7116452d6e013",
+    "reports/pilots/compose.yaml": "a93ac05d84d235f607724af02599db869543e1b18a80033baf3097c50e723757",
+    "reports/pilots/check_product.py": "4ceddc5504d74cf3b2df00c49c424466912f7e3795548f5269b7b59cec8ccce3",
+    "reports/pilots/ui/index.html": "843e71c2597839cb97a65cf5c238a1c2515239f6507d9dadc57d30545918adf1",
+    "reports/pilots/ui/app.js": "a237f9e65ecd5379ae5d6614e585eff3915315b29790ed2a955b7a72774e877f",
+    "reports/pilots/ui/styles.css": "7291eb434cc9d6dd9f8b422e7e0e617ff937c30dff8240d8570ff01f8cbfdab2"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "reports-cube-pilot",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "@cubejs-backend/server": "1.6.75",
+    "@cubejs-backend/postgres-driver": "1.6.75"
+  }
+}

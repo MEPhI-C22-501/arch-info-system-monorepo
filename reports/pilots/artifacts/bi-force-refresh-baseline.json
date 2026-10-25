@@ -1,0 +1,31 @@
+{
+  "checked_at_utc": "2026-10-24T19:21:53.934259+00:00",
+  "clients": 20,
+  "requests": 100,
+  "accounts": 2,
+  "source_time_logs": 6,
+  "cache": "Cube warm; Superset force reload",
+  "scope": "Chart data API including RLS; excludes browser rendering and the million-row Cube test",
+  "p95_seconds": 3.9656,
+  "threshold_seconds": 3,
+  "passed": false,
+  "source_sha256": {
+    "reports/pilots/compose.yaml": "b9ba54607709d8fc1b87d1b2ffa750f69e6d8f1efe0619b99078abdab77f7b04",
+    "reports/pilots/check_bi.py": "952e1e3eab5f9952cd4a7cb2578f1226b4da53d7173bf7453429ffeab9792a89",
+    "reports/pilots/provision.py": "522a3365b9c49a01e4f941b4673d70c4c687a49f18b15eb33fd0cb4d8eef5087",
+    "reports/pilots/db.py": "4bdd4992a14d1c4f7fa0c8e8db64f6b04967788acbe81dc0a418c169c08ab19f",
+    "reports/pilots/contracts.py": "05dea325e49d5f12d175cc7d9bc7fdb33f4ac8dbe5b51679f97e199e4dee40be",
+    "reports/pilots/etl.py": "9b1fcb8c16af6da67370fd048c93d38ad1329abbe9b879751f75b896b0d8d284",
+    "reports/pilots/cube/cube.js": "1d2031d0acaf9d6483b4b333a61145e94c930f0823a014eba15ca74d696b40d1",
+    "reports/pilots/cube/dataset.sql": "53cb0e7573dadf5ab88c70ea35afaf9d9cbe1f90b7bbba31011086b4eaeef4fe",
+    "reports/pilots/cube/model/TimeLogs.js": "07d4dbb8f306c767cde50164970ae8ec1cc72416cd569d20a9b44601fbe3580c",
+    "reports/pilots/worker.py": "0b128768740685ab0ebfc6d94548d914188002fca55b0154df7808e1f344c651",
+    "reports/pilots/demo.py": "e65fd0226f174c51f5557765266e8fcf008aed843fc0dc6840e0df1afb7825ae",
+    "reports/pilots/api.py": "82aaf18ecfb41b70a2bab7f8dd36631c624d9fbb9930250e2b9816ff60b4428d",
+    "reports/pilots/superset/setup_bi.py": "bd67b1c21a9ba7522fe98c6587375b9ef7368866060b6d5a402edf7456bc5ae7",
+    "reports/pilots/superset/superset_config.py": "453c089002f107673195b9286a4fb029c75b3c3fe6a26df29007269717874cba",
+    "reports/pilots/superset/session_policy.py": "51fc376d9f0ae237fc0e31b3a8429164e04960edb0136ba0ec679e3ee3fd4f42",
+    "reports/pilots/superset/check_session.py": "f7f91463be5be73e8bddbbf0493e329c4b6494f640a09bc3a46448f3138c9281",
+    "reports/pilots/superset/Dockerfile": "9051ddbfd3d0911e0d16cf8e59a8882a605d5630c55b6069c6668d73f4999047"
+  }
+}
