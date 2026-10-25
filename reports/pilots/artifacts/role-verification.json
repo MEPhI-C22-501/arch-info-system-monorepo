@@ -1,0 +1,24 @@
+{
+  "checked_at_utc": "2026-10-24T23:41:20.992676+00:00",
+  "passed": true,
+  "rotation_refresh_seconds": 0.028,
+  "checks": [
+    "new_login_denied_after_role_revocation",
+    "original_role_restored",
+    "new_login_allowed_after_restore",
+    "api_jwks_refresh_after_key_rotation",
+    "cube_jwks_refresh_after_key_rotation",
+    "superset_login_with_rotated_key",
+    "original_signing_key_restored",
+    "temporary_client_removed"
+  ],
+  "limitation": "Existing sessions end at verified access-token expiry; instant back-channel revocation is not implemented",
+  "source_sha256": {
+    "reports/pilots/check_roles.py": "86e2f8b56dcf515fae39cc176db6ac643bb844ec923a27c84f059fe9f6e16bee",
+    "reports/pilots/check_bi.py": "29aec2b4d52e0da28e2bf5d3660041c13cdb2f10c9f28544b25dec2375ce96f7",
+    "reports/pilots/superset/superset_config.py": "e86db918f2e5310405c579e51b3724ca15fc59d0456d291ec13aaea9bc3d0d86",
+    "reports/pilots/superset/session_policy.py": "a20c28b094b66e310041e6f65945aa40798b6b04ae46553f8faed74b97169fa6",
+    "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
+    "reports/pilots/cube/cube.js": "dc222426ece93bea00a7bc48042a083fffc6b206a5c6f3e7b008791181e190fe"
+  }
+}

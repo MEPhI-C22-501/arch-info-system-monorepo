@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "captured_at_utc": "2026-10-24T21:49:35.268424+00:00",
+  "url": "http://localhost:8081/ui/",
+  "account": "synthetic admin with reports-admin and reports-analyst",
+  "real_pkce_login": true,
+  "report": "R-06",
+  "observed_totals": {
+    "actual": 11.25,
+    "planned": 10,
+    "remaining": -1.25,
+    "overrun": 1.25
+  },
+  "xss_literal_text_visible": true,
+  "xss_injected_images": 0,
+  "xss_test_view_removed": true,
+  "screenshots": [
+    "screenshots/product-r06.png",
+    "screenshots/product-xss.png"
+  ],
+  "source_sha256": {
+    "reports/pilots/ui/index.html": "843e71c2597839cb97a65cf5c238a1c2515239f6507d9dadc57d30545918adf1",
+    "reports/pilots/ui/app.js": "11d595589fb04ae5214ef575e9aa12243bfdaa517601003fd549d2cb865c5e50",
+    "reports/pilots/ui/styles.css": "7291eb434cc9d6dd9f8b422e7e0e617ff937c30dff8240d8570ff01f8cbfdab2",
+    "reports/pilots/product_ui.py": "cdff72007c74d33b2d08f609907f2f7ef9e40be4ada5934f9d8d8b4ce7da990e",
+    "reports/pilots/report_engine.py": "1fbda6ea8889d0aa0cce80d06788fddd3ce32d8df33043d0488bd846b43998e3"
+  },
+  "final_capture_at_utc": "2026-10-24T21:52:04.574060+00:00",
+  "session_expiry_and_sso_relogin_observed": true,
+  "screenshot_sha256": {
+    "screenshots/product-r06.png": "b5737663f84191e1dda56d079d264753c93cd04d880e5b5e648a90d1cd93fa85",
+    "screenshots/product-xss.png": "cf56ee47fc4e40659cbf4c1e08d563ec9080e1972df2b60eeef4037524b085e0"
+  }
+}

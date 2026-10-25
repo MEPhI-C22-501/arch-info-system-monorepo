@@ -1,0 +1,218 @@
+name: reports-pilot
+x-app: &app
+  build: .
+  environment: &app-env
+    REPORTS_DATABASE_URL: ${REPORTS_DATABASE_URL:?Use launch.py}
+    REPORTS_OIDC_ISSUER: http://localhost:8180/realms/reports-pilot
+    REPORTS_OIDC_JWKS_URL: http://keycloak:8080/realms/reports-pilot/protocol/openid-connect/certs
+    REPORTS_BIND: 0.0.0.0
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      test: [CMD-SHELL, /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+  event-topics:
+    <<: *app
+    command: [python, event_runner.py, --init]
+    depends_on:
+      kafka: {condition: service_healthy}
+  events:
+    <<: *app
+    command: [python, event_runner.py]
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      REPORTS_CONTRACT_ROOT: /contracts
+      REPORTS_DEMO_PRODUCT: "1"
+      REPORTS_TRACKER_CONTRACT: /contracts/task-tracker/docs/block-g-api-and-events/openapi.yaml
+    volumes:
+      - demo-data:/demo:ro
+      - ../../task-tracker/docs/block-g-api-and-events:/contracts/task-tracker/docs/block-g-api-and-events:ro
+      - ../../qa/docs/140.event-schema.md:/contracts/qa/docs/140.event-schema.md:ro
+      - ../../planning-system/docs/contracts/events:/contracts/planning-system/docs/contracts/events:ro
+      - ../docs/contracts/events:/docs/contracts/events:ro
+    depends_on:
+      etl: {condition: service_completed_successfully}
+      event-topics: {condition: service_completed_successfully}
+    stop_grace_period: 60s
+    healthcheck:
+      test: [CMD, python, event_runner.py, --health]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+  postgres:
+    image: postgres:16.13
+    environment:
+      POSTGRES_USER: reports_owner
+      POSTGRES_DB: reports
+      POSTGRES_PASSWORD: ${REPORTS_DB_PASSWORD:?Use launch.py}
+    volumes: [pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U reports_owner -d reports]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: [start-dev, --http-port=8080, --hostname=http://localhost:8180]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: pilot-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${REPORTS_KC_ADMIN_PASSWORD:?Use launch.py}
+    ports: ["127.0.0.1:8180:8080"]
+    # Keep UUID sub values consistent with the persisted BI metadata and DWH.
+    volumes: [kc-data:/opt/keycloak/data]
+  provision:
+    <<: *app
+    command: [python, provision.py]
+    user: "0:0"
+    environment:
+      <<: *app-env
+      REPORTS_APP_DB_PASSWORD: ${REPORTS_APP_DB_PASSWORD:?Use launch.py}
+      REPORTS_CUBE_DB_PASSWORD: ${REPORTS_CUBE_DB_PASSWORD:?Use launch.py}
+      REPORTS_SUPERSET_CLIENT_SECRET: ${REPORTS_SUPERSET_CLIENT_SECRET:?Use launch.py}
+      REPORTS_KC_ADMIN_PASSWORD: ${REPORTS_KC_ADMIN_PASSWORD:?Use launch.py}
+      REPORTS_DEMO_ADMIN_PASSWORD: ${REPORTS_DEMO_ADMIN_PASSWORD:?Use launch.py}
+      REPORTS_DEMO_MEMBER_PASSWORD: ${REPORTS_DEMO_MEMBER_PASSWORD:?Use launch.py}
+    volumes: [demo-data:/demo]
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_started}
+  mock-tracker:
+    <<: *app
+    command: [python, demo.py]
+    environment:
+      REPORTS_BIND: 0.0.0.0
+      REPORTS_DEMO_SUBJECTS: /demo/subjects.json
+      REPORTS_DEMO_PRODUCT: "1"
+    volumes: [demo-data:/demo:ro]
+    depends_on:
+      provision: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  etl:
+    <<: *app
+    command: [/bin/sh, -c, "python etl.py --url http://mock-tracker:8080 --allow-http && python product_demo.py"]
+    environment:
+      <<: *app-env
+      REPORTS_TRACKER_CONTRACT: /contracts/tracker.yaml
+    volumes:
+      - demo-data:/demo:ro
+      - ../../task-tracker/docs/block-g-api-and-events/openapi.yaml:/contracts/tracker.yaml:ro
+    depends_on:
+      mock-tracker: {condition: service_healthy}
+  api:
+    <<: *app
+    environment:
+      <<: *app-env
+      REPORTS_DATABASE_URL: ${REPORTS_APP_DATABASE_URL:?Use launch.py}
+    ports: ["127.0.0.1:8081:8081"]
+    depends_on:
+      etl: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  etl-scheduler:
+    <<: *app
+    command: [python, etl.py, --url, "http://mock-tracker:8080", --allow-http, --every, "60"]
+    environment:
+      <<: *app-env
+      REPORTS_TRACKER_CONTRACT: /contracts/tracker.yaml
+    volumes:
+      - ../../task-tracker/docs/block-g-api-and-events/openapi.yaml:/contracts/tracker.yaml:ro
+    depends_on:
+      etl: {condition: service_completed_successfully}
+    stop_grace_period: 60s
+    healthcheck:
+      test: [CMD, python, worker.py, --health, /tmp/reports-etl-tracker.json]
+      interval: 10s
+      timeout: 3s
+      retries: 18
+  product-jobs:
+    <<: *app
+    volumes: [../docs/contracts/events:/docs/contracts/events:ro]
+    command: [python, product_jobs.py]
+    environment:
+      REPORTS_DATABASE_URL: ${REPORTS_APP_DATABASE_URL:?Use launch.py}
+      REPORTS_PRODUCT_DIRECTORY: keycloak
+      REPORTS_KC_ADMIN_PASSWORD: ${REPORTS_KC_ADMIN_PASSWORD:?Use launch.py}
+    depends_on:
+      etl: {condition: service_completed_successfully}
+    stop_grace_period: 60s
+  cube:
+    image: cubejs/cube:v1.6.75
+    environment:
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: postgres
+      CUBEJS_DB_NAME: reports
+      CUBEJS_DB_USER: reports_cube
+      CUBEJS_DB_PASS: ${REPORTS_CUBE_DB_PASSWORD:?Use launch.py}
+      CUBEJS_DEV_MODE: "false"
+      CUBEJS_PG_SQL_PORT: "15432"
+      # 1.6.75 misaliases a nested virtual dataset when Superset adds ORDER BY
+      # and a PostgreSQL rollup is selected. Let Cube plan the aggregate first.
+      CUBESQL_SQL_PUSH_DOWN: "false"
+      CUBEJS_PRE_AGGREGATIONS_SCHEMA: reports_preaggregations
+      CUBEJS_PRE_AGGREGATIONS_BUILDER: "true"
+      # Single-process local pilot: rollups persist in PostgreSQL. The official
+      # Cubestore image has no ARM64 manifest and hangs under QEMU on this Mac.
+      # Shared production queues/cache require a separately verified Cubestore.
+      CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+      CUBEJS_TELEMETRY: "false"
+      REPORTS_CUBE_SQL_PASSWORD: ${REPORTS_CUBE_SQL_PASSWORD:?Use launch.py}
+      REPORTS_OIDC_ISSUER: http://localhost:8180/realms/reports-pilot
+      REPORTS_OIDC_JWKS_URL: http://keycloak:8080/realms/reports-pilot/protocol/openid-connect/certs
+    volumes: [./cube:/cube/conf:ro]
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      etl: {condition: service_completed_successfully}
+  superset:
+    build:
+      context: .
+      dockerfile: superset/Dockerfile
+    command: [/bin/sh, -c, "superset db upgrade && superset init && python /app/pythonpath/setup_bi.py && gunicorn --bind 0.0.0.0:8088 --workers 4 --worker-class gthread --threads 5 --timeout 120 'superset.app:create_app()'"]
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_SECRET_KEY: ${REPORTS_SUPERSET_SECRET_KEY:?Use launch.py}
+      REPORTS_BI_METADATA_URL: ${REPORTS_BI_METADATA_URL:?Use launch.py}
+      REPORTS_CUBE_SQL_PASSWORD: ${REPORTS_CUBE_SQL_PASSWORD:?Use launch.py}
+      REPORTS_SUPERSET_CLIENT_SECRET: ${REPORTS_SUPERSET_CLIENT_SECRET:?Use launch.py}
+      REPORTS_DEMO_ADMIN_PASSWORD: ${REPORTS_DEMO_ADMIN_PASSWORD:?Use launch.py}
+    ports: ["127.0.0.1:8088:8088"]
+    depends_on:
+      cube: {condition: service_started}
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8088/health]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+volumes:
+  pg-data:
+  kc-data:
+  demo-data:
+  kafka-data:

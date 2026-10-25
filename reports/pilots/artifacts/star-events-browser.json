@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "checked_at_utc": "2026-10-24T23:41:24.751776+00:00",
+  "method": "real browser UI",
+  "keycloak_login": true,
+  "sso_after_stack_restore": true,
+  "report": "R-06",
+  "values": {
+    "actualHours": 11.25,
+    "plannedHours": 10,
+    "remainingHours": -1.25,
+    "overrunHours": 1.25,
+    "crossCheckFinish": "2026-10-25"
+  },
+  "planningQuality": "PARTIAL",
+  "missingInputs": [
+    "RATE"
+  ],
+  "screenshot": "screenshots/star-events-r06.png",
+  "source_sha256": {
+    "reports/pilots/report_engine.py": "bdde15063e43abd1ee0716e4fe492f3871c59ca4167a722df4665e78eafcdf2a",
+    "reports/pilots/star.py": "01e74c151d145e7bc91c62e7437ffa503cdc2a3c39aecbce0100058f606bf411",
+    "reports/pilots/product_ui.py": "a0ee4992ee41e1e6c25ab06df0f26488227dd0b52f422b53eed35782f48d66c6",
+    "reports/pilots/ui/app.js": "a237f9e65ecd5379ae5d6614e585eff3915315b29790ed2a955b7a72774e877f",
+    "reports/pilots/product_http.py": "81d59f7134e965e518b8ed069a25c801c70bf76056120a62507ca7feafe779d1"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "verified_by": "Interactive browser through cua_repl",
+  "dashboard": "R-01",
+  "synthetic_data": true,
+  "checks": [
+    {
+      "account": "admin",
+      "hours": "11.25",
+      "screenshot": "screenshots/admin-r01.png",
+      "sha256": "ecdaeab44a9decc5f8164dc1d50fdda670ebcc6e7cb55d90fc2b80ddbf9551e5",
+      "captured_at_utc": "2026-10-24T18:30:57.415339+00:00"
+    },
+    {
+      "account": "member1",
+      "hours": "3.75",
+      "screenshot": "screenshots/member1-r01.png",
+      "sha256": "cf8e1f02f1969e6149a46100370aae2820942a0376c949c09241f1ba38944818",
+      "captured_at_utc": "2026-10-24T18:33:28.488637+00:00"
+    },
+    {
+      "account": "member2",
+      "hours": "7.50",
+      "screenshot": "screenshots/member2-r01.png",
+      "sha256": "da8f2425b7180f5c1e5e5b3fda0454e21ea43c06b058bf1f6d09935be10297f1",
+      "captured_at_utc": "2026-10-24T18:34:21.162831+00:00"
+    }
+  ],
+  "passed": true
+}
