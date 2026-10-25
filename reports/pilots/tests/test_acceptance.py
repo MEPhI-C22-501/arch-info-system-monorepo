@@ -85,7 +85,9 @@ class Acceptance(unittest.TestCase):
             self.assertEqual(self.db.execute('SELECT COUNT(*),SUM(hours_cents) FROM dwh.fact_time_log').fetchone(), (300, 56250))
             self.assertEqual(self.db.execute("SELECT COUNT(*) FROM dwh.source_record WHERE source='qa' AND entity='defects'").fetchone()[0], 15)
             self.assertEqual(self.db.execute("SELECT COUNT(*) FROM dwh.source_record WHERE source='qa' AND entity='test-runs'").fetchone()[0], 2)
-            self.assertEqual(self.db.execute('SELECT COUNT(*) FROM etl.checkpoint').fetchone()[0], 4)
+            self.assertEqual(self.db.execute("SELECT COUNT(*) FROM etl.checkpoint WHERE source NOT LIKE 'planning:%'").fetchone()[0], 4)
+            # Planning also keeps the agreed per-portfolio checkpoint (portfolioId, batchId, dataAsOf).
+            self.assertEqual(self.db.execute("SELECT COUNT(*) FROM etl.checkpoint WHERE source LIKE 'planning:%'").fetchone()[0], 1)
             self.assertEqual(self.db.execute('SELECT COUNT(*) FROM etl.snapshot_batch').fetchone()[0], 4)
             tombstone = self.db.execute("SELECT payload FROM dwh.source_record WHERE source='reference' AND entity='employees' AND entity_id='101'").fetchone()[0]
             self.assertTrue(json.loads(tombstone)['is_deleted'])

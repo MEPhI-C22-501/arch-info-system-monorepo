@@ -95,14 +95,18 @@ def migrate(db):
     for model,table in [('defects','current_defect_daily'),('status_flow','fact_status_transition'),('defect_flow','fact_defect_transition'),('test_runs','fact_test_run'),('test_results','fact_test_result'),('demands','fact_demand'),('allocations','fact_allocation'),('availability','fact_availability')]:
         suffix=' WHERE COALESCE(is_deleted,0)=0' if model=='defects' else ''
         db.execute(f'CREATE VIEW IF NOT EXISTS dwh.cube_{model} AS SELECT * FROM dwh.{table}'+suffix)
+    # Current figures use only the ACTIVE plan version (SUPERSEDED/APPROVED repeat it).
+    if db.sqlite:db.execute('DROP VIEW IF EXISTS dwh.cube_resources')
     db.execute('''CREATE VIEW IF NOT EXISTS dwh.cube_resources AS
       SELECT 'time:'||l.id AS id,l.project_id,l.user_id,l.logged_date AS day,NULL AS role_code,l.hours_cents/100.0 AS actual_hours,
         CAST(NULL AS NUMERIC) AS required_hours,CAST(NULL AS NUMERIC) AS allocated_hours,CAST(NULL AS NUMERIC) AS available_hours,
         CASE WHEN EXISTS(SELECT 1 FROM dwh.fact_availability a WHERE a.user_id=l.user_id AND a.status='CONFIRMED') THEN 1 ELSE 0 END AS capacity_known,
         CAST(NULL AS TEXT) AS period_end FROM dwh.report_time_log l
-      UNION ALL SELECT 'demand:'||id,project_id,NULL,period_start,role_code,NULL,required_hours,NULL,NULL,1,period_end FROM dwh.fact_demand
+      UNION ALL SELECT 'demand:'||id,project_id,NULL,period_start,role_code,NULL,required_hours,NULL,NULL,1,period_end FROM dwh.fact_demand dm
+        WHERE NOT EXISTS(SELECT 1 FROM dwh.plan_version v WHERE v.id=dm.plan_version_id AND v.status<>'ACTIVE')
       UNION ALL SELECT 'allocation:'||id,project_id,user_id,d.day,f.role_code,NULL,NULL,allocated_hours,NULL,1,NULL
-        FROM dwh.fact_allocation f LEFT JOIN dwh.dim_date d ON f.date_key=d.date_key WHERE status IS NULL OR status<>'CANCELLED'
+        FROM dwh.fact_allocation f LEFT JOIN dwh.dim_date d ON f.date_key=d.date_key WHERE (status IS NULL OR status<>'CANCELLED')
+          AND NOT EXISTS(SELECT 1 FROM dwh.plan_version v WHERE v.id=f.plan_version_id AND v.status<>'ACTIVE')
       UNION ALL SELECT 'availability:'||id,project_id,user_id,day,NULL,NULL,NULL,NULL,available_hours,1,NULL
         FROM (SELECT a.*,ROW_NUMBER() OVER(PARTITION BY COALESCE(user_id,id),day ORDER BY data_as_of DESC,id DESC) AS rank
           FROM dwh.fact_availability a) selected WHERE rank=1 AND status='CONFIRMED' ''')
@@ -278,6 +282,11 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
         states=[r.get('status') for _,r in latest.values() if r.get('runId')==run['id']]
         counts={name:states.count(name) for name in ['PASSED','FAILED','BLOCKED','SKIPPED','NOT_RUN']}
         upsert(db,'fact_test_run',run['id'],dict(run_id=run['id'],test_plan_key=k('test_plan','qa',run.get('planId')),project_key=project(run.get('project')),iteration_key=k('iteration','tracker',run.get('iteration')),project_id=run.get('project'),user_id=run.get('employee'),status=run.get('status'),started_at=run.get('startedAt'),finished_at=run.get('finishedAt'),case_count=run.get('caseCount',run.get('summary',{}).get('total')),passed=counts['PASSED'],failed=counts['FAILED'],blocked=counts['BLOCKED'],skipped=counts['SKIPPED'],not_run=counts['NOT_RUN']),next(r for r in records(db,'qa','test-runs') if r['id']==run['id']),at)
+    # Planning 1.0.0 demand/allocation rows carry no planVersionId: the version
+    # is the plan row whose items contain planItemId, reached via demandId.
+    item_version={i.get('id'):plan['id'] for plan in plans for i in plan.get('data',{}).get('items',[])}
+    demand_version={d['id']:d.get('data',{}).get('planVersionId') or item_version.get(d.get('data',{}).get('planItemId'))
+                    for d in records(db,'planning','demand')}
     for entity in ['demand','allocation','availability','forecast']:
         for r in engine.planning_rows(entity):
             original=next(v for v in records(db,'planning',entity) if v['id']==r['record']);p=original.get('data',{});when=p.get('date') or p.get('periodStart') or p.get('dataAsOf') or at
@@ -287,8 +296,8 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
                 start=p.get('periodStart');end=p.get('periodEnd');week=-1
                 if start and end and date.fromisoformat(start).isocalendar()[:2]==date.fromisoformat(end).isocalendar()[:2]:week=date_key(db,(date.fromisoformat(start)-__import__('datetime').timedelta(days=date.fromisoformat(start).weekday())).isoformat())
                 else:db.execute("INSERT INTO etl.star_issue VALUES ('planning','demand',?,'UNSPLIT_SOURCE_PERIOD',?) ON CONFLICT DO NOTHING",(r['record'],at))
-                common.update(plan_version_id=p.get('planVersionId'),demand_id=r['record'],project_role_key=k('project_role','reference',p.get('roleCode')),week_key=week,role_code=p.get('roleCode'),grade_code=p.get('gradeCode'),period_start=start,period_end=end,required_hours=numeric(p.get('hours')))
-            elif entity=='allocation':common.update(plan_version_id=p.get('planVersionId'),demand_id=p.get('demandId'),employee_key=emp(r.get('employee'),when),project_role_key=k('project_role','reference',r.get('role')),week_key=date_key(db,(date.fromisoformat(when[:10])-__import__('datetime').timedelta(days=date.fromisoformat(when[:10]).weekday())).isoformat()) if when else -1,date_key=date_key(db,when),user_id=r.get('employee'),role_code=r.get('role'),allocated_hours=numeric(p.get('hours')),status=p.get('status'))
+                common.update(plan_version_id=p.get('planVersionId') or item_version.get(p.get('planItemId')),demand_id=r['record'],project_role_key=k('project_role','reference',p.get('roleCode')),week_key=week,role_code=p.get('roleCode'),grade_code=p.get('gradeCode'),period_start=start,period_end=end,required_hours=numeric(p.get('hours')))
+            elif entity=='allocation':common.update(plan_version_id=p.get('planVersionId') or demand_version.get(p.get('demandId')),demand_id=p.get('demandId'),employee_key=emp(r.get('employee'),when),project_role_key=k('project_role','reference',r.get('role')),week_key=date_key(db,(date.fromisoformat(when[:10])-__import__('datetime').timedelta(days=date.fromisoformat(when[:10]).weekday())).isoformat()) if when else -1,date_key=date_key(db,when),user_id=r.get('employee'),role_code=r.get('role'),allocated_hours=numeric(p.get('hours')),status=p.get('status'))
             elif entity=='availability':common.update(date_key=date_key(db,when),employee_key=emp(r.get('employee'),when),user_id=r.get('employee'),available_hours=numeric(p.get('availableHours')),is_absent=int((numeric(p.get('absenceHours')) or 0)>0),status=p.get('status'),day=p.get('date'))
             else:common.update(plan_version_id=p.get('planVersionId'),as_of_date_key=date_key(db,p.get('dataAsOf')),remaining_hours=numeric(p.get('remainingHours')),forecast_finish=p.get('forecastFinish'),estimated_total_cost=numeric(p.get('estimatedTotalCost')),budget_adjustment=numeric(p.get('budgetAdjustment')),currency=p.get('currencyCode'),quality=p.get('quality'),calculated_at=p.get('calculatedAt'))
             upsert(db,'fact_'+entity,r['record'],common,original,at)

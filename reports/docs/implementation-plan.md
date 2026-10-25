@@ -30,7 +30,7 @@ passed не закрывает Q-REP без ответа второй сторо
 | Q-REP-01/11 | Read-replica собственной витрины, раздельные роли, мониторинг лага и восстановление; до принятия E-10 partial | Преподаватель и Infra | 2026-10-28 |
 | Q-REP-02/03 | Tracker: REST каждые 60 секунд, допустимый лаг 15 минут; Kafka позже; полный и инкрементальный контракты с удалениями | Task Tracker и Infra | 2026-11-02 |
 | Q-REP-04/07 | Пять REST-ресурсов QA, четыре события, история REOPENED; фактические адреса и fixture | QA System | 2026-11-02 |
-| Q-REP-05 | Batch 1.0.0, TTL 24 ч; загрузка каждый час и сверка 02:00 Europe/Moscow; явные архивы/tombstone | Planning System и Infra | 2026-11-02 |
+| Q-REP-05 | Batch 1.0.0, TTL 24 ч; ежедневно 02:00 Europe/Moscow и внеочередная партия по сигналу; полный срез портфеля, текущая версия — ACTIVE | Planning System и Infra | 2026-11-02 |
 | Q-REP-10 | Соответствие проектов/эпиков Planning и локальных сущностей Tracker без подмены ID | Planning System и Task Tracker | 2026-11-02 |
 | Q-REP-15 | Python, PostgreSQL, Superset и Cube; совместимый рабочий пример Infra и лимиты ресурсов | Infra | 2026-10-28 |
 | Q-REP-16 | HR integer ID, username, Keycloak sub, TimeLog.userId и правила отзыва доступа | Reference Manager, Keycloak/Infra, Task Tracker | 2026-11-02 |
