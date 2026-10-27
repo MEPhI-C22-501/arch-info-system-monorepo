@@ -1,0 +1,45 @@
+# Локальный запуск QA System (165, раздел 1):
+#   docker compose -f qa/compose.yaml up -d --build --wait qa-api
+# Swagger: http://127.0.0.1:8090/api/v1/docs
+name: qa-system
+x-runtime: &runtime
+  DATABASE_URL: postgresql+psycopg://qa:${QA_DB_PASSWORD:-qa-local}@qa-db:5432/qa
+  APP_ENV: development
+  AUTH_MODE: demo
+services:
+  qa-db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_DB: qa
+      POSTGRES_USER: qa
+      POSTGRES_PASSWORD: ${QA_DB_PASSWORD:-qa-local}
+    volumes: ["qa-db-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qa -d qa"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  qa-migrations:
+    image: qa-system:local
+    pull_policy: never
+    command: ["python", "-m", "app", "migrate"]
+    environment: *runtime
+    depends_on:
+      qa-db: {condition: service_healthy}
+    restart: "no"
+  qa-api:
+    image: qa-system:local
+    pull_policy: build
+    build: {context: ., dockerfile: backend/Dockerfile}
+    environment: *runtime
+    ports: ["127.0.0.1:8090:8000"]
+    depends_on:
+      qa-migrations: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  qa-db-data:

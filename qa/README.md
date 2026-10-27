@@ -30,6 +30,8 @@
 
 | Путь | Содержимое |
 | --- | --- |
+| [`backend/`](backend/) | Серверная часть: FastAPI, модели и миграции по 120; запуск и правила — в [README](backend/README.md) |
+| [`compose.yaml`](compose.yaml) | Локальный запуск: `docker compose -f qa/compose.yaml up -d --build --wait qa-api` |
 | [`docs/`](docs/) | Vision, комплект документов, заявка в Infra, проверка безопасности |
 | [`api/openapi/v1/openapi.yaml`](api/openapi/v1/openapi.yaml) | Черновик спецификации API |
 | [`prototype/index.html`](prototype/index.html) | Интерактивный прототип интерфейса; открывается в браузере без сборки |
