@@ -21,6 +21,10 @@ public class PermissionPortAdapter implements PermissionPort {
         access.itemRead(Collections.singletonMap("assignee_external_id", assigneeExternalId));
     }
 
+    @Override public void requireItemReadableOrQa(String assigneeExternalId) {
+        access.itemReadOrQa(Collections.singletonMap("assignee_external_id", assigneeExternalId));
+    }
+
     @Override public void requireItemWritable(String assigneeExternalId) {
         access.itemWrite(Collections.singletonMap("assignee_external_id", assigneeExternalId));
     }

@@ -268,13 +268,16 @@ own side's assumptions — re-verify against their docs again if much time has p
   and resolve the Project/Epic master conflict the same way we now do (Planning System as master).
 - **Testing service (QA)** — `POST /bugs`'s field shape matches QA's own docs exactly, severity
   scale conversion included (QA's Blocker/Critical/Major/Minor/Trivial → our
-  critical/high/medium/low, pending our confirmation under DEC-TT-04). QA also wants read access
-  to task-tracker tasks/comments/iterations via a **separate** read-only client
-  (`qa-tracker-reader`, distinct from `testing-service`) — this role doesn't exist yet in
-  `dev/keycloak-realm.json` or `local_access`; `162.integration-spec.md` already (correctly)
-  describes this as unresolved, so no doc fix was needed there, just awareness that it's not
-  wired up. QA separately expects milestone/release context to come from Planning System, not
-  from us — nothing for task-tracker to build there.
+  critical/high/medium/low, pending our confirmation under DEC-TT-04). QA's separate read-only
+  account request (their Q-09) is now wired up: client `qa-tracker-reader` in
+  `dev/keycloak-realm.json`, checked by `AccessService.itemReadOrQa`
+  (`PermissionPort.requireItemReadableOrQa` in the Clean Architecture layer) — it bypasses
+  `local_access`/`role_permission` entirely (it's a client role, not a human role) and only
+  covers `GET /work-items/{id}` plus that item's comments; list/search, history, time logs,
+  attachments, and every write still go through the normal checks and reject it. QA separately
+  expects milestone/release context to come from Planning System, not from us — nothing for
+  task-tracker to build there; `162.integration-spec.md`'s DEC-TT-04 row has our (unconfirmed)
+  proposal that Planning System should be the source for that.
 - **Planning System** — see "Planning System now owns Project/Epic" above; it's the most
   consequential of these integrations and the only one with a confirmed field-shape match already
   in place (`openapi.yaml` vs. their `worker.py`) despite zero corresponding backend code here yet.

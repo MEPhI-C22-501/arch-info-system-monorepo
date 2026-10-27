@@ -7,5 +7,6 @@ public interface PermissionPort {
     String currentRole();
     void require(String permission);
     void requireItemReadable(String assigneeExternalId);
+    void requireItemReadableOrQa(String assigneeExternalId);
     void requireItemWritable(String assigneeExternalId);
 }

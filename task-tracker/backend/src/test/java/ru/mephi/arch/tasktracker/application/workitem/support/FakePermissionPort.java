@@ -23,6 +23,10 @@ public class FakePermissionPort implements PermissionPort {
         if ("MEMBER".equals(role) && !Objects.equals(subject, assigneeExternalId)) throw new ApiException(403, "item", "forbidden");
     }
 
+    @Override public void requireItemReadableOrQa(String assigneeExternalId) {
+        requireItemReadable(assigneeExternalId);
+    }
+
     @Override public void requireItemWritable(String assigneeExternalId) {
         require("item.update");
         if ("MEMBER".equals(role) && !Objects.equals(subject, assigneeExternalId)) throw new ApiException(403, "item", "forbidden");

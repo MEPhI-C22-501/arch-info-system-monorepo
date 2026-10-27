@@ -20,11 +20,13 @@
     { "clientId": "testing-client", "enabled": true, "publicClient": false, "secret": "testing-dev-only", "serviceAccountsEnabled": true, "standardFlowEnabled": false, "fullScopeAllowed": true,
       "protocolMappers": [{ "name": "task-tracker-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": { "included.client.audience": "task-tracker", "access.token.claim": "true", "id.token.claim": "false" } }] },
     { "clientId": "reports-client", "enabled": true, "publicClient": false, "secret": "reports-dev-only", "serviceAccountsEnabled": true, "standardFlowEnabled": false, "fullScopeAllowed": true,
+      "protocolMappers": [{ "name": "task-tracker-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": { "included.client.audience": "task-tracker", "access.token.claim": "true", "id.token.claim": "false" } }] },
+    { "clientId": "qa-tracker-reader", "enabled": true, "publicClient": false, "secret": "qa-tracker-reader-dev-only", "serviceAccountsEnabled": true, "standardFlowEnabled": false, "fullScopeAllowed": true,
       "protocolMappers": [{ "name": "task-tracker-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": { "included.client.audience": "task-tracker", "access.token.claim": "true", "id.token.claim": "false" } }] }
   ],
   "roles": {
     "client": {
-      "task-tracker": [{ "name": "testing-service" }, { "name": "reports-service" }]
+      "task-tracker": [{ "name": "testing-service" }, { "name": "reports-service" }, { "name": "qa-tracker-reader" }]
     }
   },
   "users": [
@@ -32,6 +34,7 @@
     { "id": "22222222-2222-2222-2222-222222222222", "username": "lead", "enabled": true, "email": "lead@task-tracker.dev", "emailVerified": true, "firstName": "Demo", "lastName": "Lead", "credentials": [{ "type": "password", "value": "demo12345", "temporary": false }] },
     { "id": "33333333-3333-3333-3333-333333333333", "username": "admin", "enabled": true, "email": "admin@task-tracker.dev", "emailVerified": true, "firstName": "Demo", "lastName": "Admin", "credentials": [{ "type": "password", "value": "demo12345", "temporary": false }] },
     { "username": "service-account-testing-client", "enabled": true, "serviceAccountClientId": "testing-client", "clientRoles": { "task-tracker": ["testing-service"] } },
-    { "username": "service-account-reports-client", "enabled": true, "serviceAccountClientId": "reports-client", "clientRoles": { "task-tracker": ["reports-service"] } }
+    { "username": "service-account-reports-client", "enabled": true, "serviceAccountClientId": "reports-client", "clientRoles": { "task-tracker": ["reports-service"] } },
+    { "username": "service-account-qa-tracker-reader", "enabled": true, "serviceAccountClientId": "qa-tracker-reader", "clientRoles": { "task-tracker": ["qa-tracker-reader"] } }
   ]
 }

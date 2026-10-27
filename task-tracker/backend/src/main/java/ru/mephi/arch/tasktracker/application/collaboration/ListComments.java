@@ -21,7 +21,7 @@ public class ListComments {
     /** Returns view-model maps (not the domain entity) so the wire shape — {@code authorId}, not
      * {@code authorExternalId} — stays exactly what the frontend/openapi.yaml already expect. */
     public List<Map<String, Object>> execute(UUID workItemId) {
-        permissions.requireItemReadable(workItems.getById(workItemId).assigneeId);
+        permissions.requireItemReadableOrQa(workItems.getById(workItemId).assigneeId);
         return comments.findByWorkItem(workItemId).stream()
             .<Map<String, Object>>map(c -> Map.of("id", c.id, "body", c.body, "authorId", c.authorExternalId, "createdAt", c.createdAt))
             .toList();

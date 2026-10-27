@@ -19,7 +19,7 @@ public class GetWorkItem {
 
     public Map<String, Object> execute(UUID id) {
         WorkItem item = workItems.getById(id);
-        permissions.requireItemReadable(item.assigneeId);
+        permissions.requireItemReadableOrQa(item.assigneeId);
         return view.execute(id);
     }
 }
