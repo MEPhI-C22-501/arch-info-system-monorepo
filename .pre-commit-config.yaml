@@ -1,0 +1,18 @@
+# Проверки перед коммитом. Хуки ограничены каталогами своих команд (files).
+# Установка для QA: uv run --project qa/backend pre-commit install
+repos:
+  - repo: local
+    hooks:
+      # Версии black и flake8 берутся из qa/backend/uv.lock — те же, что в CI.
+      - id: qa-black
+        name: "QA: black"
+        entry: uv run --project qa/backend black --config qa/backend/pyproject.toml
+        language: system
+        types: [python]
+        files: ^qa/backend/
+      - id: qa-flake8
+        name: "QA: flake8"
+        entry: uv run --project qa/backend flake8 --config qa/backend/.flake8
+        language: system
+        types: [python]
+        files: ^qa/backend/
