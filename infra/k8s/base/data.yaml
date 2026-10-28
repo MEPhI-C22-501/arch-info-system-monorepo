@@ -1,0 +1,242 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak-db
+spec:
+  serviceName: keycloak-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-db
+  template:
+    metadata:
+      labels:
+        app: keycloak-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18.6
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: keycloak
+            - name: POSTGRES_USER
+              value: keycloak
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: arch-infra-secrets
+                  key: KC_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "keycloak", "-d", "keycloak"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-db
+spec:
+  clusterIP: None
+  selector:
+    app: keycloak-db
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: reports-db
+spec:
+  serviceName: reports-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reports-db
+  template:
+    metadata:
+      labels:
+        app: reports-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18.6
+          args: ["postgres", "-c", "wal_level=replica", "-c", "hot_standby=on", "-c", "max_wal_senders=10"]
+          env:
+            - name: POSTGRES_DB
+              value: reports
+            - name: POSTGRES_USER
+              value: reports
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: arch-infra-secrets
+                  key: REPORTS_DB_PASSWORD
+            - name: REPORTS_REPL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: arch-infra-secrets
+                  key: REPORTS_REPL_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "reports", "-d", "reports"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: reports-db-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reports-db
+spec:
+  clusterIP: None
+  selector:
+    app: reports-db
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: reports-db-replica
+spec:
+  serviceName: reports-db-replica
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reports-db-replica
+  template:
+    metadata:
+      labels:
+        app: reports-db-replica
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18.6
+          command: ["bash", "/scripts/replica-entrypoint.sh"]
+          env:
+            - name: POSTGRES_USER
+              value: reports
+            - name: REPORTS_REPL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: arch-infra-secrets
+                  key: REPORTS_REPL_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/18/docker
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "reports", "-d", "reports"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: reports-db-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reports-db-replica
+spec:
+  clusterIP: None
+  selector:
+    app: reports-db-replica
+  ports:
+    - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reports-db-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: reports-db
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: reports-db-replica
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: arch-reports
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-db-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak-db
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - port: 5432

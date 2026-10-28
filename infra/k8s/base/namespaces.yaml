@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-task-tracker
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-planning-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-reference-manager
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-reports
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-qa

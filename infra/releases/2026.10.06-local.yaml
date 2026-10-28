@@ -1,0 +1,28 @@
+release_id: 2026.10.06-local
+status: local-only
+config_commit: uncommitted
+platform: not-selected
+tls: not-configured
+contracts:
+  catalog: infra/contracts/catalog.yaml
+  envelope: infra/contracts/schemas/envelope.schema.json
+seed: infra/seed/reports-mart.sql
+images:
+  - reference: quay.io/keycloak/keycloak:26.7.4
+    digest: sha256:82a77884f3af238beab1e7afd63b5c530e1b5c0590bd7aa60b40a40463e29b2c
+  - reference: postgres:18.6
+    digest: sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+  - reference: apache/kafka:4.3.1
+    digest: sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+  - reference: otel/opentelemetry-collector-contrib:0.149.0
+    digest: sha256:0fba96233274f6d665ac8831ad99dfe6479a9a20459f6e2719c0d20945773b46
+local_builds:
+  - reference: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+    source_tag: RELEASE.2025-10-15T17-29-55Z
+    digest: sha256:cc5db89840c1112b7b9f7bd1a765be04f48087d5bbf8c2f06ba9d064b6f7560f
+    image_manifest: sha256:d7df975fba81b2912f89d1f26bf2b3e729a0536996f19ce974cada4bae0e4cb5
+    note: digest снят docker image inspect после локальной сборки 2026-10-06
+blockers:
+  - нет площадки и TLS
+  - нет namespace реестра для публикации MinIO
+  - нет серверных поставок Planning, Reports и QA
