@@ -16,9 +16,9 @@ jobs:
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       module_path: reference-manager
-      go_version_file: reference-manager/go.mod
+      go_version_file: reference-manager/backend/go.mod
       test_command: |
         go install github.com/go-task/task/v3/cmd/task@v3.44.1
         task tests
-      dockerfile: deployments/docker/reference-manager.dockerfile
-      build_context: reference-manager
+      dockerfile: reference-manager/deployments/docker/reference-manager.dockerfile
+      build_context: reference-manager/backend
