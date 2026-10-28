@@ -1,0 +1,17 @@
+{
+  "app": "http://127.0.0.1:8080",
+  "checks": [
+    "server persistence",
+    "resource conflict and confirmation",
+    "review and activation",
+    "scenario isolation",
+    "review return",
+    "forecast",
+    "file upload",
+    "XSS escaping",
+    "role navigation",
+    "personal calendar",
+    "mobile"
+  ],
+  "errors": []
+}

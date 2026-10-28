@@ -1,0 +1,5 @@
+# build context of the interface image: only the static files, the nginx configuration is mounted at runtime
+**
+!admin/**
+admin/tests
+admin/README.md

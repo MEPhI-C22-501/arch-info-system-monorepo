@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "database_role": "reports_app",
+  "audit_select_insert_only": true,
+  "source_select_only": true,
+  "scope_and_enabled_updates_denied": true,
+  "captured_at_utc": "2026-10-24T21:49:35.411735+00:00"
+}

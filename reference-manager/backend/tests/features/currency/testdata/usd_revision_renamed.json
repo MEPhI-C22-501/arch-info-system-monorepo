@@ -1,0 +1,14 @@
+{
+  "id": 2,
+  "currency_id": 1,
+  "revision_number": 2,
+  "change": [
+    {
+      "op": "replace",
+      "path": "/name",
+      "value": "United States Dollar"
+    }
+  ],
+  "changed_by": "9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c",
+  "changed_at": "2026-10-02T10:00:00Z"
+}

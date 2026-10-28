@@ -1,0 +1,5 @@
+# Порт БД на хосте для тестов и генерации миграций:
+#   docker compose -f qa/compose.yaml -f qa/compose.dev.yaml up -d --wait qa-db
+services:
+  qa-db:
+    ports: ["127.0.0.1:5435:5432"]

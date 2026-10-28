@@ -1,0 +1,25 @@
+package: {{.Package}}
+
+generate:
+{{- if eq .Target "server"}}
+  chi-server: true
+  embedded-spec: true
+{{- else if eq .Target "models"}}
+  models: true
+{{- else}}
+  client: true
+{{- end}}
+
+output-options:
+  skip-prune: false
+  type-mapping:
+    string:
+      formats:
+        uuid:
+          type: uuid.UUID
+          import: uuid
+
+additional-imports:
+  - package: uuid
+
+output: pkg/api/v1/{{.Singular}}/{{.Target}}.gen.go

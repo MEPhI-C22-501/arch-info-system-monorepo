@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reports-cube-driver"
+version = "0.1.0"
+description = "Superset metadata adapter for the pinned read-only Cube SQL API"
+requires-python = ">=3.10"
+
+[project.entry-points."sqlalchemy.dialects"]
+"reports_cube.psycopg2" = "reports_cube.dialect:CubeDialect"
+
+[project.entry-points."superset.db_engine_specs"]
+reports_cube = "reports_cube.engine:CubeEngineSpec"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["reports_cube*"]

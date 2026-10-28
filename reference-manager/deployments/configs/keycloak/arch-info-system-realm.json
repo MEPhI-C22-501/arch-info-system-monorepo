@@ -1,0 +1,142 @@
+{
+  "realm": "arch-info-system",
+  "displayName": "ERP (local Reference Manager environment)",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      { "name": "reference-reader", "description": "Reads and exports shared classifiers and HR references (R-01)" },
+      { "name": "reference-admin", "description": "Maintains shared classifiers, reads HR references (R-02)" },
+      { "name": "reference-hr-admin", "description": "Maintains HR references, salaries and absences (R-04)" },
+      { "name": "reference-hr-reader", "description": "Reads all references including salaries and absences (R-05)" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "reference-manager",
+      "name": "Reference Manager API",
+      "description": "Resource server, the audience of the tokens accepted by the service. It has no login flows.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "reference-manager-ui",
+      "name": "Reference Manager administration interface",
+      "description": "Public client of the administration interface. Direct access grants are enabled for local development and integration tests only.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:8081/*"],
+      "webOrigins": ["http://localhost:8081"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8081/*"
+      },
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "reference-manager-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "reference-manager",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "foreign-app",
+      "name": "Application of another module",
+      "description": "Its tokens are not issued for the reference-manager audience, the service rejects them.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "username": "admin",
+      "email": "admin@reference-manager.local",
+      "firstName": "Reference",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["reference-admin"]
+    },
+    {
+      "id": "9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c",
+      "username": "second-admin",
+      "email": "second-admin@reference-manager.local",
+      "firstName": "Second",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "second-admin", "temporary": false }],
+      "realmRoles": ["reference-admin"]
+    },
+    {
+      "id": "c5a7e2d0-3b4f-4a19-8e6d-2f1b0c9d8e7a",
+      "username": "reader",
+      "email": "reader@reference-manager.local",
+      "firstName": "Reference",
+      "lastName": "Reader",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "reader", "temporary": false }],
+      "realmRoles": ["reference-reader"]
+    },
+    {
+      "id": "d81f4b6c-2e9a-4c35-b7d0-6a5e4f3c2b1d",
+      "username": "hr-admin",
+      "email": "hr-admin@reference-manager.local",
+      "firstName": "HR",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "hr-admin", "temporary": false }],
+      "realmRoles": ["reference-hr-admin"]
+    },
+    {
+      "id": "e2b9c8a7-6d5f-4e3a-9b1c-0f8e7d6c5b4a",
+      "username": "hr-reader",
+      "email": "hr-reader@reference-manager.local",
+      "firstName": "HR",
+      "lastName": "Reader",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "hr-reader", "temporary": false }],
+      "realmRoles": ["reference-hr-reader"]
+    },
+    {
+      "id": "f7a6b5c4-d3e2-4f1a-8b9c-1d2e3f4a5b6c",
+      "username": "outsider",
+      "email": "outsider@reference-manager.local",
+      "firstName": "No",
+      "lastName": "Roles",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "outsider", "temporary": false }],
+      "realmRoles": []
+    }
+  ]
+}

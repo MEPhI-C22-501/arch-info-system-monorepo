@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference Manager - администрирование</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Reference Manager <span class="muted small">/admin/, шаг 1: имитированные данные</span></h1>
+  <div class="spacer"></div>
+  <label for="role">Роль</label>
+  <select id="role"></select>
+  <span id="who" class="muted mono"></span>
+</header>
+<div class="simbar">
+  <span>Имитация сервиса:</span>
+  <label><input type="checkbox" id="kc" checked> Keycloak доступен</label>
+  <label>предел выгрузки <input type="number" id="exportLimit" min="1" max="10000"></label>
+  <button type="button" id="reset">Сбросить данные</button>
+</div>
+<main>
+  <nav class="crumbs" id="crumbs" aria-label="Навигация"></nav>
+  <div id="flash" aria-live="polite"></div>
+  <div id="view"></div>
+</main>
+<dialog id="confirm">
+  <p id="confirmText"></p>
+  <div class="toolbar">
+    <button type="button" id="confirmYes" class="danger">Подтвердить</button>
+    <button type="button" id="confirmNo">Отмена</button>
+  </div>
+</dialog>
+<script src="js/dom.js"></script>
+<script src="js/filter.js"></script>
+<script src="js/xlsx.js"></script>
+<script src="js/catalogs.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/mock-api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

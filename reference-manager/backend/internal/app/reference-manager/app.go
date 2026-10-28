@@ -1,0 +1,131 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"golang.org/x/sync/errgroup"
+
+	currencyrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres/currency"
+	currencysrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/currency"
+	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
+	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/keycloak"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/ready"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/telemetry"
+)
+
+type App struct {
+	log            *slog.Logger
+	telemetry      *telemetry.Telemetry
+	httpServer     *httpserver.Server
+	postgresClient *postgres.Client
+	verifier       *keycloak.Verifier
+}
+
+func NewApp(cfg *Config) (*App, error) {
+	telemetry, err := telemetry.NewTelemetry(&cfg.Telemetry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize telemetry: %w", err)
+	}
+
+	log := telemetry.Logger()
+
+	postgresClient, err := postgres.NewClient(&cfg.Databases.Postgres, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize postgres client: %w", err)
+	}
+
+	readinessManager := ready.NewManager(log, postgresClient.ReadinessCheck())
+
+	verifier, err := keycloak.NewVerifier(&cfg.Auth.Keycloak, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize keycloak token verifier: %w", err)
+	}
+
+	txManager := postgres.NewTxManager(postgresClient)
+
+	currencyService := currencysrv.NewService(
+		txManager,
+		currencyrepo.NewCurrencyRepository(postgresClient),
+		currencyrepo.NewCurrencyRevisionRepository(postgresClient),
+		currencyrepo.NewExpandedCurrencyRepository(postgresClient),
+	)
+
+	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
+	httpServer.RegisterRouter(httptr.NewRouter(
+		log,
+		readinessManager,
+		verifier,
+		currencyService,
+		catalogMounts(txManager, postgresClient)...,
+	))
+
+	log.Info("application initialized successfully")
+	return &App{
+		log:            log,
+		telemetry:      telemetry,
+		httpServer:     httpServer,
+		postgresClient: postgresClient,
+		verifier:       verifier,
+	}, nil
+}
+
+func (a *App) Startup(ctx context.Context) error {
+	a.log.Info("application startup")
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		a.log.Info("postgres client startup")
+		return a.postgresClient.Startup(gCtx)
+	})
+
+	g.Go(func() error {
+		a.log.Info("http server startup")
+		return a.httpServer.Startup(gCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		a.log.Error("failed to startup application", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to startup application: %w", err)
+	}
+
+	return nil
+}
+
+func (a *App) Shutdown(ctx context.Context) error {
+	a.log.Info("application shutdown")
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		a.log.Info("postgres client shutdown")
+		return a.postgresClient.Shutdown(gCtx)
+	})
+
+	g.Go(func() error {
+		a.log.Info("http server shutdown")
+		return a.httpServer.Shutdown(gCtx)
+	})
+
+	g.Go(func() error {
+		a.log.Info("keycloak token verifier shutdown")
+		return a.verifier.Shutdown(gCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		a.log.Error("failed to shutdown application", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to shutdown application: %w", err)
+	}
+
+	// the last one, so the telemetry of the shutdown itself is flushed to the collector
+	a.log.Info("telemetry shutdown")
+	if err := a.telemetry.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown telemetry: %w", err)
+	}
+
+	return nil
+}

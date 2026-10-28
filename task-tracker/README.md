@@ -25,3 +25,7 @@
 [162 — предложения интеграций и реестр согласований](docs/block-i-integration-and-deployment/162.integration-spec.md), [130 — проектные API-контракты](docs/block-g-api-and-events/130.api-contracts.md), [160 — этапы работ](docs/block-i-integration-and-deployment/160.integration-plan.md), [095 — полнота требований](docs/block-d-verification/095.requirements-check.md).
 
 Keycloak принят как единый IdP проекта. Владение данными Planning, выбор Kafka либо REST, формат ETL и параметры общего MinIO требуют подтверждения соответствующими командами согласно 162. Новая реализация интеграций в этот коммит не входит. Проверка существующего прототипа — по [чек-листу](frontend/prototype/CHECKLIST.md).
+
+## Исправления по проверке 12.10.2026
+
+Добавлены [CI и демо-данные](docs/block-i-integration-and-deployment/165.deployment-diagram.md), [отчёт безопасности](docs/security-check.md); временный REST-опрос и контрольные даты согласований уточнены в [162](docs/block-i-integration-and-deployment/162.integration-spec.md). Линтеры: `cd backend && mvn checkstyle:check`; `cd frontend && npm run lint`.

@@ -30,8 +30,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: reference-manager/go.mod
-          cache-dependency-path: reference-manager/go.sum
+          go-version-file: reference-manager/backend/go.mod
+          cache-dependency-path: reference-manager/backend/go.sum
 
       - name: Install development tools
         run: |
@@ -76,8 +76,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: reference-manager/go.mod
-          cache-dependency-path: reference-manager/go.sum
+          go-version-file: reference-manager/backend/go.mod
+          cache-dependency-path: reference-manager/backend/go.sum
 
       - name: Install Task
         run: |

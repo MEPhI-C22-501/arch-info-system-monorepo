@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "real_kafka": "3.9.1",
+  "real_postgres": true,
+  "duplicate_after_restart": true,
+  "poison_retries": 3,
+  "durable_dlq": true,
+  "outbox_acknowledged": true,
+  "isolated_database": true,
+  "pilot_data_changed": false,
+  "checked_at_utc": "2026-10-24T23:41:19.643962+00:00",
+  "source_sha256": {
+    "reports/pilots/events.py": "7f7bdfc2becd72907f2b057526318c55e703fdc6efbce071d959230ae6ad7817",
+    "reports/pilots/ops.py": "734385e4247df39b23423cf52f50cde228002e0eea1a145c09f0bb76376a41bc",
+    "reports/pilots/event_runner.py": "4ba8820439439864b0c2d14e47f247459cbf2509b25ef22c9420e709dc854c66",
+    "reports/pilots/event_outbox.py": "06470e7f293860b9875ac3e648c7ea54a06dd4dd2072ba0ba7b794fc813e32dc",
+    "reports/pilots/maintenance.py": "9ab2956d1cffedd716514e1138e8b3558aa676fa6cba1f765546a612fa62c001",
+    "reports/pilots/star.py": "01e74c151d145e7bc91c62e7437ffa503cdc2a3c39aecbce0100058f606bf411",
+    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77",
+    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
+    "reports/pilots/check_events.py": "d5d1d54cfcd1009311f773d68982804e1a172837308cee9ab1615752edf3ff45",
+    "reports/pilots/record_events.py": "32e91a701b969dcb71e40d5b4ee4df5f3b5b8498bfe9e78120ff977f8ad14135",
+    "reports/pilots/compose.yaml": "a93ac05d84d235f607724af02599db869543e1b18a80033baf3097c50e723757",
+    "reports/pilots/Dockerfile": "e92ff3494439f5796ff6b727b09438ffc7347ca7fdaa98d3da220c0e17903108",
+    "reports/pilots/requirements.txt": "9e6871c5afb13889608845eba19ed5d161d46e8f64ecbca7819e7d788a1d0cff"
+  }
+}

@@ -1,0 +1,10 @@
+[flake8]
+# Согласовано с black (pyproject.toml): длина строки 100, E203 и E701/E704 конфликтуют с его форматом.
+max-line-length = 100
+extend-ignore = E203, E701, E704
+extend-exclude = .venv
+# Длинные выражения CHECK в миграциях black не переносит. Пути считаются от каталога запуска:
+# первый — из корня репозитория (pre-commit, VS Code), второй — из qa/backend.
+per-file-ignores =
+    qa/backend/migrations/versions/*.py: E501
+    migrations/versions/*.py: E501

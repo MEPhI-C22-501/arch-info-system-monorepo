@@ -1,7 +1,7 @@
 # Planning System
 
-Проектный комплект документации системы портфельного, ресурсного и календарного
-планирования проектов.
+Документация и серверное приложение системы портфельного, ресурсного и календарного
+планирования проектов. Локальная среда использует синтетические данные и явные заглушки.
 
 Planning System хранит проекты и версии планов, выполняет годовое и скользящее
 планирование, рассчитывает потребность в людях, строит календарь и формирует единый
@@ -26,3 +26,39 @@ Planning System является мастер-системой проектов.
 работ, сроки и назначения в Task Tracker. Task Tracker хранит задачи и возвращает
 события об их создании и изменении, статусы, историю и фактическую трудоемкость.
 Обмен задачами выполняется только через API и события.
+
+## Локальный запуск приложения
+
+Из корня репозитория, Docker Desktop/Engine + Compose v2:
+
+```sh
+docker compose -f planning-system/compose.yaml up --build
+```
+
+Откройте http://localhost:8080. Миграции и идемпотентный demo seed запускаются
+перед API. PostgreSQL и файлы сохраняются в отдельных volumes. Вход demo и
+переключение ролей разрешены только при APP_ENV=development. Worker возвращает
+receipt с префиксом mock:; это не подтверждение Task Tracker.
+Перезапуск сохраняет данные; для уничтожения только собственного локального
+набора используйте `docker compose -f planning-system/compose.yaml down -v`.
+
+[Инструкция разработчика](development.md) — тесты, конфигурация OIDC/S3,
+Kubernetes, границы поставки. [Рабочий план](work-plan.md),
+[согласования](docs/integration-agreements.md),
+[ручные действия GitHub](github-actions.md), [результаты проверки](docs/rework-status.md).
+
+## Воспроизводимая проверка документации
+
+Из корня репозитория, в виртуальном окружении Python. Проверено на Python 3.14.3;
+контейнер и CI используют Python 3.12 (отдельный прогон записывается в отчёте).
+
+```sh
+python -m pip install -r planning-system/scripts/requirements-docs.txt
+python planning-system/scripts/validate-docs.py
+python planning-system/scripts/audit-traceability.py
+```
+
+Создание окружения при необходимости: `python3 -m venv .venv`, затем
+`source .venv/bin/activate` (Windows: `.venv\Scripts\activate`).
+Зависимости проверки OpenAPI перечислены и закреплены в requirements-docs.txt.
+Серверные тесты выполняются отдельно и не подменяют приёмку реальных интеграций.

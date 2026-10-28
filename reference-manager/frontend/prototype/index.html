@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference Manager - прототип интерфейса администрирования</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --line:#d9dde3; --text:#1d2330; --muted:#6b7280; --accent:#1f5fbf; --danger:#b42318; --ok:#067647; --warn:#b54708; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--text); background:var(--bg); }
+  header { display:flex; align-items:center; gap:16px; padding:10px 20px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; }
+  header h1 { font-size:16px; margin:0; }
+  header .spacer { flex:1; }
+  main { max-width:1100px; margin:0 auto; padding:20px; }
+  .crumbs { color:var(--muted); margin-bottom:12px; }
+  .crumbs a { color:var(--accent); text-decoration:none; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr.row:hover { background:#eef3fb; cursor:pointer; }
+  .deleted td { color:var(--muted); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; }
+  .badge.ACTIVE { background:#e6f4ea; color:var(--ok); }
+  .badge.DELETED { background:#fdecea; color:var(--danger); }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  input[type=text], select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  input.filter { flex:1; min-width:280px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  button { padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.danger { color:var(--danger); border-color:#f3c2bd; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .grid { display:grid; grid-template-columns: 1fr 320px; gap:16px; }
+  @media (max-width:800px) { .grid { grid-template-columns:1fr; } }
+  .field { margin-bottom:10px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .field input, .field select { width:100%; }
+  .field .err { color:var(--danger); font-size:12px; margin-top:3px; }
+  .field.invalid input, .field.invalid select { border-color:var(--danger); }
+  .banner { padding:8px 12px; border-radius:6px; margin-bottom:12px; }
+  .banner.error { background:#fdecea; color:var(--danger); }
+  .banner.ok { background:#e6f4ea; color:var(--ok); }
+  .banner.warn { background:#fff4e5; color:var(--warn); }
+  .meta dt { color:var(--muted); font-size:12px; }
+  .meta dd { margin:0 0 8px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
+  .rev { border-top:1px solid var(--line); padding:8px 0; }
+  .rev .h { display:flex; gap:8px; align-items:baseline; }
+  .rev .h b { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .rev ul { margin:4px 0 0 16px; padding:0; }
+  .rev li code { background:#f1f3f6; padding:0 4px; border-radius:3px; }
+  .muted { color:var(--muted); }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .pager { display:flex; gap:8px; align-items:center; margin-top:10px; }
+  dialog { border:1px solid var(--line); border-radius:8px; padding:16px; max-width:420px; }
+  dialog::backdrop { background:rgba(0,0,0,.3); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Reference Manager <span class="muted">прототип /admin/</span></h1>
+  <div class="spacer"></div>
+  <label>Роль <select id="role"><option value="admin">admin</option><option value="reader">reader</option><option value="none">без ролей</option></select></label>
+  <span class="muted" id="who">user@erp</span>
+</header>
+<main>
+  <div class="crumbs" id="crumbs"></div>
+  <section id="s1" class="card"></section>
+  <section id="s2" class="card" hidden></section>
+  <section id="s3" hidden></section>
+  <section id="s4" class="card" hidden>
+    <h2>Нет доступа</h2>
+    <p>У учётной записи нет ролей <code>reference-reader</code> или <code>reference-admin</code>. Обратитесь к команде справочников.</p>
+  </section>
+</main>
+<dialog id="confirm"><p id="confirmText"></p><div class="toolbar"><button id="confirmYes" class="danger">Подтвердить</button><button id="confirmNo">Отмена</button></div></dialog>
+
+<script>
+// ---- данные прототипа: образцовые справочники, ревизии считаются в памяти ----
+const CATALOGS = {
+  currencies: {
+    title: 'Валюты', idHint: 'три заглавные буквы (ISO 4217)', idRe: /^[A-Z]{3}$/,
+    fields: [
+      { name: 'numeric_code', label: 'Числовой код', type: 'text', required: true, re: /^[0-9]{3}$/, err: 'три цифры', unique: true },
+      { name: 'minor_units', label: 'Знаков дробной части', type: 'number', required: true, min: 0, max: 6, err: 'от 0 до 6' },
+      { name: 'symbol', label: 'Символ', type: 'text', maxLen: 8, err: 'до 8 символов' },
+    ],
+    records: {
+      EUR: { display_name: 'Евро', numeric_code: '978', minor_units: 2, symbol: 'EUR' },
+      USD: { display_name: 'Доллар США', numeric_code: '840', minor_units: 2, symbol: '$' },
+      RUB: { display_name: 'Российский рубль', numeric_code: '643', minor_units: 2, symbol: '₽' },
+      JPY: { display_name: 'Японская иена', numeric_code: '392', minor_units: 0, symbol: '¥' },
+      XTS: { display_name: 'Тестовая валюта', numeric_code: '963', minor_units: 2, symbol: '' },
+    },
+  },
+  countries: {
+    title: 'Страны', idHint: 'две заглавные буквы (ISO 3166-1 alpha-2)', idRe: /^[A-Z]{2}$/,
+    fields: [
+      { name: 'alpha3', label: 'Код alpha-3', type: 'text', required: true, re: /^[A-Z]{3}$/, err: 'три заглавные буквы', unique: true },
+      { name: 'numeric_code', label: 'Числовой код', type: 'text', required: true, re: /^[0-9]{3}$/, err: 'три цифры', unique: true },
+      { name: 'currency', label: 'Валюта', type: 'ref', ref: 'currencies', err: 'должна быть именем записи currencies/*' },
+    ],
+    records: {
+      RU: { display_name: 'Россия', alpha3: 'RUS', numeric_code: '643', currency: 'currencies/RUB' },
+      DE: { display_name: 'Германия', alpha3: 'DEU', numeric_code: '276', currency: 'currencies/EUR' },
+      US: { display_name: 'США', alpha3: 'USA', numeric_code: '840', currency: 'currencies/USD' },
+      JP: { display_name: 'Япония', alpha3: 'JPN', numeric_code: '392', currency: 'currencies/JPY' },
+    },
+  },
+};
+const EXPORT_LIMIT = 4;           // предел выгрузки в прототипе, чтобы показать отказ
+const PAGE_SIZE = 3;
+let etagSeq = 100;
+const state = { role: 'admin', catalog: null, record: null, filter: '', orderBy: 'name', showDeleted: false, page: 0, banner: null };
+
+// каждая запись получает служебные поля и первую ревизию CREATED
+for (const [col, cat] of Object.entries(CATALOGS)) {
+  for (const [id, rec] of Object.entries(cat.records)) {
+    rec.id = id; rec.state = 'ACTIVE'; rec.delete_time = null; rec.etag = newEtag();
+    rec.revisions = [revision('CREATED', 'seed', Object.fromEntries(['display_name', ...cat.fields.map(f => f.name)].map(k => [k, [null, rec[k] ?? null]])))];
+  }
+}
+function newEtag() { return '"' + (etagSeq++).toString(16) + '"'; }
+function revision(action, author, changesMap) {
+  const changes = Object.entries(changesMap).filter(([, [o, n]]) => o !== n).map(([field, [old_value, new_value]]) => ({ field, old_value, new_value }));
+  return { action, author, create_time: new Date().toISOString(), request_id: Math.random().toString(16).slice(2, 10), changes };
+}
+function name(col, id) { return `${col}/${id}`; }
+function can(level) { return state.role === 'admin' || (state.role === 'reader' && (level === 'R' || level === 'X')); }
+
+// ---- фильтр AIP-160 (подмножество): поле = значение, поле:"подстрока", AND ----
+function compileFilter(expr, cat) {
+  const allowed = new Set(['name', 'display_name', 'state', ...cat.fields.map(f => f.name)]);
+  const clauses = expr.trim() ? expr.split(/\s+AND\s+/i) : [];
+  const preds = clauses.map(c => {
+    const m = c.trim().match(/^([a-z_]+)\s*(=|!=|:)\s*(?:"([^"]*)"|(\S+))$/i);
+    if (!m) throw new Error(`не разобрано: ${c.trim()}`);
+    const [, field, op, q, bare] = m; const val = q ?? bare;
+    if (!allowed.has(field)) throw new Error(`неизвестное поле: ${field}`);
+    return rec => {
+      const v = field === 'name' ? name(state.catalog, rec.id) : rec[field];
+      const s = v == null ? '' : String(v);
+      if (op === ':') return s.toLowerCase().includes(val.toLowerCase());
+      return op === '=' ? s === val : s !== val;
+    };
+  });
+  return rec => preds.every(p => p(rec));
+}
+function listRecords() {
+  const cat = CATALOGS[state.catalog];
+  let rows = Object.values(cat.records);
+  if (!state.showDeleted) rows = rows.filter(r => r.state === 'ACTIVE');
+  const pred = compileFilter(state.filter, cat); rows = rows.filter(pred);
+  const [key, dir] = state.orderBy.split(' ');
+  rows.sort((a, b) => String(key === 'name' ? a.id : a[key] ?? '').localeCompare(String(key === 'name' ? b.id : b[key] ?? ''), 'ru') * (dir === 'desc' ? -1 : 1));
+  return rows;
+}
+
+// ---- экраны ----
+const $ = s => document.querySelector(s);
+function show(id) { for (const s of ['s1', 's2', 's3', 's4']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+function crumbs(parts) { $('#crumbs').innerHTML = parts.map((p, i) => i < parts.length - 1 ? `<a href="#" data-go="${p[1]}">${p[0]}</a> / ` : p[0]).join(''); }
+function render() {
+  if (state.role === 'none') { crumbs([['Нет доступа']]); show('s4'); return; }
+  if (!state.catalog) return renderS1();
+  if (state.record === null) return renderS2();
+  return renderS3();
+}
+function renderS1() {
+  crumbs([['Справочники']]);
+  $('#s1').innerHTML = `<h2>Справочники</h2><p class="muted">Перечень из спецификации OpenAPI. Клик по строке открывает записи.</p>
+    <table><thead><tr><th>Коллекция</th><th>Название</th><th>Активных записей</th></tr></thead><tbody>
+    ${Object.entries(CATALOGS).map(([col, c]) => `<tr class="row" data-cat="${col}"><td><code>/v1/${col}</code></td><td>${c.title}</td><td>${Object.values(c.records).filter(r => r.state === 'ACTIVE').length}</td></tr>`).join('')}
+    </tbody></table>`;
+  show('s1');
+}
+function renderS2() {
+  const cat = CATALOGS[state.catalog];
+  crumbs([['Справочники', 'home'], [cat.title]]);
+  let rows = [], err = null;
+  try { rows = listRecords(); } catch (e) { err = e.message; }
+  const total = rows.length, pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  state.page = Math.min(state.page, pages - 1);
+  const pageRows = rows.slice(state.page * PAGE_SIZE, (state.page + 1) * PAGE_SIZE);
+  $('#s2').innerHTML = `
+    <h2>${cat.title} <span class="muted">/v1/${state.catalog}</span></h2>
+    ${state.banner ? `<div class="banner ${state.banner.kind}">${state.banner.text}</div>` : ''}
+    <div class="toolbar">
+      <input class="filter" id="filter" type="text" placeholder='filter: state = ACTIVE AND display_name:"Евро"' value="${esc(state.filter)}">
+      <select id="orderBy">${['name', 'display_name', 'display_name desc', ...cat.fields.map(f => f.name)].map(o => `<option ${o === state.orderBy ? 'selected' : ''}>${o}</option>`).join('')}</select>
+      <label><input type="checkbox" id="showDeleted" ${state.showDeleted ? 'checked' : ''}> показывать удалённые</label>
+      <button id="apply">Применить</button>
+      <button id="export">Выгрузить в Excel</button>
+      ${can('C') ? '<button id="create" class="primary">Создать запись</button>' : ''}
+    </div>
+    ${err ? `<div class="banner error">INVALID_ARGUMENT: ${esc(err)}</div>` : ''}
+    <div class="hint">Поля фильтра: name, display_name, state, ${cat.fields.map(f => f.name).join(', ')}. Операторы: =, !=, : (вхождение), AND.</div>
+    <table><thead><tr><th>name</th><th>display_name</th><th>state</th>${cat.fields.map(f => `<th>${f.name}</th>`).join('')}</tr></thead><tbody>
+    ${pageRows.length ? pageRows.map(r => `<tr class="row ${r.state === 'DELETED' ? 'deleted' : ''}" data-id="${r.id}"><td><code>${name(state.catalog, r.id)}</code></td><td>${esc(r.display_name)}</td><td><span class="badge ${r.state}">${r.state}</span></td>${cat.fields.map(f => `<td>${esc(r[f.name] ?? '')}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${3 + cat.fields.length}" class="muted">Записей нет${can('C') ? ', создайте первую' : ''}.</td></tr>`}
+    </tbody></table>
+    <div class="pager"><span class="muted">total_size: ${total}, page_size: ${PAGE_SIZE}</span><button id="prev" ${state.page === 0 ? 'disabled' : ''}>Назад</button><span>${state.page + 1} / ${pages}</span><button id="next" ${state.page >= pages - 1 ? 'disabled' : ''}>Вперёд</button></div>`;
+  state.banner = null;
+  show('s2');
+}
+function renderS3() {
+  const cat = CATALOGS[state.catalog];
+  const isNew = state.record === '__new__';
+  const rec = isNew ? { id: '', display_name: '', state: 'ACTIVE', etag: null, delete_time: null, revisions: [] } : cat.records[state.record];
+  crumbs([['Справочники', 'home'], [cat.title, 'cat'], [isNew ? 'Новая запись' : name(state.catalog, rec.id)]]);
+  const ro = !can('U') || rec.state === 'DELETED';
+  const fieldHtml = f => {
+    const v = rec[f.name] ?? '';
+    if (f.type === 'ref') {
+      const opts = Object.values(CATALOGS[f.ref].records).filter(r => r.state === 'ACTIVE').map(r => `<option value="${name(f.ref, r.id)}" ${name(f.ref, r.id) === v ? 'selected' : ''}>${name(f.ref, r.id)} - ${esc(r.display_name)}</option>`).join('');
+      return `<div class="field" data-field="${f.name}"><label>${f.label} <span class="muted">${f.name}</span></label><select name="${f.name}" ${ro ? 'disabled' : ''}><option value="">-</option>${opts}<option value="currencies/XXX">currencies/XXX (несуществующая, для проверки)</option></select><div class="err"></div></div>`;
+    }
+    return `<div class="field" data-field="${f.name}"><label>${f.label} <span class="muted">${f.name}${f.required ? ', обязательно' : ''}</span></label><input type="${f.type}" name="${f.name}" value="${esc(v)}" ${ro ? 'disabled' : ''}><div class="err"></div></div>`;
+  };
+  $('#s3').innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${isNew ? 'Новая запись' : esc(rec.display_name)} <span class="muted">${cat.title}</span></h2>
+        <div id="formBanner"></div>
+        <form id="form">
+          ${isNew ? `<div class="field" data-field="id"><label>Идентификатор <span class="muted">${cat.idHint}</span></label><input type="text" name="id" value=""><div class="err"></div></div>` : ''}
+          <div class="field" data-field="display_name"><label>Наименование <span class="muted">display_name, обязательно</span></label><input type="text" name="display_name" value="${esc(rec.display_name)}" ${ro ? 'disabled' : ''}><div class="err"></div></div>
+          ${cat.fields.map(fieldHtml).join('')}
+          <div class="toolbar">
+            ${!ro ? '<button type="submit" class="primary">Сохранить</button>' : ''}
+            ${!isNew && can('D') && rec.state === 'ACTIVE' ? '<button type="button" id="del" class="danger">Удалить</button>' : ''}
+            ${!isNew && can('U') && rec.state === 'DELETED' ? '<button type="button" id="undel">Восстановить</button>' : ''}
+            <button type="button" id="back">Назад</button>
+          </div>
+        </form>
+      </div>
+      <div>
+        <div class="card"><h3>Сведения</h3><dl class="meta">
+          <dt>name</dt><dd>${isNew ? '-' : name(state.catalog, rec.id)}</dd>
+          <dt>state</dt><dd><span class="badge ${rec.state}">${rec.state}</span></dd>
+          <dt>etag</dt><dd>${rec.etag ?? '-'}</dd>
+          <dt>delete_time</dt><dd>${rec.delete_time ?? '-'}</dd>
+        </dl></div>
+        <div class="card"><h3>История</h3><div class="hint">GET /v1/${state.catalog}/${rec.id || '{id}'}/revisions, от новой к старой</div>
+          ${[...rec.revisions].reverse().map((rv, i, arr) => { const n = arr.length - i; return `<div class="rev"><div class="h"><b>#${n}</b> <span>${rv.action}</span> <span class="muted">${rv.create_time.replace('T', ' ').slice(0, 19)}</span> <span class="muted">${esc(rv.author)}</span> <button type="button" data-rev="${n}" class="asof">на ревизию</button></div><ul>${rv.changes.map(c => `<li><code>${c.field}</code>: ${fmt(c.old_value)} → ${fmt(c.new_value)}</li>`).join('')}</ul></div>`; }).join('') || '<p class="muted">Ревизий нет.</p>'}
+          <div id="asof"></div>
+        </div>
+      </div>
+    </div>`;
+  show('s3');
+}
+function fmt(v) { return v == null || v === '' ? '<span class="muted">пусто</span>' : esc(String(v)); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ---- проверка полей: как это сделает сервер (INVALID_ARGUMENT с BadRequest.fieldViolations) ----
+function validate(cat, id, values, isNew) {
+  const viol = [];
+  if (isNew) {
+    if (!cat.idRe.test(id)) viol.push({ field: 'id', description: cat.idHint });
+    else if (cat.records[id]) return { alreadyExists: cat.records[id].state };
+  }
+  if (!values.display_name) viol.push({ field: 'display_name', description: 'обязательно' });
+  for (const f of cat.fields) {
+    const v = values[f.name];
+    if (f.required && (v === '' || v == null)) { viol.push({ field: f.name, description: 'обязательно' }); continue; }
+    if (v === '' || v == null) continue;
+    if (f.re && !f.re.test(String(v))) viol.push({ field: f.name, description: f.err });
+    if (f.type === 'number' && (Number(v) < f.min || Number(v) > f.max)) viol.push({ field: f.name, description: f.err });
+    if (f.maxLen && String(v).length > f.maxLen) viol.push({ field: f.name, description: f.err });
+    if (f.type === 'ref') { const [col, rid] = String(v).split('/'); if (!(CATALOGS[col]?.records[rid])) viol.push({ field: f.name, description: f.err }); }
+    if (f.unique && Object.values(cat.records).some(r => r.id !== id && String(r[f.name]) === String(v))) viol.push({ field: f.name, description: 'уже используется' });
+  }
+  return { fieldViolations: viol };
+}
+
+// ---- обработчики ----
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go], [data-cat], tr.row[data-id], #apply, #export, #create, #prev, #next, #back, #del, #undel, .asof');
+  if (!t) return;
+  if (t.dataset.go === 'home') { state.catalog = null; state.record = null; state.page = 0; state.filter = ''; return render(); }
+  if (t.dataset.go === 'cat') { state.record = null; return render(); }
+  if (t.dataset.cat) { state.catalog = t.dataset.cat; state.record = null; state.page = 0; state.filter = ''; state.orderBy = 'name'; state.showDeleted = false; return render(); }
+  if (t.matches('tr.row[data-id]')) { state.record = t.dataset.id; return render(); }
+  if (t.id === 'apply') { state.filter = $('#filter').value; state.orderBy = $('#orderBy').value; state.showDeleted = $('#showDeleted').checked; state.page = 0; return render(); }
+  if (t.id === 'prev') { state.page--; return render(); }
+  if (t.id === 'next') { state.page++; return render(); }
+  if (t.id === 'create') { state.record = '__new__'; return render(); }
+  if (t.id === 'back') { state.record = null; return render(); }
+  if (t.id === 'export') {
+    let rows; try { rows = listRecords(); } catch (err) { state.banner = { kind: 'error', text: 'INVALID_ARGUMENT: ' + esc(err.message) }; return render(); }
+    if (rows.length > EXPORT_LIMIT) { state.banner = { kind: 'error', text: `FAILED_PRECONDITION EXPORT_TOO_LARGE: в отборе ${rows.length} записей, предел ${EXPORT_LIMIT}. Сузьте фильтр.` }; return render(); }
+    const cat = CATALOGS[state.catalog];
+    const head = ['name', 'display_name', 'state', 'delete_time', ...cat.fields.map(f => f.name)];
+    const csv = [head.join(';'), ...rows.map(r => [name(state.catalog, r.id), r.display_name, r.state, r.delete_time ?? '', ...cat.fields.map(f => r[f.name] ?? '')].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = `${state.catalog}.csv`; a.click();
+    state.banner = { kind: 'ok', text: `Выгружено ${rows.length} записей (в прототипе CSV вместо .xlsx).` }; return render();
+  }
+  if (t.id === 'del' || t.id === 'undel') {
+    const rec = CATALOGS[state.catalog].records[state.record];
+    const isDel = t.id === 'del';
+    confirmDialog(isDel ? `Удалить ${name(state.catalog, rec.id)} "${rec.display_name}"? Запись перейдёт в DELETED, идентификатор останется занятым, ссылки продолжат работать.` : `Восстановить ${name(state.catalog, rec.id)}?`, () => {
+      const before = { state: rec.state, delete_time: rec.delete_time };
+      rec.state = isDel ? 'DELETED' : 'ACTIVE'; rec.delete_time = isDel ? new Date().toISOString() : null; rec.etag = newEtag();
+      rec.revisions.push(revision(isDel ? 'DELETED' : 'UNDELETED', state.role + '@erp', { state: [before.state, rec.state], delete_time: [before.delete_time, rec.delete_time] }));
+      render(); banner('#formBanner', 'ok', isDel ? 'Запись удалена (state = DELETED).' : 'Запись восстановлена (state = ACTIVE).');
+    });
+    return;
+  }
+  if (t.classList.contains('asof')) {
+    const n = Number(t.dataset.rev); const rec = CATALOGS[state.catalog].records[state.record];
+    const snap = {}; for (const rv of rec.revisions.slice(0, n)) for (const c of rv.changes) snap[c.field] = c.new_value;
+    $('#asof').innerHTML = `<div class="banner warn">GET /v1/${state.catalog}/${rec.id}?revision=${n}: ${Object.entries(snap).map(([k, v]) => `<code>${k}</code>=${fmt(v)}`).join(', ')}</div>`;
+  }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'form') return; e.preventDefault();
+  const cat = CATALOGS[state.catalog]; const isNew = state.record === '__new__';
+  const fd = new FormData(e.target); const values = {}; for (const f of ['display_name', ...cat.fields.map(f => f.name)]) values[f] = fd.get(f) ?? '';
+  for (const f of cat.fields) if (f.type === 'number' && values[f.name] !== '') values[f.name] = Number(values[f.name]);
+  const id = isNew ? String(fd.get('id') || '').trim() : state.record;
+  document.querySelectorAll('.field').forEach(el => { el.classList.remove('invalid'); el.querySelector('.err').textContent = ''; });
+  const res = validate(cat, id, values, isNew);
+  if (res.alreadyExists) return banner('#formBanner', 'error', `ALREADY_EXISTS: ${name(state.catalog, id)} уже существует в состоянии ${res.alreadyExists}${res.alreadyExists === 'DELETED' ? ', восстановите её' : ''}.`);
+  if (res.fieldViolations.length) {
+    for (const v of res.fieldViolations) { const el = document.querySelector(`.field[data-field="${v.field}"]`); if (el) { el.classList.add('invalid'); el.querySelector('.err').textContent = v.description; } }
+    return banner('#formBanner', 'error', `INVALID_ARGUMENT: неверных полей ${res.fieldViolations.length}. См. подписи у полей.`);
+  }
+  if (isNew) {
+    const rec = { id, ...values, state: 'ACTIVE', delete_time: null, etag: newEtag(), revisions: [] };
+    rec.revisions.push(revision('CREATED', state.role + '@erp', Object.fromEntries(Object.entries(values).map(([k, v]) => [k, [null, v === '' ? null : v]]))));
+    cat.records[id] = rec; state.record = id; render(); return banner('#formBanner', 'ok', `Создано ${name(state.catalog, id)}, ревизия #1 CREATED.`);
+  }
+  const rec = cat.records[id]; const changes = {};
+  for (const [k, v] of Object.entries(values)) { const nv = v === '' ? null : v; if ((rec[k] ?? null) !== nv) changes[k] = [rec[k] ?? null, nv]; }
+  if (!Object.keys(changes).length) return banner('#formBanner', 'warn', 'Изменений нет: update_mask пуст.');
+  for (const [k, [, nv]] of Object.entries(changes)) rec[k] = nv;
+  rec.etag = newEtag(); rec.revisions.push(revision('UPDATED', state.role + '@erp', changes)); render();
+  banner('#formBanner', 'ok', `Сохранено: update_mask = ${Object.keys(changes).join(', ')}; ревизия #${rec.revisions.length} UPDATED.`);
+});
+function banner(sel, kind, text) { const el = $(sel); if (el) el.innerHTML = `<div class="banner ${kind}">${text}</div>`; }
+function confirmDialog(text, onYes) { const d = $('#confirm'); $('#confirmText').textContent = text; d.showModal(); $('#confirmYes').onclick = () => { d.close(); onYes(); }; $('#confirmNo').onclick = () => d.close(); }
+$('#role').addEventListener('change', e => { state.role = e.target.value; $('#who').textContent = state.role === 'none' ? 'guest@erp' : `${state.role}@erp`; render(); });
+render();
+</script>
+</body>
+</html>

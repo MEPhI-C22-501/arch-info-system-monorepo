@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: QA System API
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   description: >
     Draft contract of the QA System (test management). Described in
     qa/docs/130.api-contracts.md. Role names refer to qa/docs/070.role-matrix.md.
@@ -305,12 +305,18 @@ paths:
       tags: [runs]
       operationId: createRun
       summary: Create a run from a plan or a suite; with start=true also start it and queue autotests
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Repeated call with the same key by the same client returns the same run (pipeline uses the deployment commit SHA)
+          schema: { type: string, maxLength: 128 }
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/RunInput' }
-            example: { suiteName: Smoke, environment: dev, start: true }
+            example: { suiteName: Smoke, environment: staging, start: true }
       responses:
         '201':
           description: Run created
@@ -544,7 +550,7 @@ paths:
       - name: resource
         in: path
         required: true
-        schema: { type: string, enum: [test-plans, test-runs, test-results, defects] }
+        schema: { type: string, enum: [test-cases, test-plans, test-runs, test-results, defects] }
     get:
       tags: [reports]
       operationId: listReportData
@@ -650,6 +656,25 @@ components:
             version: { type: integer }
             copiedFromId: { type: string, format: uuid }
             updatedAt: { type: string, format: date-time }
+            lastResult:
+              description: >
+                Read-only. Latest run result of the case with status other than NOT_RUN.
+                The test case itself has no actual-result field (ADR-014).
+              oneOf:
+                - { $ref: '#/components/schemas/LastResult' }
+                - { type: 'null' }
+    LastResult:
+      type: object
+      required: [runId, runKey, status, finishedAt]
+      properties:
+        runId: { type: string, format: uuid }
+        runKey: { type: string }
+        caseVersion: { type: integer }
+        status: { $ref: '#/components/schemas/ResultStatus' }
+        actualResult: { type: string }
+        failedStepPosition: { type: integer }
+        environment: { type: string }
+        finishedAt: { type: string, format: date-time }
     TestCaseVersionInfo:
       type: object
       required: [version, author, createdAt, changedFields]
@@ -698,8 +723,14 @@ components:
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
         trackerIterationId: { type: string }
-        planningMilestoneId: { type: string }
+        planningMilestoneId: { type: string, description: logicalItemId of the MILESTONE in Planning System }
         planningProjectId: { type: string }
+        planningReleaseId: { type: string, description: logicalItemId of the RELEASE in Planning System; required when scopeKind is RELEASE }
+        planningPlanVersionId: { type: string, description: Planning System plan version the release was selected from }
+      if:
+        properties: { scopeKind: { const: RELEASE } }
+      then:
+        required: [planningProjectId, planningReleaseId]
     TestPlan:
       allOf:
         - $ref: '#/components/schemas/TestPlanInput'
@@ -730,6 +761,7 @@ components:
         suiteName: { type: string, description: Alternative to suiteId for CI }
         environment: { type: string, description: Environment code }
         start: { type: boolean, default: false }
+        automatedOnly: { type: boolean, default: false, description: Take only cases with an implemented autotest }
       oneOf:
         - required: [planId]
         - required: [suiteId]
@@ -744,6 +776,7 @@ components:
         blocked: { type: integer }
         notRun: { type: integer }
         skipped: { type: integer }
+        unverified: { type: integer, description: SKIPPED because the subsystem API is not available yet }
     Run:
       type: object
       required: [id, key, status, environment, trigger, summary]
@@ -763,6 +796,10 @@ components:
         finishedAt: { type: string, format: date-time }
         durationMs: { type: integer }
         summary: { $ref: '#/components/schemas/RunSummary' }
+        smokeVerdict: { type: [string, 'null'], enum: [GREEN, RED, null], description: GREEN when the finished run has no FAILED results }
+        verdict: { type: [string, 'null'], enum: [ACCEPTED, REJECTED, null], description: Stand acceptance verdict, only for the acceptance suite }
+        verdictBy: { type: string }
+        verdictAt: { type: string, format: date-time }
     RunPage:
       type: object
       required: [items, page, pageSize, totalPages]
@@ -819,7 +856,7 @@ components:
         expectedResult: { type: string }
         actualResult: { type: string, minLength: 1 }
         severity: { $ref: '#/components/schemas/Severity' }
-        priority: { type: string }
+        priority: { type: string, description: Proposed priority; after the Bug is created Task Tracker owns the fix priority }
         testCaseId: { type: string, format: uuid }
         runResultId: { type: string, format: uuid }
         stepId: { type: string, format: uuid }
@@ -841,6 +878,10 @@ components:
             trackerWorkItemId: { type: string }
             trackerWorkItemUrl: { type: string }
             trackerSyncState: { type: string, enum: [PENDING, SYNCED, FAILED] }
+            trackerStatus: { type: string, description: Read-only copy of the Bug status in Task Tracker }
+            trackerPriority: { type: string, description: Read-only copy of the Bug priority in Task Tracker }
+            trackerAssignee: { type: string }
+            trackerMismatch: { type: boolean, description: Statuses of the two systems differ according to the mapping table }
             reopenCount: { type: integer }
             runIds:
               type: array

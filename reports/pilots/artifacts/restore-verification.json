@@ -1,0 +1,21 @@
+{
+  "checked_at_utc": "2026-10-24T23:41:02.361443+00:00",
+  "passed": true,
+  "scope": "Isolated synthetic Reports database; no shared stand or Keycloak backup",
+  "checks": [
+    "real_pg_dump_restore",
+    "hours",
+    "scd2_versions",
+    "daily_snapshot",
+    "checkpoint",
+    "member_scope",
+    "idempotent_replay",
+    "invalid_archive_rejected"
+  ],
+  "source_sha256": {
+    "reports/pilots/tests/test_restore.py": "12b959895e6cb66b22d9ddd535293adc2458d5b50178061fec84418a56c99057",
+    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77",
+    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
+    "reports/pilots/demo.py": "27302d23e8f792349a015c468a72b479ab0e485e867820066f03ac367d952a4d"
+  }
+}

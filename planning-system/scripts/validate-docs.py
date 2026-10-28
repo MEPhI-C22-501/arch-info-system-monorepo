@@ -90,7 +90,7 @@ for file in sorted((docs/'contracts/events').glob('*.schema.json')):
         errors.append(f'{file.name}: {exc}')
     counts['events']+=1
 
-for file in [docs/'contracts/openapi.json',docs/'contracts/task-tracker-receiver.openapi.json']:
+for file in [docs/'contracts/openapi.json',docs/'contracts/task-tracker-receiver.openapi.json',docs/'contracts/runtime.openapi.json']:
     spec=json.loads(file.read_text(encoding='utf-8'))
     try:
         validate(spec)

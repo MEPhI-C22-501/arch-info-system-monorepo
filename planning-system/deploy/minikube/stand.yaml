@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: arch-planning-system}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: planning-config, namespace: arch-planning-system}
+data:
+  APP_ENV: development
+  AUTH_MODE: demo
+  STORAGE_MODE: local
+  LOCAL_FILES: /data/files
+  INTEGRATION_MODE: mock
+  DEMO_SEED: "false"
+  ALLOWED_ORIGINS: http://planning.local,http://localhost:8080
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgres, namespace: arch-planning-system}
+spec:
+  clusterIP: None
+  selector: {app: postgres}
+  ports: [{port: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: postgres, namespace: arch-planning-system}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: {matchLabels: {app: postgres}}
+  template:
+    metadata: {labels: {app: postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16.6-alpine
+          env:
+            - {name: POSTGRES_DB, value: planning}
+            - {name: POSTGRES_USER, value: planning}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: planning-secret, key: DB_PASSWORD}}
+          ports: [{containerPort: 5432}]
+          readinessProbe: {exec: {command: [pg_isready, -U, planning, -d, planning]}, initialDelaySeconds: 5}
+          volumeMounts: [{name: database, mountPath: /var/lib/postgresql/data}]
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: "1", memory: 512Mi}}
+  volumeClaimTemplates:
+    - metadata: {name: database}
+      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 1Gi}}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: planning-files, namespace: arch-planning-system}
+spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 1Gi}}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: planning-migrate, namespace: arch-planning-system}
+spec:
+  backoffLimit: 5
+  template:
+    metadata: {labels: {app: planning-migrate}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: planning-system:local
+          imagePullPolicy: Never
+          command: [python, -m, server.manage, seed]
+          envFrom: [{configMapRef: {name: planning-config}}, {secretRef: {name: planning-secret}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planning-api, namespace: arch-planning-system}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planning-api}}
+  template:
+    metadata: {labels: {app: planning-api}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001}
+      containers:
+        - name: api
+          image: planning-system:local
+          imagePullPolicy: Never
+          envFrom: [{configMapRef: {name: planning-config}}, {secretRef: {name: planning-secret}}]
+          ports: [{containerPort: 8000}]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          readinessProbe: {httpGet: {path: /readyz, port: 8000}, initialDelaySeconds: 5}
+          livenessProbe: {httpGet: {path: /livez, port: 8000}, initialDelaySeconds: 15}
+          volumeMounts: [{name: files, mountPath: /data/files}]
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: files, persistentVolumeClaim: {claimName: planning-files}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planning-worker, namespace: arch-planning-system}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planning-worker}}
+  template:
+    metadata: {labels: {app: planning-worker}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      containers:
+        - name: worker
+          image: planning-system:local
+          imagePullPolicy: Never
+          command: [python, -m, server.worker]
+          envFrom: [{configMapRef: {name: planning-config}}, {secretRef: {name: planning-secret}}]
+          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: "1", memory: 512Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: planning-api, namespace: arch-planning-system}
+spec:
+  selector: {app: planning-api}
+  ports: [{port: 8000, targetPort: 8000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: {name: planning, namespace: arch-planning-system}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: planning.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: planning-api, port: {number: 8000}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: postgres-module-only, namespace: arch-planning-system}
+spec:
+  podSelector: {matchLabels: {app: postgres}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: arch-planning-system}
+          podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [planning-api, planning-worker, planning-migrate]}
+      ports: [{protocol: TCP, port: 5432}]

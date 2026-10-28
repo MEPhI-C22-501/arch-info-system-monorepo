@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.sqlite*
+.venv/
+artifacts/local/
+node_modules/
+.cubestore/

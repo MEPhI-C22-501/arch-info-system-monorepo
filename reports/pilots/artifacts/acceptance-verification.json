@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "checked_at_utc": "2026-10-24T23:40:52.379534+00:00",
+  "backend": "PostgreSQL",
+  "seed": "reports-acceptance-v1",
+  "dataset": {
+    "logs": 300,
+    "tasks": 40,
+    "iterations": 2,
+    "projects": 3,
+    "runs": 2,
+    "defects": 15,
+    "total_hours": 562.5,
+    "member1_hours": 187.5,
+    "member2_hours": 375.0,
+    "project_hours": 187.5,
+    "member1_project_hours": 62.5
+  },
+  "http_sources": [
+    "tracker",
+    "qa",
+    "reference",
+    "planning"
+  ],
+  "replays": 2,
+  "http_report_totals": {
+    "member1": 187.5,
+    "member2": 375.0,
+    "admin": 562.5
+  },
+  "real_sources_verified": false,
+  "source_sha256": {
+    "reports/pilots/acceptance_data.py": "d70c40bbe4a2bcd5d70f1c2ff6173439600bf109322c3ab699f91edea5995da9",
+    "reports/pilots/tests/test_acceptance.py": "1ea2377413d390deac5caa3ca664c97b68709918d75c4556b1998aba38205ced",
+    "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
+    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
+    "reports/pilots/adapters.py": "3fb4be608e81bce429cf191b50eb6023482bb84580a432e5e881a8d805872829",
+    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77"
+  }
+}

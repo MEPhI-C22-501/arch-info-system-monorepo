@@ -1,15 +1,32 @@
 version: '3'
 
+# entry point for the whole module, run `task` from reference-manager/
+# layout: backend/ (Go service), frontend/ (administration interface),
+# deployments/ (Dockerfiles, Compose, configs, migrations of both parts)
+
+vars:
+  BACKEND_DIR: backend
+  FRONTEND_DIR: frontend
+  DOCKERFILES_DIR: deployments/docker
+  IMAGE_REGISTRY: erp
+  IMAGE_TAG: latest
+  IMAGES:
+    map:
+      reference-manager: '{{.BACKEND_DIR}}'
+      reference-manager-ui: '{{.FRONTEND_DIR}}'
+
 tasks:
   generate:
-    desc: Generate all artifacts (server, models, client)
+    desc: Generate the catalog specs, domains, handlers and migrations, then the API code from every OpenAPI spec
+    dir: '{{.BACKEND_DIR}}'
     cmds:
+      - go run ./tools/gencatalog
       - |
         find api/openapi -name "openapi.yaml" -type f | while read file; do
           dir=$(dirname "$file")
-          
+
           configs=("codegen.server.yaml" "codegen.models.yaml" "codegen.client.yaml")
-          
+
           for config_name in "${configs[@]}"; do
             config="$dir/$config_name"
             if [ -f "$config" ]; then
@@ -22,13 +39,44 @@ tasks:
   lint:
     desc: Run all linters checks (pass extra flags after '--', e.g., 'task lint -- --fix')
     cmds:
+      - task: lint:backend
+      - task: lint:docker
+
+  lint:backend:
+    desc: Run golangci-lint on the backend
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
       - golangci-lint run ./... {{.CLI_ARGS}}
-      - docker run --rm -i ghcr.io/hadolint/hadolint:latest < deployments/docker/reference-manager.dockerfile
+
+  lint:docker:
+    desc: Run hadolint on the Dockerfiles of all images
+    cmds:
+      - for: { var: IMAGES }
+        cmd: docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.DOCKERFILES_DIR}}/{{.KEY}}.dockerfile
 
   tests:
     desc: Run all tests
     cmds:
-      - echo "not implemented"
+      - task: tests:backend
+      - task: tests:frontend
+
+  tests:backend:
+    desc: Run backend unit tests
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      - go test ./...
+
+  tests:integration:
+    desc: Run backend integration tests, the environment from docker-compose.test.yaml is started by testcontainers
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      # a single package, with a package list go test buffers the output until the package finishes even with -v
+      - go test -v -tags integration -count=1 ./tests {{.CLI_ARGS}}
+
+  tests:frontend:
+    desc: Run the unit tests of the admin panel (Node 18+, no dependencies)
+    cmds:
+      - node --test {{.FRONTEND_DIR}}/admin/tests/*.test.js
 
   migration:
     desc: Create new migration file
@@ -36,15 +84,30 @@ tasks:
       - migrate create -ext sql -dir deployments/migrations -seq {{.CLI_ARGS}}
 
   build:
-    desc: Build Docker image for the reference manager application
+    desc: Build all Docker images of the module (pass extra 'docker build' flags after '--', e.g., 'task build -- --no-cache')
     cmds:
-      - docker build -f deployments/docker/reference-manager.dockerfile -t erp/reference-manager:latest .
+      - for: { var: IMAGES }
+        task: build:{{.KEY}}
+
+  build:*:
+    desc: Build one Docker image by its name, e.g., 'task build:reference-manager-ui'
+    vars:
+      NAME: '{{index .MATCH 0}}'
+    preconditions:
+      - sh: '{{if hasKey .IMAGES .NAME}}true{{else}}false{{end}}'
+        msg: 'unknown image "{{.NAME}}", available: {{.IMAGES | keys | sortAlpha | join ", "}}'
+    cmds:
+      - >-
+        docker build {{.CLI_ARGS}}
+        -f {{.DOCKERFILES_DIR}}/{{.NAME}}.dockerfile
+        -t {{.IMAGE_REGISTRY}}/{{.NAME}}:{{.IMAGE_TAG}}
+        {{index .IMAGES .NAME}}
 
   up:
     desc: Start the local development environment using Docker Compose
     cmds:
       - docker compose -f deployments/docker-compose.yaml up -d --build
-  
+
   down:
     desc: Stop the local environment and remove associated volumes
     cmds:
@@ -52,6 +115,7 @@ tasks:
 
   swagger:
     desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
+    dir: '{{.BACKEND_DIR}}'
     cmds:
       - |
         URLS_JSON="["
