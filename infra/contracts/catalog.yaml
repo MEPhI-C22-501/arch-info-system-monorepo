@@ -26,7 +26,7 @@ apis:
     validation: compare-with-task-tracker
   - id: reference-manager-health
     owner: reference-manager
-    path: reference-manager/api/openapi/v1/health/openapi.yaml
+    path: reference-manager/backend/api/openapi/v1/health/openapi.yaml
     version: "1.0.0"
     base_path: /v1/health
     implementation: server-present
@@ -34,7 +34,7 @@ apis:
     validation: reference-manager-checks
   - id: reference-manager-currency
     owner: reference-manager
-    path: reference-manager/api/openapi/v1/currency/openapi.yaml
+    path: reference-manager/backend/api/openapi/v1/currency/openapi.yaml
     version: "1.0.0"
     base_path: /v1
     implementation: server-present

@@ -4,7 +4,7 @@
 
 | Замечание | Задача | Артефакт | Проверка | Статус |
 | --- | --- | --- | --- | --- |
-| Нет комплекта документов | Шаг 0–5 | `infra/docs/` | `check-mermaid.py`, `validate-contracts.py` 06.10.2026 | verified |
+| Нет комплекта документов | Шаг 0–5 | `infra/docs/` | `validate-contracts.py` 06.10.2026 | verified |
 | Пустой Compose | Шаг 2 | `compose.yaml`, `compose.dev.yaml` | `docker compose config` и `infra/scripts/smoke.sh` exit 0 | verified |
 | Нет realm и клиентов | Шаг 2 | `infra/keycloak/realm/desired.json` | Bootstrap повторно, токен `example-caller` после restart | verified |
 | Нет MinIO | Шаг 2 | `infra/images/minio` | Сборка, digest `sha256:cc5db89840c1112b7b9f7bd1a765be04f48087d5bbf8c2f06ba9d064b6f7560f`, бакеты и эталон S3 | verified |
@@ -17,7 +17,7 @@
 | Нет minikube | Шаг 6 | `infra/k8s/` | `minikube` и `kubectl` не установлены, кластер не запускался | blocked для запуска, манифесты есть |
 | Справочники запрещают учётные записи | Не повторять | vision справочников от 02.10.2026 уже включает HR и Keycloak | Сверка `reference-manager/documents/vision.md` | устарело |
 | Битая ссылка на vision справочников | Шаг 0 | `infra/vision.md` | Путь `reference-manager/documents/vision.md` существует | verified |
-| Пять видов интеграции | Шаг 0 | vision, 162, 078 | В перечне четыре вида, `check-mermaid.py` успешен | verified |
+| Пять видов интеграции | Шаг 0 | vision, 162, 078 | В перечне четыре вида | verified |
 | QA нет в границах и бакетах | Шаг 0 и 2 | vision, бакет `arch-dev-qa` | Бакет создан, политика `qa-own` привязана к `qa-system` | verified |
 | События Task Tracker и Planning не совпадают | Шаг 1 | `135`, `160` | Расхождение зафиксировано, контракт не объявлен agreed | draft |
 | QA отказывается от DLQ | Шаг 1 | `135`, ADR-011 | Повтор издателя и DLQ потребителя разделены | draft |
