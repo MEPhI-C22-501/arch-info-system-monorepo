@@ -24,6 +24,8 @@ type fieldView struct {
 	IsDate      bool
 	IsEnum      bool
 	GoDefault   string
+	// Later is true for a column added by a hand-written migration, the create migration leaves it out.
+	Later bool
 
 	SchemaYAML string
 	SQLColumn  string
@@ -130,6 +132,7 @@ func newFieldView(f Field, apiPkg string) fieldView {
 		IsEnum:      f.Kind == KindEnum,
 		ExportName:  humanize(f.Name),
 		GoDefault:   f.GoDefault,
+		Later:       f.Migration > 0,
 	}
 
 	var (

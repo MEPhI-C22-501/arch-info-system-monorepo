@@ -34,6 +34,10 @@ type Infra struct {
 	BaseURL     string
 	PostgresDSN string
 	KeycloakURL string
+	// KeycloakAdmin and KeycloakAdminPassword are the bootstrap administrator of the test Keycloak,
+	// the steps check the accounts of employees through the Admin REST API with them.
+	KeycloakAdmin         string
+	KeycloakAdminPassword string
 }
 
 func Up(ctx context.Context, composeFile string) (*Infra, error) {
@@ -125,6 +129,15 @@ func (i *Infra) resolveEndpoints(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get %s endpoint: %w", keycloakName, err)
 	}
+
+	keycloakInspect, err := keycloak.Inspect(ctx)
+	if err != nil {
+		return fmt.Errorf("inspect %s container: %w", keycloakName, err)
+	}
+
+	keycloakEnv := parseEnv(keycloakInspect.Config.Env)
+	i.KeycloakAdmin = keycloakEnv["KC_BOOTSTRAP_ADMIN_USERNAME"]
+	i.KeycloakAdminPassword = keycloakEnv["KC_BOOTSTRAP_ADMIN_PASSWORD"]
 
 	return nil
 }

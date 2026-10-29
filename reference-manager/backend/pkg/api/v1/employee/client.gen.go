@@ -183,6 +183,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /v1/employees/{employeeID}/revisions/{revisionNumber} (the `GetEmployeeRevision` operationId).
 	GetEmployeeRevision(ctx context.Context, employeeID EmployeeID, revisionNumber RevisionNumber, params *GetEmployeeRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SyncEmployeeAccount Repeat the pending operation with the Keycloak account
+	//
+	// Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56).
+	//
+	// Corresponds with POST /v1/employees/{employeeID}/syncAccount (the `SyncEmployeeAccount` operationId).
+	SyncEmployeeAccount(ctx context.Context, employeeID EmployeeID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListEmployees List employees with pagination
@@ -389,6 +396,23 @@ func (c *Client) ListEmployeeRevisions(ctx context.Context, employeeID EmployeeI
 // Corresponds with GET /v1/employees/{employeeID}/revisions/{revisionNumber} (the `GetEmployeeRevision` operationId).
 func (c *Client) GetEmployeeRevision(ctx context.Context, employeeID EmployeeID, revisionNumber RevisionNumber, params *GetEmployeeRevisionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetEmployeeRevisionRequest(c.Server, employeeID, revisionNumber, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SyncEmployeeAccount Repeat the pending operation with the Keycloak account
+//
+// Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56).
+//
+// Corresponds with POST /v1/employees/{employeeID}/syncAccount (the `SyncEmployeeAccount` operationId).
+func (c *Client) SyncEmployeeAccount(ctx context.Context, employeeID EmployeeID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSyncEmployeeAccountRequest(c.Server, employeeID)
 	if err != nil {
 		return nil, err
 	}
@@ -988,6 +1012,40 @@ func NewGetEmployeeRevisionRequest(server string, employeeID EmployeeID, revisio
 	return req, nil
 }
 
+// NewSyncEmployeeAccountRequest constructs an http.Request for the SyncEmployeeAccount method
+func NewSyncEmployeeAccountRequest(server string, employeeID EmployeeID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "employeeID", employeeID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/employees/%s/syncAccount", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1137,6 +1195,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /v1/employees/{employeeID}/revisions/{revisionNumber} (the `GetEmployeeRevision` operationId).
 	GetEmployeeRevisionWithResponse(ctx context.Context, employeeID EmployeeID, revisionNumber RevisionNumber, params *GetEmployeeRevisionParams, reqEditors ...RequestEditorFn) (*GetEmployeeRevisionResponse, error)
+
+	// SyncEmployeeAccountWithResponse Repeat the pending operation with the Keycloak account
+	//
+	// Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/employees/{employeeID}/syncAccount (the `SyncEmployeeAccount` operationId).
+	SyncEmployeeAccountWithResponse(ctx context.Context, employeeID EmployeeID, reqEditors ...RequestEditorFn) (*SyncEmployeeAccountResponse, error)
 }
 
 type ListEmployeesResponse struct {
@@ -1823,6 +1890,89 @@ func (r GetEmployeeRevisionResponse) ContentType() string {
 	return ""
 }
 
+type SyncEmployeeAccountResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuccessWithExpandedEmployee
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON200() *SuccessWithExpandedEmployee {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r SyncEmployeeAccountResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SyncEmployeeAccountResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SyncEmployeeAccountResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SyncEmployeeAccountResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SyncEmployeeAccountResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListEmployeesWithResponse List employees with pagination
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1999,6 +2149,21 @@ func (c *ClientWithResponses) GetEmployeeRevisionWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetEmployeeRevisionResponse(rsp)
+}
+
+// SyncEmployeeAccountWithResponse Repeat the pending operation with the Keycloak account
+//
+// Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/employees/{employeeID}/syncAccount (the `SyncEmployeeAccount` operationId).
+func (c *ClientWithResponses) SyncEmployeeAccountWithResponse(ctx context.Context, employeeID EmployeeID, reqEditors ...RequestEditorFn) (*SyncEmployeeAccountResponse, error) {
+	rsp, err := c.SyncEmployeeAccount(ctx, employeeID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSyncEmployeeAccountResponse(rsp)
 }
 
 // ParseListEmployeesResponse parses an HTTP response from a ListEmployeesWithResponse call
@@ -2546,6 +2711,74 @@ func ParseGetEmployeeRevisionResponse(rsp *http.Response) (*GetEmployeeRevisionR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSyncEmployeeAccountResponse parses an HTTP response from a SyncEmployeeAccountWithResponse call
+func ParseSyncEmployeeAccountResponse(rsp *http.Response) (*SyncEmployeeAccountResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SyncEmployeeAccountResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuccessWithExpandedEmployee
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

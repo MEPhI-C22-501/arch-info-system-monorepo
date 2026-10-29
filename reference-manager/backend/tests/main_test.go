@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/infra"
 	httpsteps "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/http"
+	keycloaksteps "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/keycloak"
 	sqlsteps "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/tests/steps/sql"
 )
 
@@ -61,6 +62,7 @@ func TestFeatures(t *testing.T) {
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
 			httpsteps.New(env.BaseURL, client, tokens).Register(sc)
 			sqlsteps.New(pool).Register(sc)
+			keycloaksteps.New(env.KeycloakURL, realm, env.KeycloakAdmin, env.KeycloakAdminPassword, client).Register(sc)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",

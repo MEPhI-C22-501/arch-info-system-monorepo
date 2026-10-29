@@ -1,6 +1,7 @@
 package app
 
 import (
+	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
 	httpconfig "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/keycloak"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
@@ -15,7 +16,8 @@ type Config struct {
 }
 
 type TransportConfig struct {
-	HTTP httpconfig.Config `yaml:"http"`
+	HTTP   httpconfig.Config `yaml:"http"`
+	Limits httptr.Limits     `yaml:"limits"`
 }
 
 type DatabasesConfig struct {

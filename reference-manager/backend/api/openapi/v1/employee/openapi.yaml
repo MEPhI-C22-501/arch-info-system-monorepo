@@ -221,6 +221,36 @@ paths:
           description: Internal Server Error.
           $ref: '#/components/responses/Error'
 
+  /v1/employees/{employeeID}/syncAccount:
+    post:
+      operationId: syncEmployeeAccount
+      summary: Repeat the pending operation with the Keycloak account
+      description: "Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56)."
+      x-required-roles: [reference-hr-admin]
+      parameters:
+        - $ref: '#/components/parameters/EmployeeID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessWithExpandedEmployee'
+        '400':
+          description: Bad Request. Invalid input data or the operation is not allowed in the current state.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client lacks the role required for the operation.
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Not Found. The employee does not exist or is deleted.
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Conflict. The employee was modified concurrently.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error.
+          $ref: '#/components/responses/Error'
+
   /v1/employees/{employeeID}/revisions:
     get:
       operationId: listEmployeeRevisions
@@ -339,6 +369,14 @@ components:
         - EMPLOYED
         - DISMISSED
 
+    AccountState:
+      type: string
+      description: "State of the Keycloak account: PENDING until the last operation with the account is confirmed, ENABLED while the employee works, DISABLED after the dismissal (FR-RM-55)."
+      enum:
+        - PENDING
+        - ENABLED
+        - DISABLED
+
     Employee:
       type: object
       description: The fields of a employee a client sets on creation and update.
@@ -403,6 +441,7 @@ components:
         - username
         - hire_date
         - employment_state
+        - account_state
         - is_deleted
         - revision
         - last_changer
@@ -474,6 +513,13 @@ components:
           minimum: 1
           description: "Identifier of the position from the assignment in effect today, filled by migration 000011. Read-only, set by the service."
           example: 1
+        account_state:
+          $ref: '#/components/schemas/AccountState'
+        account_user_id:
+          type: string
+          maxLength: 36
+          description: "Identifier of the Keycloak account, the sub claim of its tokens. Empty until the account is created, kept after the dismissal. Read-only, set by the service."
+          example: "9b2f1c4e-6d3a-4b8e-9f10-2a7c5d8e1b34"
         is_deleted:
           type: boolean
           description: Indicates whether the record has been soft-deleted.

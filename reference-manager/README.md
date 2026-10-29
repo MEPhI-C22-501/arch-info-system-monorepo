@@ -28,7 +28,9 @@ Every catalog is a collection under `/v1/` with the same methods: create, list, 
 
 To add a catalog: append a definition to `defs.go`, run `task generate`, write `rules.go` when the catalog has cross-field rules, register the service in `internal/app/reference-manager/catalogs.go` and add feature files under `tests/features/`.
 
-Employees carry `employment_state` and `dismissal_date`, both set by the service. `POST /v1/employees/{employeeID}/dismiss` closes the assignment and the salary in effect with the dismissal date. The unit and the position of an employee are computed from the assignment in effect today (migration `000011`). Keycloak accounts for employees are not implemented yet.
+Employees carry `employment_state` and `dismissal_date`, both set by the service. `POST /v1/employees/{employeeID}/dismiss` closes the assignment and the salary in effect with the dismissal date. The unit and the position of an employee are computed from the assignment in effect today (migration `000011`).
+
+Every employee has a Keycloak account managed by the service through the Admin REST API under the client `reference-manager-provisioner` (FR-RM-53..58). `account_state` and `account_user_id` are read-only fields of the record: the creation stores the record with `PENDING`, creates a disabled account with a random temporary password (the employee changes it at the first login), gives it the realm roles from the configuration, enables it and stores its ID with `ENABLED`. The dismissal disables the account (`DISABLED`, the ID stays), a changed name or email is passed to the account, a working employee with an account cannot be deleted. When Keycloak is unavailable the record stays `PENDING` and the method answers `503`; `POST /v1/employees/{employeeID}/syncAccount` repeats the operation and never creates a second account (the account is found by its ID, or by username when the email matches). The `pkg/keycloak` package holds the client, `internal/services/employee` the coordination.
 
 ## Requirements
 
@@ -49,9 +51,11 @@ Configuration is split into separate files by responsibility:
 | `transport.yaml` | HTTP transport configuration                        |
 | `telemetry.yaml` | Logs, traces and metrics, export to the collector   |
 | `databases.yaml` | Database connections, retries, and connection pools |
-| `auth.yaml`      | Verification of Keycloak access tokens              |
+| `auth.yaml`      | Verification of Keycloak access tokens, the provisioner client of employee accounts |
 
 Environment-specific configuration examples are stored separately in the examples directory.
+
+Secrets are never written to the configuration files: the database password comes from `POSTGRES_PASSWORD` and the secret of the provisioner client from `KEYCLOAK_PROVISIONER_SECRET` of the environment. Compose takes both from `deployments/.env`.
 
 ### Transport layer
 
@@ -65,6 +69,14 @@ HTTP server configuration is defined under `transport.http`.
 | `read_timeout`        | `duration` | Maximum time allowed for reading the complete request |
 | `write_timeout`       | `duration` | Maximum time allowed for writing a response           |
 | `idle_timeout`        | `duration` | Maximum time an idle connection can remain open       |
+
+Request limits of the router are defined under `transport.limits`.
+
+| Parameter             | Type       | Description                                                   |
+| --------------------- | ---------- | ------------------------------------------------------------- |
+| `requests_per_second` | `float`    | Sustained rate of accepted requests, `10` by default          |
+| `burst`               | `int`      | Size of the token bucket, `100` by default                    |
+| `request_timeout`     | `duration` | Timeout of one request, the context is cancelled after it, `1s` by default |
 
 ### Logging
 
@@ -115,8 +127,10 @@ PostgreSQL connection settings are defined under `databases.postgres`.
 | `host`     | `string` | PostgreSQL server hostname |
 | `port`     | `int`    | PostgreSQL server port     |
 | `user`     | `string` | Database user              |
-| `password` | `string` | Database password          |
+| `password` | `string` | Database password, read from `POSTGRES_PASSWORD` of the environment |
 | `database` | `string` | Database name              |
+
+The service connects as `reference_manager_app`, an account with data rights only (select, insert, update, delete on the tables, usage on the sequences). The schema belongs to `reference_manager`, the account of the migrations and the seed. In the local environment `deployments/postgres/init/10-app-role.sh` creates the service account on the first start of the database with the password `POSTGRES_APP_PASSWORD`, on the shared stand both accounts are provided by Infra.
 
 #### Connection retry
 
@@ -164,6 +178,19 @@ Token verification is configured under `auth.keycloak`.
 | `jwks.unknown_key_refresh_interval` | `duration` | Minimal period between refreshes caused by unknown keys, `1m` by default                          |
 | `jwks.request_timeout`              | `duration` | Timeout of a request for the keys, `5s` by default                                                |
 
+### Employee accounts
+
+The accounts of employees are managed under `auth.keycloak.provisioner` (see [Catalogs](#catalogs)). The client needs the roles `manage-users`, `view-users`, `query-users` and `view-realm` of the `realm-management` client.
+
+| Parameter             | Type       | Description                                                                                       |
+| --------------------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `base_url`            | `string`   | Address of Keycloak for the Admin REST API, derived from `jwks_url` (or the issuer) by default     |
+| `realm`               | `string`   | Realm of the accounts, derived from `jwks_url` (or the issuer) by default                          |
+| `client_id`           | `string`   | Service client, `reference-manager-provisioner` by default                                        |
+| `client_secret`       | `string`   | Secret of the client, read from `KEYCLOAK_PROVISIONER_SECRET` of the environment only. Required   |
+| `request_timeout`     | `duration` | Timeout of one call to Keycloak, `5s` by default                                                  |
+| `default_realm_roles` | `[]string` | Realm roles given to every created account, `reference-reader` in the local environment           |
+
 ### Telemetry
 
 Logs are written to stdout and, together with traces and metrics, sent over OTLP gRPC to the OpenTelemetry Collector. Every HTTP request except `/v1/health/*` gets a span named after its route with child spans of the database queries (query parameters are not recorded); an incoming `traceparent` is continued and the trace ID is returned in the `X-Trace-Id` header. Metrics cover HTTP requests, database queries, the connection pool and the Go runtime. The exporters connect lazily, so an unavailable collector neither blocks the startup nor affects requests: export errors are logged to stdout and the data is dropped.
@@ -196,7 +223,9 @@ task up
 
 The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`. The admin panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`).
 
-The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+Copy `deployments/.env.example` to `deployments/.env` first: it holds every secret of the environment (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PROVISIONER_SECRET`), the configuration files hold none. The service account of the database is created on the first start of the database, so run `task down` before `task up` on an environment created before this version. When port `5432` is taken on the host, set `POSTGRES_PORT`.
+
+The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` (its secret is substituted from `KEYCLOAK_PROVISIONER_SECRET` by `deployments/configs/keycloak/import-realm.sh` on the start of Keycloak) and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
 
 The environment also includes the telemetry stack:
 
@@ -217,6 +246,17 @@ TOKEN=$(curl -s -d grant_type=password -d client_id=reference-manager-ui -d user
   http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token | jq -r .access_token)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/currencies/
 ```
+
+### Demonstration data
+
+`task demo` fills the running environment with a demonstration data set and creates the Keycloak accounts of its employees:
+
+```bash
+task demo:data      # loads deployments/seed/demo.sql: classifiers, units, positions, 8 employees with assignments, salaries and absences
+task demo:accounts  # calls POST /v1/employees/{id}/syncAccount for every employee as hr-admin (backend/tools/demoaccounts)
+```
+
+The data set is loaded once: a second `task demo:data` finds the employees and changes nothing. Every record has its first revision. The accounts appear in the Keycloak admin console under the realm `arch-info-system`, each with a temporary password and a forced password change; `task demo:accounts` is safe to repeat. A typical demonstration after that: hire an employee (`POST /v1/employees/`), show the enabled account in Keycloak, export `POST /v1/employees/export`, dismiss the employee (`POST /v1/employees/{id}/dismiss`) and show the disabled account and the revisions of the record.
 
 To stop the local environment and remove its associated volumes:
 

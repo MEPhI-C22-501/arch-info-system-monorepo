@@ -59,6 +59,8 @@ func ErrorToAPI(err error, singular string) (Error, int) {
 		return Error{Message: singular + " revision not found"}, http.StatusNotFound
 	case errors.Is(err, domains.ErrNotFound):
 		return Error{Message: singular + " not found"}, http.StatusNotFound
+	case errors.Is(err, domains.ErrUnavailable):
+		return Error{Message: err.Error()}, http.StatusServiceUnavailable
 	default:
 		return Error{Message: "internal server error"}, http.StatusInternalServerError
 	}

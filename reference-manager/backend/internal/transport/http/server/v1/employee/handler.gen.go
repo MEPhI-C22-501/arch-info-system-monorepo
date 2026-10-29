@@ -31,6 +31,7 @@ type Service interface {
 	GetRevision(ctx context.Context, id int64, revisionNumber int32, allowDeleted bool) (*record.Revision, error)
 	ListRevisions(ctx context.Context, request *record.RevisionListRequest) (*record.RevisionListPage, error)
 	Dismiss(ctx context.Context, id int64, dismissalDate time.Time) (*record.Expanded[employeedmn.Fields], error)
+	SyncAccount(ctx context.Context, id int64) (*record.Expanded[employeedmn.Fields], error)
 }
 
 type Handler struct {
@@ -184,6 +185,7 @@ func fieldsFromAPI(in *employeev1.Employee) *employeedmn.Fields {
 		Username:        in.Username,
 		HireDate:        in.HireDate.Time,
 		EmploymentState: "EMPLOYED",
+		AccountState:    "PENDING",
 	}
 }
 
@@ -203,6 +205,8 @@ func expandedToAPI(m *record.Expanded[employeedmn.Fields]) employeev1.ExpandedEm
 		DismissalDate:   recordhndl.DatePtrTo(f.DismissalDate),
 		OrgUnitId:       f.OrgUnitID,
 		PositionId:      f.PositionID,
+		AccountState:    employeev1.AccountState(f.AccountState),
+		AccountUserId:   f.AccountUserID,
 		IsDeleted:       m.IsDeleted,
 		Revision:        m.Revision,
 		LastChanger:     m.LastChanger,

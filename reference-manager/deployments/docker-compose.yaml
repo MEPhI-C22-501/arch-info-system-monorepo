@@ -8,6 +8,11 @@ services:
 
     command: [ "--configs", "/app/configs/reference-manager" ]
 
+    # secrets come from .env only, the configuration files hold no passwords (NFR-RM-22)
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET}
+
     ports:
       - "${REFERENCE_MANAGER_PORT:-8080}:8080"
 
@@ -38,11 +43,31 @@ services:
     volumes:
       - ./migrations:/migrations:ro
 
-    command: [ "-path=/migrations", "-database=postgres://reference_manager:reference_manager@reference-manager-database:5432/reference_manager?sslmode=disable", "up" ]
+    command: [ "-path=/migrations", "-database=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@reference-manager-database:5432/${POSTGRES_DB}?sslmode=disable", "up" ]
 
     depends_on:
       reference-manager-database:
         condition: service_healthy
+
+    restart: "no"
+
+  # loads the demonstration data set, started by `task demo:data` only (profile demo)
+  reference-manager-seed:
+    container_name: reference_manager_seed
+    image: postgres:18-alpine
+    profiles: [ "demo" ]
+
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+
+    command: [ "psql", "-v", "ON_ERROR_STOP=1", "-h", "reference-manager-database", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}", "-f", "/seed/demo.sql" ]
+
+    volumes:
+      - ./seed/demo.sql:/seed/demo.sql:ro
+
+    depends_on:
+      reference-manager-migrations:
+        condition: service_completed_successfully
 
     restart: "no"
 
@@ -54,12 +79,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # the account of the service, created by postgres/init with data rights only (K-08)
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
 
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
 
     volumes:
       - reference_manager_database_data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
 
     restart: unless-stopped
 
@@ -75,7 +103,8 @@ services:
     container_name: reference_manager_keycloak
     image: quay.io/keycloak/keycloak:26.7.4
 
-    command: [ "start-dev", "--import-realm" ]
+    # the entry point writes the realm with the secret of the provisioner client, then starts Keycloak
+    entrypoint: [ "/bin/bash", "/opt/keycloak/import-realm.sh" ]
 
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
@@ -83,12 +112,14 @@ services:
       # the issuer of the tokens, it has to match auth.keycloak.issuer_url of the service
       KC_HOSTNAME: http://localhost:8180
       KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET}
 
     ports:
       - "8180:8080"
 
     volumes:
-      - ./configs/keycloak/arch-info-system-realm.json:/opt/keycloak/data/import/arch-info-system-realm.json:ro
+      - ./configs/keycloak/arch-info-system-realm.json:/opt/keycloak/realm-template/arch-info-system-realm.json:ro
+      - ./configs/keycloak/import-realm.sh:/opt/keycloak/import-realm.sh:ro
 
     restart: unless-stopped
 

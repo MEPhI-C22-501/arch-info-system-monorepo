@@ -41,6 +41,9 @@ type Field struct {
 	EnumName string
 	// Ref is the referenced table of a KindRef field.
 	Ref string
+	// Migration is the number of the hand-written migration that adds the column to an existing table,
+	// zero means the column is created with the table. The create migration and its view leave such fields out.
+	Migration int
 }
 
 // CustomOp is a catalog-specific method the generator declares in the spec and the service interface,
@@ -52,6 +55,7 @@ type CustomOp struct {
 	Summary     string
 	Description string
 	// BodySchema is the name of the request body schema, BodyYAML its YAML definition indented by four spaces.
+	// An operation without a body leaves both empty.
 	BodySchema string
 	BodyYAML   string
 	// ServiceMethod is the Go signature the handler expects from the service.
@@ -175,6 +179,10 @@ var Catalogs = []Catalog{
 			{Name: "dismissal_date", Kind: KindDate, ServerManaged: true, Description: "Date of dismissal, set by the dismissal.", Example: "2026-10-31"},
 			{Name: "org_unit_id", Kind: KindRef, Ref: "org_units", Computed: "NULL::bigint", Description: "Identifier of the unit from the assignment in effect today, filled by migration 000011.", Example: "1"},
 			{Name: "position_id", Kind: KindRef, Ref: "positions", Computed: "NULL::bigint", Description: "Identifier of the position from the assignment in effect today, filled by migration 000011.", Example: "1"},
+			{Name: "account_state", Kind: KindEnum, Required: true, ServerManaged: true, Default: "'PENDING'", GoDefault: `"PENDING"`, Enum: []string{"PENDING", "ENABLED", "DISABLED"}, EnumName: "AccountState", Migration: 12,
+				Description: "State of the Keycloak account: PENDING until the last operation with the account is confirmed, ENABLED while the employee works, DISABLED after the dismissal (FR-RM-55).", Example: "ENABLED"},
+			{Name: "account_user_id", Kind: KindString, ServerManaged: true, MaxLen: 36, Migration: 12,
+				Description: "Identifier of the Keycloak account, the sub claim of its tokens. Empty until the account is created, kept after the dismissal.", Example: "9b2f1c4e-6d3a-4b8e-9f10-2a7c5d8e1b34"},
 		},
 		Constraints: []string{"CONSTRAINT chk_employees_dismissal CHECK (dismissal_date IS NULL OR dismissal_date >= hire_date)"},
 		Indexes:     []string{"CREATE INDEX idx_employees_employment_state ON employees (employment_state) WHERE is_deleted = FALSE;"},
@@ -186,6 +194,10 @@ var Catalogs = []Catalog{
 			BodyYAML: "      type: object\n      required:\n        - dismissal_date\n      properties:\n        dismissal_date:\n" +
 				"          type: string\n          format: date\n          description: Last day of employment, not earlier than the hire date.\n          example: \"2026-10-31\"\n",
 			ServiceMethod: "Dismiss(ctx context.Context, id int64, dismissalDate time.Time) (*record.Expanded[employeedmn.Fields], error)",
+		}, {
+			Path: "syncAccount", OperationID: "syncEmployeeAccount", Summary: "Repeat the pending operation with the Keycloak account",
+			Description:   "Brings the Keycloak account in line with the record: creates it when it is missing, enables it while the employee works, disables it after the dismissal and passes the names and the email. Safe to repeat, a second account is never created (FR-RM-56).",
+			ServiceMethod: "SyncAccount(ctx context.Context, id int64) (*record.Expanded[employeedmn.Fields], error)",
 		}},
 	},
 	{
