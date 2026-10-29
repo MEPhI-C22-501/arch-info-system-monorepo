@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: QA System API
-  version: 0.2.0-draft
+  version: 0.3.0-draft
   description: >
     Draft contract of the QA System (test management). Described in
     qa/docs/130.api-contracts.md. Role names refer to qa/docs/070.role-matrix.md.
@@ -11,6 +11,9 @@ security:
   - bearerAuth: []
 tags:
   - name: test-cases
+  - name: templates
+  - name: suites
+  - name: admin
   - name: test-plans
   - name: runs
   - name: defects
@@ -24,11 +27,12 @@ paths:
       summary: List test cases with filters
       parameters:
         - { name: module, in: query, schema: { type: string } }
-        - { name: status, in: query, schema: { $ref: '#/components/schemas/TestCaseStatus' } }
+        - { name: status, in: query, description: Without status ARCHIVED cases are not listed, schema: { $ref: '#/components/schemas/TestCaseStatus' } }
         - { name: type, in: query, schema: { type: string } }
         - { name: epicRef, in: query, schema: { type: string } }
         - { name: automated, in: query, schema: { type: boolean } }
         - { name: q, in: query, description: Substring of key or title, schema: { type: string } }
+        - { name: suiteId, in: query, description: Cases of a suite (MANUAL composition or FILTER condition), schema: { type: string, format: uuid } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/PageSize' }
       responses:
@@ -76,6 +80,12 @@ paths:
       tags: [test-cases]
       operationId: updateTestCase
       summary: Save the test case; creates a new immutable version when content changed
+      description: >
+        Fields missing from the request keep their values from the current version. The module
+        is immutable (the key is built from it). Reference fields (featureRef, epicRef,
+        requirementRef) change without a new version. Errors - 409 CASE_ARCHIVED,
+        409 VERSION_CONFLICT (stale `version` or a parallel save), 403 when a role other than
+        qa-automation or qa-lead changes `automated` or `autotestKey`, 422 VALIDATION_FAILED.
       requestBody:
         required: true
         content:
@@ -93,8 +103,13 @@ paths:
       tags: [test-cases]
       operationId: deleteDraftTestCase
       summary: Delete a draft that never took part in a run
+      description: >
+        Testers and automation engineers delete only their own drafts, qa-lead any draft.
+        409 INVALID_TRANSITION - the case is not a draft; 409 CASE_HAS_RUNS - the case has run
+        results or defects.
       responses:
         '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /test-cases/{id}/status:
     parameters:
@@ -103,6 +118,9 @@ paths:
       tags: [test-cases]
       operationId: changeTestCaseStatus
       summary: Change status (ACTUAL, NEEDS_UPDATE, ARCHIVED)
+      description: >
+        Transitions of qa/docs/050.entities.md, section 2. 409 INVALID_TRANSITION lists the
+        allowed targets in errors[].reason; 409 CASE_NOT_READY - no step with an expected result.
       requestBody:
         required: true
         content:
@@ -143,6 +161,9 @@ paths:
       tags: [test-cases]
       operationId: copyTestCases
       summary: Copy one or several test cases atomically
+      description: >
+        Each copy is a DRAFT version 1 with copiedFromId set. `automated` and `autotestKey` are
+        not copied - one autotest is linked to one case.
       requestBody:
         required: true
         content:
@@ -207,6 +228,273 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportReport' }
+        '422': { $ref: '#/components/responses/Error' }
+  /templates:
+    get:
+      tags: [templates]
+      operationId: listTemplates
+      summary: List test case templates (qa-tester and above)
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Page of templates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplatePage' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [templates]
+      operationId: createTemplate
+      summary: Create a template (qa-admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /templates/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [templates]
+      operationId: getTemplate
+      summary: Get a template
+      responses:
+        '200':
+          description: Template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [templates]
+      operationId: updateTemplate
+      summary: Replace a template (qa-admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /suites:
+    get:
+      tags: [suites]
+      operationId: listSuites
+      summary: List suites
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/SuiteStatus' } }
+        - { name: purpose, in: query, schema: { $ref: '#/components/schemas/SuitePurpose' } }
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/SuiteKind' } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Page of suites
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuitePage' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [suites]
+      operationId: createSuite
+      summary: Create a suite; SMOKE and ACCEPTANCE - qa-lead only, one of each
+      description: >
+        422 VALIDATION_FAILED with errors[] - duplicate name (name/duplicate), the second suite
+        of a purpose (purpose/exists:<name>), a case that is not ACTUAL (caseIds.N/status:<status>),
+        filter missing for FILTER or present for MANUAL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SuiteInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suite' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /suites/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [suites]
+      operationId: getSuite
+      summary: Get a suite with its composition
+      responses:
+        '200':
+          description: Suite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suite' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [suites]
+      operationId: updateSuite
+      summary: Replace name, kind, filter and composition
+      description: >
+        Purpose is immutable. The name of SMOKE and ACCEPTANCE suites is fixed: the pipeline finds
+        the suite by name (suiteName). Cases already in the suite stay whatever their status;
+        new ones must be ACTUAL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SuiteInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suite' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /suites/{id}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [archive, restore] } }
+    post:
+      tags: [suites]
+      operationId: changeSuiteStatus
+      summary: Archive or restore a suite (owner or qa-lead; SMOKE and ACCEPTANCE - qa-lead)
+      description: Archiving deactivates the suite schedules. A repeated action - 409 INVALID_TRANSITION.
+      responses:
+        '200':
+          description: Status changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suite' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /admin/classifiers:
+    get:
+      tags: [admin]
+      operationId: listClassifiers
+      summary: Severity, priority and case type values (read - qa-viewer to qa-admin)
+      parameters:
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/ClassifierKind' } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Page of values
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClassifierPage' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      operationId: createClassifier
+      summary: Add a priority or case type value (qa-admin); severity codes are fixed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClassifierInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Classifier' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /admin/classifiers/{kind}/{code}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { $ref: '#/components/schemas/ClassifierKind' } }
+      - { name: code, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [admin]
+      operationId: updateClassifier
+      summary: Rename, reorder, enable or disable a value (qa-admin)
+      description: Disabling a value used by a current case version, an active template or an open defect - 409 VALUE_IN_USE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClassifierUpdate' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Classifier' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /admin/environments:
+    get:
+      tags: [admin]
+      operationId: listEnvironments
+      summary: Environments (read - qa-viewer to qa-admin)
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Page of environments
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvironmentPage' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [admin]
+      operationId: createEnvironment
+      summary: Create an environment (qa-admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnvironmentInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /admin/environments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    put:
+      tags: [admin]
+      operationId: updateEnvironment
+      summary: Change name, base URLs or activity (qa-admin); the code is immutable
+      description: Disabling an environment with unfinished runs or active schedules - 409 VALUE_IN_USE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnvironmentUpdate' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /test-plans:
     get:
@@ -644,6 +932,12 @@ components:
         steps:
           type: array
           items: { $ref: '#/components/schemas/Step' }
+        version:
+          type: integer
+          minimum: 1
+          description: >
+            PUT only, optional: the version the edit is based on. If the case already has a
+            newer version, the save is rejected with 409 VERSION_CONFLICT.
     TestCase:
       allOf:
         - $ref: '#/components/schemas/TestCaseInput'
@@ -654,7 +948,10 @@ components:
             key: { type: string, examples: [TC-RM-03] }
             status: { $ref: '#/components/schemas/TestCaseStatus' }
             version: { type: integer }
+            currentVersion: { type: integer, description: Number of the latest version }
             copiedFromId: { type: string, format: uuid }
+            createdBy: { type: string }
+            createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
             lastResult:
               description: >
@@ -711,6 +1008,180 @@ components:
               row: { type: integer }
               field: { type: string }
               reason: { type: string }
+    SuiteKind: { type: string, enum: [MANUAL, FILTER] }
+    SuiteStatus: { type: string, enum: [ACTIVE, ARCHIVED] }
+    SuitePurpose: { type: string, enum: [GENERAL, SMOKE, ACCEPTANCE] }
+    ClassifierKind: { type: string, enum: [SEVERITY, PRIORITY, CASE_TYPE] }
+    TemplateBody:
+      type: object
+      description: Default fields and steps of a new case
+      properties:
+        description: { type: string }
+        preconditions: { type: string }
+        priority: { type: string }
+        severity: { $ref: '#/components/schemas/Severity' }
+        type: { type: string }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/Step' }
+    TemplateInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        body: { $ref: '#/components/schemas/TemplateBody' }
+        isActive: { type: boolean, default: true }
+    Template:
+      type: object
+      required: [id, name, body, isActive]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        body: { $ref: '#/components/schemas/TemplateBody' }
+        isActive: { type: boolean }
+    TemplatePage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Template' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    CaseFilter:
+      type: object
+      additionalProperties: false
+      description: >
+        Case selection of a FILTER suite; same meaning as the GET /test-cases parameters.
+        suiteId may reference a MANUAL suite only.
+      properties:
+        module: { type: string }
+        status: { $ref: '#/components/schemas/TestCaseStatus' }
+        type: { type: string }
+        epicRef: { type: string }
+        automated: { type: boolean }
+        q: { type: string }
+        suiteId: { type: string, format: uuid }
+    SuiteInput:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string, minLength: 1 }
+        kind: { $ref: '#/components/schemas/SuiteKind' }
+        purpose:
+          $ref: '#/components/schemas/SuitePurpose'
+          description: GENERAL when omitted on create; immutable afterwards
+        filter: { $ref: '#/components/schemas/CaseFilter' }
+        caseIds:
+          type: array
+          description: Full composition of a MANUAL suite
+          items: { type: string, format: uuid }
+    Suite:
+      type: object
+      required: [id, name, kind, purpose, status, owner, caseIds, caseCount]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/SuiteKind' }
+        purpose: { $ref: '#/components/schemas/SuitePurpose' }
+        status: { $ref: '#/components/schemas/SuiteStatus' }
+        owner: { type: string }
+        filter:
+          oneOf:
+            - { $ref: '#/components/schemas/CaseFilter' }
+            - { type: 'null' }
+        caseIds:
+          type: array
+          items: { type: string, format: uuid }
+        caseCount: { type: integer, description: Cases the suite selects now, archived excluded }
+    SuitePage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Suite' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    ClassifierInput:
+      type: object
+      required: [kind, code, name]
+      properties:
+        kind: { $ref: '#/components/schemas/ClassifierKind' }
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,31}$' }
+        name: { type: string, minLength: 1 }
+        sortOrder: { type: integer, default: 0 }
+        isActive: { type: boolean, default: true }
+    ClassifierUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+    Classifier:
+      type: object
+      required: [kind, code, name, sortOrder, isActive]
+      properties:
+        kind: { $ref: '#/components/schemas/ClassifierKind' }
+        code: { type: string }
+        name: { type: string }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+    ClassifierPage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Classifier' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    EnvironmentInput:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[a-z][a-z0-9-]{0,31}$' }
+        name: { type: string, minLength: 1 }
+        baseUrls:
+          type: object
+          description: 'Subsystem base URLs, e.g. {"task-tracker": "http://..."}'
+          additionalProperties: { type: string, pattern: '^https?://' }
+        isActive: { type: boolean, default: true }
+    EnvironmentUpdate:
+      type: object
+      properties:
+        code: { type: string, description: Must equal the current code if sent }
+        name: { type: string, minLength: 1 }
+        baseUrls:
+          type: object
+          additionalProperties: { type: string, pattern: '^https?://' }
+        isActive: { type: boolean }
+    Environment:
+      type: object
+      required: [id, code, name, baseUrls, isActive]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        baseUrls:
+          type: object
+          additionalProperties: { type: string }
+        isActive: { type: boolean }
+    EnvironmentPage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Environment' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
     TestPlanInput:
       type: object
       required: [name, scopeKind, owner, startDate, endDate]

@@ -6,6 +6,8 @@ dependencies = [
     "alembic==1.16.1",
     "fastapi==0.115.12",
     "psycopg[binary]==3.2.13",
+    # pydantic 2.12+ несовместим с FastAPI 0.115 (UnsupportedFieldAttributeWarning на телах запросов).
+    "pydantic==2.11.10",
     "sqlalchemy==2.0.45",
     "uvicorn==0.34.2",
 ]
@@ -17,6 +19,7 @@ dev = [
     "httpx==0.28.1",
     "pre-commit==4.2.0",
     "pytest==8.3.5",
+    "pyyaml==6.0.2",
 ]
 
 [tool.black]

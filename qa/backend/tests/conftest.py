@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.auth import Role  # noqa: E402
 from app.db import get_session  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.seed import load_classifiers  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -102,3 +103,9 @@ def auth() -> Callable[..., dict[str, str]]:
         return {"Authorization": f"Bearer {token}"}
 
     return headers
+
+
+@pytest.fixture
+def classifiers(db_session: Session) -> None:
+    """Серьёзность, приоритеты и типы кейсов из демо-данных."""
+    load_classifiers(db_session)

@@ -14,6 +14,9 @@ RUN uv sync --frozen --no-dev --no-install-project && useradd --uid 10001 --crea
 COPY backend/alembic.ini ./
 COPY backend/migrations ./migrations
 COPY backend/app ./app
+# Демо-данные для `python -m app seed` (сервис qa-seed).
+COPY dev/demo-seed ./demo-seed
+ENV QA_SEED_DIR=/app/demo-seed
 USER qa
 EXPOSE 8000
 CMD ["python", "-m", "app", "api"]

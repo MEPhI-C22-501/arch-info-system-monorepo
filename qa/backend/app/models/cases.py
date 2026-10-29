@@ -49,6 +49,13 @@ class TestCase(Base):
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
+    # Текущая версия — та, чей номер равен current_version (050, раздел 2а).
+    current: Mapped["TestCaseVersion"] = relationship(
+        primaryjoin="and_(TestCase.id == foreign(TestCaseVersion.test_case_id), "
+        "TestCase.current_version == foreign(TestCaseVersion.version))",
+        viewonly=True,
+    )
+
 
 class TestCaseVersion(Base):
     """Строки не изменяются и не удаляются после вставки (ADR-003)."""

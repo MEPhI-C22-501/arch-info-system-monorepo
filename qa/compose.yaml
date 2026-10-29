@@ -27,6 +27,15 @@ services:
     depends_on:
       qa-db: {condition: service_healthy}
     restart: "no"
+  # Демо-данные чистой среды; повторный запуск ничего не меняет.
+  qa-seed:
+    image: qa-system:local
+    pull_policy: never
+    command: ["python", "-m", "app", "seed"]
+    environment: *runtime
+    depends_on:
+      qa-migrations: {condition: service_completed_successfully}
+    restart: "no"
   qa-api:
     image: qa-system:local
     pull_policy: build
@@ -35,6 +44,7 @@ services:
     ports: ["127.0.0.1:8090:8000"]
     depends_on:
       qa-migrations: {condition: service_completed_successfully}
+      qa-seed: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
       interval: 5s

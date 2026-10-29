@@ -1,10 +1,10 @@
 """Общие схемы API: camelCase в JSON и постраничные списки (130, раздел 2)."""
 
 import math
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, TypeVar
 
 from fastapi import Query
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 class ApiModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
 
+
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 T = TypeVar("T", bound=BaseModel)
 
