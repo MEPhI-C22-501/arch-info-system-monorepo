@@ -94,7 +94,7 @@ def main():
                 except RuntimeError:checks.append('permission-denied')
                 else:raise AssertionError('Unauthorized Cube query succeeded')
             result={'passed':True,'checks':checks,'real_cube':True,'real_postgres':True,'m16_approved':False,'source_integrations_verified':False}
-            root=Path(__file__).resolve().parents[2];sources=[Path(__file__),Path(__file__).with_name('star.py'),*Path(__file__).with_name('cube').rglob('*.js')]
+            root=Path(__file__).resolve().parents[2];sources=[Path(__file__),Path(__file__).with_name('star.py'),*(p for p in Path(__file__).with_name('cube').rglob('*.js') if p.is_file() and 'node_modules' not in p.parts)]
             result['source_sha256']={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
             artifact.write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));return 0
         finally:

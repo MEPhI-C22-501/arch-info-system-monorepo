@@ -29,7 +29,8 @@ reports/pilots/.venv/bin/python reports/ci/record_checks.py --native-postgres --
 Он проверяет известные ключи из `~/secrets.env`, JWT и приватные ключи; это не
 гарантия обнаружения любого неизвестного формата секрета.
 
-[Шаблон GitHub Actions](workflow.example.yaml) запускает отдельные unit/E2E и
-BI jobs и публикует только перечисленные JSON-протоколы. GitHub не обнаруживает
-workflow в `reports/ci`; регистрация требует изменения `.github/workflows`
-за пределами текущего разрешённого объёма. Удалённый запуск не заявляется.
+[Workflow GitHub Actions](../../.github/workflows/reports-checks.yaml) на каждый
+pull request и push в main с изменениями Reports или контрактов владельцев
+запускает `record_checks.py --native-postgres` и собирает оба образа. Полный
+BI-прогон с Keycloak, Superset и Cube запускается вручную (workflow_dispatch).
+Публикуются только перечисленные JSON-протоколы.
