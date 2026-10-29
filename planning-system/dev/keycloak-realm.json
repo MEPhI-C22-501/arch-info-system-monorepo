@@ -151,7 +151,11 @@
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "firstName": "outsider",
+      "lastName": "Local",
+      "email": "outsider@example.invalid",
+      "emailVerified": true
     }
   ],
   "clients": [
