@@ -209,7 +209,7 @@ new Server(config).listen().catch(()=>process.exit(1));"""
             source_names = ['reports/pilots/check_cube.py', 'reports/pilots/db.py', 'reports/pilots/cube/cube.js',
                             'reports/pilots/cube/dataset.sql', 'reports/pilots/cube/model/TimeLogs.js']
             source_names += ['reports/pilots/star.py','reports/pilots/cube/access.js']
-            source_names += [str(p.relative_to(root)) for p in Path(__file__).with_name('cube').rglob('*.js') if str(p.relative_to(root)) not in source_names]
+            source_names += [str(p.relative_to(root)) for p in Path(__file__).with_name('cube').rglob('*.js') if p.is_file() and 'node_modules' not in p.parts and str(p.relative_to(root)) not in source_names]
             output['source_sha256'] = {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in source_names}
             if args.record: artifact.write_text(json.dumps(output, indent=2)+'\n')
             print(json.dumps(output))
