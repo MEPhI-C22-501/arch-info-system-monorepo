@@ -38,7 +38,7 @@
 | --- | --- | --- |
 | Q-REP-01 | Письменно принять read-replica собственной витрины как выполнение постановки | Преподаватель, Infra |
 | Q-REP-11/15 | Выдать primary/replica, роли, адреса, лимиты и общий Keycloak; подтвердить стек и размещение | Infra |
-| Q-REP-16 | Утвердить HR ID ↔ Keycloak sub ↔ Tracker userId и срок отзыва доступа; совпадение ID само по себе прав не даёт | Reference Manager, Infra, Task Tracker |
+| Q-REP-16 | Часть Reference Manager согласована ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228): `account_user_id` = `sub`, поле до 02.11.2026); остаются Tracker `TimeLog.userId` и срок отзыва доступа; совпадение ID само по себе прав не даёт | Reference Manager, Infra, Task Tracker |
 | Q-REP-02/03 | Подтвердить отчётный REST, удаления/инкремент и согласованный переход к событиям | Task Tracker, Infra |
 | Q-REP-04/07 | Контракт QA закрыт (Q-05 у QA); остаются событие `BugCreatedFromTesting` трекера, выдача тестовых доступов и сама выдача данных у QA | QA System, Task Tracker, Infra |
 | Q-REP-05/10 | Ответ Reports в #147 дан; уточнения Planning от 29.10 совпадают с реализацией, остаются T-INT-08 и клиент S-06. Формулировки мастера проекта и эпика сошлись, нужен подписанный ID mapping (#145) | Planning System, Task Tracker, Infra |
@@ -86,7 +86,7 @@ read-replica, предоставление ресурсов, реальные с
 
 | Разрыв | Состояние Reports |
 | --- | --- |
-| 2. Сотрудник не связан с учётной записью | Q-REP-16 открыт; DWH связывает сотрудника через `account_user_id`, которого у Reference Manager пока нет в коде |
+| 2. Сотрудник не связан с учётной записью | Q-REP-16 частично: Reference Manager подтвердил `account_user_id` = `sub` ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228)), поле — до 02.11.2026; ответ трекера ждём в [#159](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/159) |
 | 5. Свежесть «5 минут» без публикации событий | Требования разведены: 5 минут — только после Kafka (NFR-04.1), сейчас опрос REST с порогом 15 минут (NFR-04.2) — [075](075.nfr.md) |
 | 6а. Конвейер сверяется с собственной заглушкой трекера | Признаётся: совместимость с живыми сервисами не подтверждена; прогон ETL против сервера Task Tracker — задача И-M2 |
 | 9. Мастер проекта и эпика | Q-REP-10 переформулирован: противоречия в текстах больше нет, не хватает подписанного mapping |
