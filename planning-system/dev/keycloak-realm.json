@@ -1,0 +1,297 @@
+{
+  "realm": "planning",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "PORTFOLIO_OWNER"
+      },
+      {
+        "name": "PLANNER"
+      },
+      {
+        "name": "PROJECT_MANAGER"
+      },
+      {
+        "name": "RESOURCE_MANAGER"
+      },
+      {
+        "name": "TEAM_MEMBER"
+      },
+      {
+        "name": "MODULE_ADMIN"
+      }
+    ]
+  },
+  "users": [
+    {
+      "id": "demo-R-01",
+      "username": "owner",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "owner",
+      "lastName": "Local",
+      "email": "owner@example.invalid",
+      "realmRoles": [
+        "PORTFOLIO_OWNER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-R-02",
+      "username": "planner",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "planner",
+      "lastName": "Local",
+      "email": "planner@example.invalid",
+      "realmRoles": [
+        "PLANNER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-R-03",
+      "username": "manager",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "manager",
+      "lastName": "Local",
+      "email": "manager@example.invalid",
+      "realmRoles": [
+        "PROJECT_MANAGER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-R-04",
+      "username": "resource",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "resource",
+      "lastName": "Local",
+      "email": "resource@example.invalid",
+      "realmRoles": [
+        "RESOURCE_MANAGER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-R-05",
+      "username": "member",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "member",
+      "lastName": "Local",
+      "email": "member@example.invalid",
+      "realmRoles": [
+        "TEAM_MEMBER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-R-06",
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "admin",
+      "lastName": "Local",
+      "email": "admin@example.invalid",
+      "realmRoles": [
+        "MODULE_ADMIN"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "demo-outsider",
+      "username": "outsider",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-planning-demo",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "planning-web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8080/"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "portfolios",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "portfolio_ids",
+            "claim.value": "[\"10000000-0000-4000-8000-000000000001\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "projects",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "project_ids",
+            "claim.value": "[\"10000000-0000-4000-8000-000000000002\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "employees",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "employee_ids",
+            "claim.value": "[\"employees/demo-1\", \"employees/demo-2\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "planning-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "planning-smoke",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "5"
+      },
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "portfolios",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "portfolio_ids",
+            "claim.value": "[\"10000000-0000-4000-8000-000000000001\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "projects",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "project_ids",
+            "claim.value": "[\"10000000-0000-4000-8000-000000000002\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "employees",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "employee_ids",
+            "claim.value": "[\"employees/demo-1\", \"employees/demo-2\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "planning-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

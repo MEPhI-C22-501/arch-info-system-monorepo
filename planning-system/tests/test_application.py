@@ -74,6 +74,48 @@ def test_return_stale_revision_and_idempotency(client):
     saved=call(client,'PUT',f'versions/{VID}/draft',d,revision=returned['revision']);assert saved['contentRevision']>returned['contentRevision']
     call(client,'PUT',f'versions/{VID}/draft',d,revision=returned['revision'],expected=412)
 
+def test_export_full_portfolio_archive_and_snapshot(client):
+    active=activate(client)
+    second=call(client,'POST','projects',{'portfolioId':PORT,'programId':None,'code':'SECOND',
+        'name':'Второй проект','goal':'Срез портфеля','managerSubject':'demo-R-03'},expected=201)
+    # S-06's demo project_ids contains PID only. Its portfolio permission must
+    # still include this second project in a complete export.
+    other=call(client,'POST',f'projects/{second["id"]}/versions',
+        {'baseVersionId':None,'kind':'PLAN','name':'Утверждённый второй план'},expected=201)
+    with db.engine.begin() as c:
+        other.update(status='APPROVED',dataAsOf=db.now())
+        db.put(c,'plan',other,PORT,second['id'])
+    call(client,'POST',f'versions/{VID}/forecasts',{'contentRevision':active['contentRevision']},expected=202)
+    key=str(uuid4())
+    before=call(client,'POST','exports',{'portfolioId':PORT},role='S-06',key=key,expected=202)
+
+    def all_pages(batch):
+        rows=[];cursor=None
+        while True:
+            url=f'exports/{batch["batchId"]}/rows?pageSize=2'+('&cursor='+cursor if cursor else '')
+            page=call(client,'GET',url,role='S-06')
+            assert page==call(client,'GET',url,role='S-06')
+            rows.extend(page['items']);cursor=page['nextCursor']
+            if not cursor:break
+        assert {x['entityType']:sum(r['entityType']==x['entityType'] for r in rows) for x in batch['counts']}=={x['entityType']:x['count'] for x in batch['counts']}
+        return rows
+
+    frozen=all_pages(before)
+    assert len(frozen)>4
+    assert {r['data']['projectId'] for r in frozen if r['entityType']=='plan'}=={PID,second['id']}
+    original=next(r['data'] for r in frozen if r['entityType']=='plan' and r['data']['projectId']==PID)
+    assert original['demands']==[r['data'] for r in frozen if r['entityType']=='demand']
+    assert original['allocations']==[r['data'] for r in frozen if r['entityType']=='allocation']
+    p=call(client,'GET','projects/'+PID)
+    call(client,'POST','projects/'+PID+'/archive',{'reason':'Завершён'},role='R-01',revision=p['revision'])
+    after=call(client,'POST','exports',{'portfolioId':PORT},role='S-06',expected=202)
+    remaining=all_pages(after)
+    assert [r['data']['projectId'] for r in remaining if r['entityType']=='plan']==[second['id']]
+    assert not any(r['entityType'] in {'demand','allocation','forecast'} for r in remaining)
+    assert any(r['entityType']=='availability' for r in remaining)
+    assert all_pages(before)==frozen
+    assert call(client,'POST','exports',{'portfolioId':PORT},role='S-06',key=key,expected=202)==before
+
 def test_crud_filters_cursor_and_first_version(client):
     body={'portfolioId':PORT,'programId':None,'code':'NEW','name':'Проект 2','goal':'Цель','managerSubject':'demo-R-03'}
     p=call(client,'POST','projects',body,expected=201)
@@ -159,6 +201,7 @@ def test_oidc_signature_issuer_audience_expiry(client,monkeypatch):
     def request(value,key=private):
         token=jwt.encode(value,key,algorithm='RS256');return client.get('/api/v1/projects/'+PID,headers={'Authorization':'Bearer '+token})
     assert request(claims).status_code==200
+    assert request({**claims,'realm_access':{'roles':[]}}).status_code==403
     monkeypatch.setenv('OIDC_ISSUER','https://issuer.test/realm/')
     assert request(claims).status_code==200
     for field,value in [('iss','https://other.test'),('aud','other-api'),('exp',int(time.time())-60)]:assert request({**claims,field:value}).status_code==401

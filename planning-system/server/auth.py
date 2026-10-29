@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 import jwt
 from fastapi import Request, HTTPException
+from .oidc import endpoint
 
 ROLES = {'PORTFOLIO_OWNER':'R-01','PLANNER':'R-02','PROJECT_MANAGER':'R-03',
          'RESOURCE_MANAGER':'R-04','TEAM_MEMBER':'R-05','MODULE_ADMIN':'R-06'}
@@ -36,7 +37,7 @@ def actor(request: Request):
         return Actor('demo-'+role, {role}, scopes, {DEMO_PORTFOLIO}, {DEMO_PROJECT}, {'employees/demo-1','employees/demo-2'} if role=='R-04' else {'employees/demo-1'})
     try:
         issuer = os.environ['OIDC_ISSUER'].rstrip('/'); audience = os.environ['OIDC_AUDIENCE']
-        if not issuer.startswith('https://'): raise ValueError('HTTPS issuer required')
+        endpoint(issuer)
         client = request.app.state.jwks
         key = client.get_signing_key_from_jwt(token).key
         claims = jwt.decode(token, key, algorithms=['RS256'], audience=audience,

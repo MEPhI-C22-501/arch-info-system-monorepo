@@ -26,7 +26,7 @@ for story in stories:
 counts=Counter(re.findall(r'^\| (?:FR|INT|NFR|TECH)-\d+ \|.*?\| (covered|partial|missing) \|',matrix,re.M))
 # Hash exact review inputs; exclude this generated audit and execution outputs.
 source_suffixes={'.md','.py','.mjs','.js','.css','.html','.json','.txt','.yaml','.yml','.sql'}
-inputs={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for folder in [docs,module/'scripts',module/'server',module/'ui',module/'migrations',module/'deploy'] for f in sorted(folder.rglob('*')) if f.is_file() and '__pycache__' not in f.parts and f.suffix in source_suffixes}
+inputs={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for folder in [docs,module/'scripts',module/'server',module/'ui',module/'migrations',module/'deploy',module/'dev'] for f in sorted(folder.rglob('*')) if f.is_file() and '__pycache__' not in f.parts and f.suffix in source_suffixes}
 for f in sorted(module.glob('*')):
  if f.is_file() and (f.suffix in {'.md','.yaml','.yml'} or f.name in {'Dockerfile','.env.example','Dockerfile.dockerignore'}):inputs[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()
 for f in sorted((root/'.github/workflows').glob('planning*')):inputs[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()

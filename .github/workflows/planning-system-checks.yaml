@@ -64,6 +64,29 @@ jobs:
           path: planning-system/artifacts/
       - run: docker compose -p planning-ci -f planning-system/compose.yaml down -v
         if: always()
+  oidc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: python -m pip install httpx==0.28.1
+      - run: docker compose -p planning-oidc -f planning-system/compose.yaml -f planning-system/compose.oidc.yaml up -d --build --wait api
+      - run: python planning-system/scripts/check-oidc.py
+      - run: npm install --prefix /tmp/planning-browser playwright@1.58.2
+      - run: /tmp/planning-browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: node planning-system/scripts/check-oidc-browser.mjs
+        env:
+          PLAYWRIGHT_MODULE: /tmp/planning-browser/node_modules/playwright/index.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: planning-oidc
+          path: planning-system/artifacts/oidc-report.json
+      - run: docker compose -p planning-oidc -f planning-system/compose.yaml -f planning-system/compose.oidc.yaml down -v
+        if: always()
   minikube:
     if: github.event_name == 'workflow_dispatch' && inputs.minikube
     needs: verify
@@ -97,7 +120,7 @@ jobs:
         if: always()
   image:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify
+    needs: [verify, oidc]
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: write}
     steps:

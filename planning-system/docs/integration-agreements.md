@@ -1,19 +1,25 @@
 # Реестр межкомандного принятия
 
-Обновлено 18.10.2026. База сверки main f5eb235. Описанный контракт и письменное принятие
-версии — разные доказательства. Запросы ниже подготовлены, но не отправлены;
-отправка на GitHub — [ручные действия](../github-actions.md). В ответе нужны
-дата, представитель второй команды, версия/hash, выбранный вариант и ссылка.
+Обновлено 29.10.2026 по [замечаниям PR #154](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/154).
+База сверки: main `338cf0f8eb724992ed29db6a84a7b92f9eeaaae0`.
+Запросы #142, #143, #145, #146, #147 опубликованы 18.10.2026 пользователем
+pachecou; обсуждения повторно прочитаны 29.10.2026. Запрос и ответ не равны
+приёмке интеграции. Реальные credentials передаются вне GitHub.
 
-| Связь / вопрос | Текущее доказательство | Ответ второй стороны с датой | Статус |
+| Связь / вопрос | Запрос / дата | Подтверждённое состояние на 29.10 | Статус / условие закрытия |
 | --- | --- | --- | --- |
-| INT-01, Infra access | Infra vision, набор среды в PR #128 | Нет ссылки на выдачу client/JWKS/audience | pending |
-| INT-02, D-02/03 | HR-мастер заявлен обеими командами; контракт чтения RM 130 | Нет принятия rename/норм и fixture smoke | pending |
-| INT-03, D-01/07 | TT 130 и OpenAPI теперь имеют PUT/facts; форматы различаются | Нет двустороннего mapping/версии | pending |
-| INT-04, D-04 | Асинхронные схемы PS 135/140 | Поставщик и receipt не приняты | pending |
-| INT-05/08, D-05 | Reports 160 описывает projection/партии и Q-REP-05 | Нет принятия полей/TTL/расписания | pending |
-| INT-06, S3 | Infra называет arch-dev-planning-system | Нет выдачи credentials/ACL и smoke | pending |
-| INT-07, D-09 | QA 130/160 от 12.10 уже ссылается на release-context, Q-10 закрыт | Q-03/Q-04 остаются; источник итераций не выбран | pending |
+| INT-01, Infra access | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142), 18.10 | PR #128 уже влит в main; ответа о выдаче клиентов/JWKS/audience нет | pending: параметры и общий вход T-INT-01 |
+| INT-02, D-02/03 | [#143](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143), 18.10 | HR API RM описан; комментариев с принятием rename/норм/fixture нет | pending: ответ RM и T-INT-02 |
+| INT-03, D-01/07 | [#145](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/145), 18.10 | Mapping PUT/facts/events предложен; ответ TT отсутствует | pending: подпись mapping и T-INT-03 |
+| INT-04, D-04 | Решение PS от 29.10: вопрос владельцу общего проекта; отдельное обращение не отправлено | Поставщик уведомлений не назначен, у Reports тот же Q-REP-13 | pending: назначение поставщика и принятие схем/receipt |
+| INT-05/08, D-05 | [#147](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147), 18.10 | DarkMast001 / Reports ответил 25.10: schemaVersion 1.0.0, TTL 24 ч, 02:00 Europe/Moscow, собственный локальный ETL-прогон | Частично согласовано: ответ PS ниже; T-INT-08 и доступы общего стенда ещё открыты |
+| INT-06, S3 | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142), 18.10 | Infra уже содержит arch-dev-planning-system; выдача credentials/ACL и smoke не подтверждены | pending: выдача и T-INT-06 |
+| INT-07, D-09 | [#146](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/146), 18.10 | release-context 1.1.0 реализован и покрыт API-тестами PS; ответа QA нет | pending: источник итераций, принятие QA и T-INT-07 |
+
+Следующая контрольная точка — 02.11.2026: владельцы adapters PS вместе с
+соответствующими командами фиксируют ответы и результаты T-INT либо причину
+переноса. Дата является планом PS, не обязательством соседей. Существующие
+обращения не дублируются; неподтверждённые строки не переводятся в tested.
 
 ## Task Tracker D-01
 
@@ -64,17 +70,51 @@ PS сохраняет прежние значения в baseline, обновл�
 
 ## Reports D-05
 
-Попросить согласовать plan/demand/availability/allocation/forecast, manifest counts,
-schemaVersion, ARCHIVED/tombstone, cost.read, срок batch (локально 24 ч),
-расписание/TZ, checkpoint batchId и staging merge. Предложение начального
-расписания: ежедневно 02:00 Europe/Moscow + ручной повтор; принять или изменить
-в ответе. Повтор строки ключуется (batchId, entityType, entityId), EXPIRED начинает
-новый batch; частичный staging не становится витриной.
+Основание — [ответ DarkMast001 от 25.10.2026](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147#issuecomment-6395930440).
+Reports принял schemaVersion 1.0.0, TTL 24 часа и ежедневную полную партию в
+02:00 Europe/Moscow. Владелец расписания — Reports; CronJob Infra и клиент S-06
+ещё требуют выдачи/настройки. Внеочередной запуск — не чаще раза в час после
+PlanActivated/RemainingForecastChanged/BudgetAdjustmentChanged; пока событий
+на общем стенде нет, доступны ежедневный и ручной запуски.
+
+### Ответ Planning System по оставшимся пунктам
+
+Зафиксирован в этой редакции 29.10.2026; публикация PR является предложением
+принять уточнения, не подменяет ответ второй стороны.
+
+1. Партия S-06 — полный срез **экспортируемых данных** указанного портфеля,
+   разрешённого portfolio_ids. project_ids токена её не сужает. Черновики и
+   версии ON_REVIEW не экспортируются: plan имеет статус ACTIVE/APPROVED/SUPERSEDED.
+2. Уточнение вместо прежней фразы «явные ARCHIVED/tombstone»: ARCHIVED-версии
+   и данные архивированного проекта (его планы, demand/allocation/forecast)
+   отсутствуют в новой партии. Availability остаётся срезом всего портфеля.
+   Исчезновение строки из следующей **полностью загруженной READY-партии**
+   того же портфеля закрывает запись в DWH с сохранением истории. Это правило
+   относится только к batch ETL, не к событиям задач и не к отдельной странице.
+3. Результат Idempotency-Key хранится в request_results без автоматического
+   удаления, то есть не менее 24 часов. Повтор с тем же subject/operation/key
+   возвращает исходную партию; после её EXPIRED нужен новый ключ, повтор не
+   продлевает TTL. Чтение существующей партии после 24 ч возвращает BATCH_EXPIRED.
+4. Вложенные plan.data.demands/allocations дублируют строки верхнего уровня.
+   Reports читает только отдельные entityType demand/allocation, связывает их
+   с планом через planItemId/demandId, считает текущими только данные ACTIVE.
+   Денежные поля без cost.read отсутствуют, null при наличии права неизвестен.
+
+Формальные уточнения — [130](130.api-contracts.md), [140](140.event-schema.md),
+[162](162.integration-spec.md). Регрессия проверяет полный срез нескольких
+проектов, неизменяемость старой партии, архивирование и повтор POST/страниц.
+
+T-INT-08 ведёт Reports; PS предоставляет стенд, fixture и S-06. До 02.11.2026
+планируется общий прогон: не менее трёх страниц pageSize=2, counts, повтор POST
+и страницы, EXPIRED, два токена с cost.read и без, перепланирование без двойного
+учёта. Локальный прогон Reports от 25.10 — доказательство потребителя; новый
+общий прогон в этой доработке не объявляется выполненным. Выдача S-06/Infra и
+методика стоимости D-07 остаются открытыми.
 
 ## Infra
 
-Попросить решение по [PR #128](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/128),
-web/API clients, redirect URI, audience/JWKS, отдельные service accounts,
+Инфраструктура из [PR #128](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/128)
+уже в main. По #142 ожидаются web/API clients, redirect URI, audience/JWKS, отдельные service accounts,
 S3 bucket/ACL, broker/topics/DLQ, schedule/TZ, эталонные fixture IDs и адрес/протокол
 коллектора. Секреты передаются вне Git; в ответе фиксируются только факт выдачи
 и несекретные идентификаторы. Запрос не равен выданным доступам.
