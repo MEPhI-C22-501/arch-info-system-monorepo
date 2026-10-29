@@ -1,0 +1,103 @@
+name: Reports Checks
+
+# Reports reads the owners' contracts directly, so their changes rerun the checks.
+on:
+  pull_request:
+    paths:
+      - 'reports/**'
+      - '.github/workflows/reports-checks.yaml'
+      - 'task-tracker/docs/block-g-api-and-events/**'
+      - 'qa/api/**'
+      - 'qa/docs/140.event-schema.md'
+      - 'planning-system/docs/contracts/**'
+      - 'reference-manager/backend/api/openapi/**'
+  push:
+    branches: [main]
+    paths:
+      - 'reports/**'
+      - '.github/workflows/reports-checks.yaml'
+      - 'task-tracker/docs/block-g-api-and-events/**'
+      - 'qa/api/**'
+      - 'qa/docs/140.event-schema.md'
+      - 'planning-system/docs/contracts/**'
+      - 'reference-manager/backend/api/openapi/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: reports/pilots/requirements-test.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          python -m pip install -r reports/pilots/requirements-test.txt
+          npm install --prefix reports/ci
+          npm install --prefix reports/pilots/cube
+      # Links, contracts, tests on a temporary PostgreSQL, Cube measures and scope,
+      # UI syntax, diagrams and the secret scan; exits non-zero on any failure.
+      - name: Run Reports checks
+        run: python reports/ci/record_checks.py --native-postgres
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-verification
+          path: |
+            reports/pilots/artifacts/verification.json
+            reports/pilots/artifacts/acceptance-verification.json
+            reports/pilots/artifacts/restore-verification.json
+            reports/pilots/artifacts/secret-verification.json
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build application image
+        run: docker build -t reports-pilot:ci reports/pilots
+      - name: Build Superset image
+        run: docker build -t reports-superset:ci -f reports/pilots/superset/Dockerfile reports/pilots
+
+  # Full Keycloak/Superset/Cube stack; heavy, so it runs only on request.
+  local-bi:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [checks, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r reports/pilots/requirements.txt
+      # The ephemeral runner has no shared secrets; create demo-only values in
+      # the sole permitted secret store. Never upload this file or Compose config.
+      - run: python reports/ci/init_pilot_secrets.py
+      - run: python reports/pilots/launch.py up --build -d --wait --wait-timeout 600
+      - run: python reports/pilots/check_roles.py --record
+      - run: python reports/pilots/check_bi.py --record
+      - run: python reports/pilots/check_product.py --record
+      - run: python reports/pilots/launch.py exec -T superset python /app/pythonpath/check_session.py
+      - run: python reports/ci/check_secrets.py --record
+      - if: always()
+        run: python reports/pilots/launch.py down -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-bi-verification
+          path: |
+            reports/pilots/artifacts/bi-verification.json
+            reports/pilots/artifacts/role-verification.json
+            reports/pilots/artifacts/product-verification.json
+            reports/pilots/artifacts/secret-verification.json
