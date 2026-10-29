@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from . import storage as db
 from .auth import actor, DEMO_PORTFOLIO, DEMO_PROJECT
 from .domain import fail, validate_draft, check_resources, forecast, hours
+from .oidc import endpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = json.loads((ROOT/'docs/contracts/openapi.json').read_text())
@@ -34,12 +35,15 @@ async def lifespan(app):
         raise RuntimeError('CURSOR_SECRET must contain at least 32 characters')
     if os.environ.get('AUTH_MODE','oidc')=='oidc':
         issuer=os.environ['OIDC_ISSUER'].rstrip('/')
-        if not issuer.startswith('https://'):raise RuntimeError('HTTPS issuer required')
+        endpoint(issuer)
+        discovery=endpoint(os.environ.get('OIDC_DISCOVERY_URL',issuer+'/.well-known/openid-configuration'))
         with httpx.Client(timeout=10) as client:
-            r=client.get(issuer+'/.well-known/openid-configuration');r.raise_for_status()
+            r=client.get(discovery);r.raise_for_status()
         app.state.oidc=r.json()
         if app.state.oidc['issuer']!=issuer:raise RuntimeError('Issuer mismatch')
-        app.state.jwks=jwt.PyJWKClient(app.state.oidc['jwks_uri'],cache_keys=True)
+        for field in ['authorization_endpoint','token_endpoint']:
+            endpoint(app.state.oidc[field])
+        app.state.jwks=jwt.PyJWKClient(endpoint(os.environ.get('OIDC_JWKS_URL',app.state.oidc['jwks_uri'])),cache_keys=True)
     db.migrate()
     if os.environ.get('DEMO_SEED')=='true':
         if os.environ.get('APP_ENV')!='development':raise RuntimeError('Synthetic seed requires development')
@@ -330,14 +334,20 @@ def dispatch(c,op,req,a,b):
         if 'reports.export' not in a.scopes:fail(403,'Нужен reports.export')
         get(c,'portfolio',b['portfolioId'],a)
         rows=[]
+        visible_plans=set()
         for r in db.all_rows(c,'plan',b['portfolioId']):
             v=r['data']
             if v['status'] not in {'ACTIVE','SUPERSEDED','APPROVED'}:continue
+            owner=db.find(c,'project',v['projectId'])
+            if not owner or owner['data']['status']=='ARCHIVED':continue
+            visible_plans.add(v['id'])
             rows.append({'entityType':'plan','entityId':v['id'],'data':plan_public(v)})
             for kind,field in [('demand','demands'),('allocation','allocations')]:
                 for x in v[field]:rows.append({'entityType':kind,'entityId':x['id'],'data':x})
         for kind in ['availability','forecast']:
-            for r in db.all_rows(c,kind,b['portfolioId']):rows.append({'entityType':kind,'entityId':r['id'],'data':r['data']})
+            for r in db.all_rows(c,kind,b['portfolioId']):
+                if kind=='forecast' and r['data']['planVersionId'] not in visible_plans:continue
+                rows.append({'entityType':kind,'entityId':r['id'],'data':r['data']})
         rows=money_filter(rows,a)
         batch={'id':db.uid(),'batchId':None,'portfolioId':b['portfolioId'],'dataAsOf':db.now(),'schemaVersion':'1.0.0','status':'READY',
            'expiresAt':(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat().replace('+00:00','Z'),

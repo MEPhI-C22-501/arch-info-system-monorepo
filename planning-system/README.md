@@ -42,6 +42,20 @@ receipt с префиксом mock:; это не подтверждение Task
 Перезапуск сохраняет данные; для уничтожения только собственного локального
 набора используйте `docker compose -f planning-system/compose.yaml down -v`.
 
+Для демонстрации настоящего входа через Keycloak:
+
+```sh
+docker compose -f planning-system/compose.yaml -f planning-system/compose.oidc.yaml up -d --build --wait api
+```
+
+Откройте **http://localhost:8080/** (этот адрес зарегистрирован для PKCE).
+Пользователи: owner, planner, manager, resource, member, admin; пароль локального
+набора — `local-planning-demo`. outsider не имеет бизнес-роли. Переключение ролей
+в приложении скрыто; пользователя выбирают на странице Keycloak.
+Для смены пользователя используйте отдельный приватный сеанс браузера.
+Это изолированный dev-стенд с настоящими подписанными JWT, синтетическими данными
+и mock-обменом TT; общие доступы выдаются Infra отдельно. Проверки — в development.md.
+
 [Инструкция разработчика](development.md) — тесты, конфигурация OIDC/S3,
 Kubernetes, границы поставки. [Рабочий план](work-plan.md),
 [согласования](docs/integration-agreements.md),

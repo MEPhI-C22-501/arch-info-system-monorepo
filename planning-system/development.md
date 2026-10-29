@@ -68,6 +68,39 @@ scripts/check-prototype.mjs; его результат не подменяет b
 
 ## Общий стенд: OIDC и реальные adapters
 
+### Локальная демонстрация OIDC по замечанию 1.1 PR #154
+
+Запуск с `compose.oidc.yaml` описан в README. Keycloak 26.7.4 импортирует
+`dev/keycloak-realm.json`; шесть пользователей соответствуют ролям R-01…R-06,
+их стабильные sub совпадают с владельцем и руководителем synthetic seed.
+Клиент planning-web допускает только Authorization Code + PKCE S256, redirect
+http://localhost:8080/ и этот web origin; password grant у него отключён.
+Отдельный planning-smoke разрешает password grant только для локальной
+автоматической проверки и выдаёт JWT на 5 секунд. В общий realm его не переносить.
+
+```sh
+python planning-system/scripts/check-oidc.py
+PLAYWRIGHT_MODULE=/tmp/planning-browser/node_modules/playwright/index.mjs node planning-system/scripts/check-oidc-browser.mjs
+```
+
+Первый smoke проверяет реальный JWT планировщика (200), отсутствие роли (403),
+demo-токен (401) и тот же настоящий JWT после истечения (401). Второй проходит
+браузерный redirect, форму Keycloak и PKCE, затем читает workspace API.
+Оба запускаются отдельным заданием oidc в CI. Локальные credentials и claims
+относятся только к synthetic fixture; реальные HR account IDs ими не заменяются.
+
+Публичный issuer — http://localhost:8081/realms/planning. API читает discovery/JWKS
+через внутреннее имя keycloak; issuer в metadata и JWT всё равно сравнивается
+с публичным адресом. Для этого добавлены OIDC_DISCOVERY_URL и OIDC_JWKS_URL.
+OIDC_LOCAL_HTTP=true допускает HTTP только при APP_ENV=development и только
+для localhost/127.0.0.1/keycloak. В staging/production всегда требуется HTTPS,
+даже при установленном флаге; unit-регрессии проверяют эту границу.
+При переходе с базового Compose пересоздайте api этой же командой; миграции
+и seed сохраняют существующий локальный набор. Этот режим не подтверждает
+выдачу общих клиентов, S3, Kafka и T-INT-01.
+
+### Конфигурация общего стенда
+
 Compose здесь — dev. Для общего стенда Infra предоставляет конфигурацию по
 [160](docs/160.integration-plan.md): APP_ENV=staging, AUTH_MODE=oidc,
 OIDC_ISSUER (HTTPS), OIDC_AUDIENCE, OIDC_CLIENT_ID и redirect URI web клиента.
