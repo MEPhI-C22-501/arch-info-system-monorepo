@@ -49,6 +49,10 @@ jobs:
       # UI syntax, diagrams and the secret scan; exits non-zero on any failure.
       - name: Run Reports checks
         run: python reports/ci/record_checks.py --native-postgres
+      # The log has passed the secret scan; show it so a failure is readable.
+      - name: Show check log
+        if: failure()
+        run: cat reports/pilots/artifacts/checks.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
