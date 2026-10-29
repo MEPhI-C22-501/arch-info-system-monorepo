@@ -238,7 +238,7 @@ def dispatch(c,op,req,a,b):
             for i in v['items']:i.update(id=mapping[i['id']],parentItemId=mapping.get(i['parentItemId']))
             for dep in v['dependencies']:dep.update(id=db.uid(),predecessorId=mapping[dep['predecessorId']],successorId=mapping[dep['successorId']])
             for d in v['demands']:d.update(id=dm[d['id']],planItemId=mapping[d['planItemId']])
-            for al in v['allocations']:al.update(id=db.uid(),demandId=dm[al['demandId']],status='PROPOSED')
+            for al in v['allocations']:al.update(id=db.uid(),demandId=dm[al['demandId']],status='CANCELLED' if al['status']=='CANCELLED' else 'PROPOSED')
         else:
             v={'planningMode':'ANNUAL','horizonStart':'2026-10-05','horizonEnd':'2026-12-31','items':[],'dependencies':[],'demands':[],'allocations':[]}
         v.update(id=db.uid(),projectId=p['id'],name=b['name'],kind=b['kind'],baseVersionId=b['baseVersionId'],

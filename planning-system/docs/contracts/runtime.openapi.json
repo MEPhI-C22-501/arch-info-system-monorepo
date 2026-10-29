@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Planning System resource and UI contracts",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "servers": [
     {
@@ -575,6 +575,632 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/project-cards": {
+      "get": {
+        "operationId": "listProjectCards",
+        "summary": "Карточки доступных проектов; период пересекается с горизонтом последней версии",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Результат в области текущего пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "ACTIVE",
+                "ON_HOLD",
+                "COMPLETED",
+                "ARCHIVED"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "operationId": "listAssignments",
+        "summary": "Назначения последней версии доступных проектов; R-04 только свои сотрудники",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Результат в области текущего пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROPOSED",
+                "CONFIRMED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/resource-options": {
+      "get": {
+        "operationId": "getResourceOptions",
+        "summary": "Доступные сотрудники, работы и доступность для назначения",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Результат в области текущего пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/versions/{versionId}/assignments": {
+      "post": {
+        "operationId": "addWorkAssignment",
+        "summary": "Назначить одного доступного сотрудника на выбранную потребность и дату; R-02/R-04, DRAFT",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Результат в области текущего пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "demandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "employeeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hours": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "multipleOf": 0.01
+                  }
+                },
+                "required": [
+                  "demandId",
+                  "employeeId",
+                  "date",
+                  "hours"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/versions/{versionId}/assignments/{assignmentId}": {
+      "patch": {
+        "operationId": "changeWorkAssignment",
+        "summary": "Изменить или отменить назначение в DRAFT; подтверждение сбрасывается в PROPOSED",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Результат в области текущего пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "demandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "employeeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hours": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "multipleOf": 0.01
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PROPOSED",
+                      "CANCELLED"
+                    ]
+                  }
+                },
+                "required": [
+                  "demandId",
+                  "employeeId",
+                  "date",
+                  "hours"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/projects.xlsx": {
+      "get": {
+        "operationId": "downloadProjectsExcel",
+        "summary": "Пользовательский XLSX проектов, R-01/R-02/R-03",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "XLSX с отфильтрованными строками",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "ACTIVE",
+                "ON_HOLD",
+                "COMPLETED",
+                "ARCHIVED"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/downloads/assignments.xlsx": {
+      "get": {
+        "operationId": "downloadAssignmentsExcel",
+        "summary": "Пользовательский XLSX назначений, R-01/R-02/R-03/R-04 в своей области",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "XLSX с отфильтрованными строками",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Токен отсутствует или недействителен"
+          },
+          "403": {
+            "description": "Операция не разрешена роли"
+          },
+          "422": {
+            "description": "Неверные фильтры или данные"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROPOSED",
+                "CONFIRMED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ]
