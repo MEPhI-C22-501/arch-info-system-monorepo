@@ -1,0 +1,10 @@
+{
+  "issuer": "local Keycloak",
+  "checks": [
+    "planner:200",
+    "no-role:403",
+    "demo-token:401",
+    "expired:401"
+  ],
+  "passed": true
+}
