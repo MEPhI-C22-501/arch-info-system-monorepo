@@ -31,7 +31,7 @@ def register(app):
                 return
             def complete(body,portfolio,project_id=None,status=200):
                 c.execute(db.requests.insert().values(id=request_id,fingerprint=fingerprint,status=status,body=body,portfolio_id=portfolio,project_id=project_id))
-                c.execute(db.audit.insert().values(id=db.uid(),subject=a.subject,project_id=project_id,action=req.url.path,occurred_at=db.now(),details={'correlationId':req.state.correlation}))
+                c.execute(db.audit.insert().values(id=db.uid(),subject=a.subject,project_id=project_id,action=req.scope['route'].path,occurred_at=db.now(),details={'correlationId':req.state.correlation,'path':req.url.path}))
                 return body
             yield c,None,complete
 
@@ -58,7 +58,7 @@ def register(app):
             allowed(a,['R-01','R-02','R-03','R-04'])
             plans=[r['data'] for r in db.all_rows(c,'plan',project=pid)]
             v=max(plans,key=lambda x:x['versionNumber']) if plans else None
-            av=[r['data'] for r in db.all_rows(c,'availability',p['portfolioId']) if r['data']['employeeId'] in a.employees]
+            av=[r['data'] for r in db.all_rows(c,'availability',p['portfolioId']) if a.roles & {'R-01','R-02','R-03'} or r['data']['employeeId'] in a.employees]
             base=db.find(c,'plan',p['activePlanVersionId']) if p['activePlanVersionId'] else None
             base=base['data'] if base else None
             tasks=[r['data'] for r in db.all_rows(c,'task',project=pid)]
@@ -67,12 +67,22 @@ def register(app):
             events=[r['action'] for r in c.execute(select(db.audit).where(db.audit.c.project_id==pid).order_by(db.audit.c.occurred_at)).mappings()]
             allocation=next((x for x in v['allocations'] if x['employeeId']=='employees/demo-1'),{}) if v else {}
             availability=next((x for x in av if x['employeeId']=='employees/demo-1' and x['date']=='2026-10-05'),{})
+            allocations=[x for x in v['allocations'] if x['status']!='CANCELLED'] if v else []
+            pairs={(x['employeeId'],x['date']) for x in allocations}
+            available={(x['employeeId'],x['date']):x['availableHours'] for x in av if x['status']=='CONFIRMED'}
+            assigned={}
+            for x in allocations:
+                key=(x['employeeId'],x['date']);assigned[key]=assigned.get(key,0)+x['hours']
+            per_demand={}
+            for x in allocations:per_demand[x['demandId']]=per_demand.get(x['demandId'],0)+x['hours']
             response={'projectId':pid,'portfolioId':p['portfolioId'],'projectRevision':p['revision'],'finalApprover':get(c,'portfolio',p['portfolioId'],a).get('ownerSubject'),'name':p['name'],'goal':p['goal'],'role':next(iter(a.roles)),
                 'versionId':v['id'] if v else None,'version':v['versionNumber'] if v else 0,'revision':v['revision'] if v else 0,
                 'contentRevision':v['contentRevision'] if v else 0,'reviewRound':v['reviewRound'] if v else 0,'status':v['status'] if v else 'DRAFT',
                 'scenario':v['kind']=='SCENARIO' if v else False,'demand':sum(x['hours'] for x in v['demands']) if v else 0,
-                'allocation':allocation.get('hours',0),'availability':availability.get('availableHours',0),
-                'confirmed':all(x['status']=='CONFIRMED' for x in v['allocations']) if v and v['allocations'] else False,
+                'allocation':sum(x['hours'] for x in allocations),'availability':sum(available.get(key,0) for key in pairs),
+                'overloadHours':sum(max(value-available.get(key,0),0) for key,value in assigned.items()),
+                'deficitHours':sum(max(d['hours']-per_demand.get(d['id'],0),0) for d in v['demands']) if v else 0,
+                'confirmed':all(x['status']=='CONFIRMED' for x in allocations) if allocations else False,
                 'date':next((x['finish'] for x in v['items'] if x['type']=='MILESTONE'),'2026-10-09') if v else '2026-10-09',
                 'baseline':{'version':base['versionNumber'],'demand':sum(x['hours'] for x in base['demands']),'allocation':sum(x['hours'] for x in base['allocations'] if x['employeeId']=='employees/demo-1'),'date':next((x['finish'] for x in base['items'] if x['type']=='MILESTONE'),'2026-10-09')} if base else None,
                 'publication':pubs[-1]['status'] if pubs else 'PENDING','publicationId':pubs[-1]['id'] if pubs else None,
@@ -101,7 +111,7 @@ def register(app):
             for r in db.all_rows(c,'plan',row['portfolio_id']):
                 v=copy.deepcopy(r['data'])
                 if v['status'] not in {'DRAFT','ON_REVIEW'}:continue
-                related=[x for x in v['allocations'] if x['employeeId']==b['employeeId'] and x['date']==b['date']]
+                related=[x for x in v['allocations'] if x['employeeId']==b['employeeId'] and x['date']==b['date'] and x['status']!='CANCELLED']
                 if not related:continue
                 for x in related:x['status']='PROPOSED'
                 v.update(status='DRAFT',revision=v['revision']+1,contentRevision=v['contentRevision']+1,decisions=[])
@@ -123,7 +133,7 @@ def register(app):
             v=version(c,req.path_params['versionId'],a,['R-04']);p=project(c,v['projectId'],a,['R-04'])
             if v['status']!='DRAFT':fail(409,'Подтверждается только черновик')
             for x in v['allocations']:
-                if x['employeeId'] in a.employees:x['status']='CONFIRMED'
+                if x['employeeId'] in a.employees and x['status']!='CANCELLED':x['status']='CONFIRMED'
             check_resources(v,*resource_inputs(c,v))
             v['contentRevision']+=1;changed(c,'plan',v,req,a)
             return complete({'revision':v['revision'],'contentRevision':v['contentRevision'],'status':v['status']},p['portfolioId'],p['id'])
@@ -182,3 +192,6 @@ def register(app):
             pid=req.path_params['portfolioId'];get(c,'portfolio',pid,a)
             if any(r['data']['code']==b['code'] for r in db.all_rows(c,'program',pid)):fail(409,'Код программы занят')
             return complete(save(c,'program',{'id':db.uid(),'portfolioId':pid,'revision':1,'status':'ACTIVE',**b},a,pid),pid,status=201)
+
+    from .ui_features import register as register_features
+    register_features(app,command_tx)

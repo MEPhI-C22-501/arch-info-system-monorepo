@@ -1,6 +1,10 @@
 {
-  "app": "http://127.0.0.1:8080",
+  "app": "http://127.0.0.1:8082",
   "checks": [
+    "project cards and filters",
+    "project XLSX download",
+    "employee dropdown per work",
+    "assignment XLSX download",
     "server persistence",
     "resource conflict and confirmation",
     "review and activation",
