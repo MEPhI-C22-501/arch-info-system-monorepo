@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 
 	absencedmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/absence"
@@ -50,7 +52,7 @@ func newCatalogService[F any](desc *record.Descriptor[F], txManager *postgres.Tx
 }
 
 // catalogMounts builds the services of the catalogs besides currencies and returns the mounts of their handlers.
-func catalogMounts(txManager *postgres.TxManager, client *postgres.Client) []httptr.Mount {
+func catalogMounts(log *slog.Logger, txManager *postgres.TxManager, client *postgres.Client, accounts employeesrv.Accounts) []httptr.Mount {
 	countries := newCatalogService(countrydmn.Descriptor, txManager, client)
 	projectRoles := newCatalogService(projectroledmn.Descriptor, txManager, client)
 	grades := newCatalogService(gradedmn.Descriptor, txManager, client)
@@ -59,7 +61,7 @@ func catalogMounts(txManager *postgres.TxManager, client *postgres.Client) []htt
 	assignments := newCatalogService(assignmentdmn.Descriptor, txManager, client)
 	salaries := newCatalogService(salarydmn.Descriptor, txManager, client)
 	absences := newCatalogService(absencedmn.Descriptor, txManager, client)
-	employees := employeesrv.NewService(newCatalogService(employeedmn.Descriptor, txManager, client), txManager, assignments, salaries)
+	employees := employeesrv.NewService(log, newCatalogService(employeedmn.Descriptor, txManager, client), txManager, assignments, salaries, accounts)
 
 	return []httptr.Mount{
 		func(r chi.Router) {

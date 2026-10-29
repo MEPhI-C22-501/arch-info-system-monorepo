@@ -15,6 +15,10 @@ services:
 
     command: [ "--configs", "/app/configs/reference-manager" ]
 
+    environment:
+      POSTGRES_PASSWORD: reference_manager_app
+      KEYCLOAK_PROVISIONER_SECRET: test-provisioner-secret
+
     ports:
       - "8080"
 
@@ -54,7 +58,7 @@ services:
   reference-manager-keycloak:
     image: quay.io/keycloak/keycloak:26.7.4
 
-    command: [ "start-dev", "--import-realm" ]
+    entrypoint: [ "/bin/bash", "/opt/keycloak/import-realm.sh" ]
 
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -62,12 +66,14 @@ services:
       # the issuer stays the same as in the local environment, whatever host port the tests get tokens from
       KC_HOSTNAME: http://localhost:8180
       KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_PROVISIONER_SECRET: test-provisioner-secret
 
     ports:
       - "8080"
 
     volumes:
-      - ../../deployments/configs/keycloak/arch-info-system-realm.json:/opt/keycloak/data/import/arch-info-system-realm.json:ro
+      - ../../deployments/configs/keycloak/arch-info-system-realm.json:/opt/keycloak/realm-template/arch-info-system-realm.json:ro
+      - ../../deployments/configs/keycloak/import-realm.sh:/opt/keycloak/import-realm.sh:ro
 
     healthcheck:
       test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3" ]
@@ -92,12 +98,16 @@ services:
       POSTGRES_DB: reference_manager
       POSTGRES_USER: reference_manager
       POSTGRES_PASSWORD: reference_manager
+      POSTGRES_APP_PASSWORD: reference_manager_app
 
     ports:
       - "5432"
 
     tmpfs:
       - /var/lib/postgresql
+
+    volumes:
+      - ../../deployments/postgres/init:/docker-entrypoint-initdb.d:ro
 
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U reference_manager -d reference_manager" ]

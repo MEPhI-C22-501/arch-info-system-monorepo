@@ -17,6 +17,14 @@ const (
 	StateDismissed = "DISMISSED"
 )
 
+// States of the Keycloak account of an employee (FR-RM-55): PENDING until the last operation with the account
+// is confirmed, ENABLED while the employee works, DISABLED after the dismissal.
+const (
+	AccountPending  = "PENDING"
+	AccountEnabled  = "ENABLED"
+	AccountDisabled = "DISABLED"
+)
+
 // validate keeps the employment state and the dismissal date consistent.
 func validate(_ context.Context, _ postgres.Querier, next, _ *record.Record[Fields]) error {
 	errs := &record.ValidationError{}
@@ -28,6 +36,10 @@ func validate(_ context.Context, _ postgres.Querier, next, _ *record.Record[Fiel
 
 	if (f.EmploymentState == StateDismissed) != (f.DismissalDate != nil) {
 		errs.Add("employment_state", "DISMISSED requires a dismissal date and EMPLOYED excludes it")
+	}
+
+	if f.AccountState == AccountEnabled && f.AccountUserID == nil {
+		errs.Add("account_state", "ENABLED requires an account")
 	}
 
 	return errs.OrNil()

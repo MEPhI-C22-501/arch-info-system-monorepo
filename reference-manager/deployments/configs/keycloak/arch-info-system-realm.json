@@ -14,6 +14,19 @@
   },
   "clients": [
     {
+      "clientId": "reference-manager-provisioner",
+      "name": "Reference Manager provisioner",
+      "description": "Service client the service manages the accounts of employees with (FR-RM-53..58). The secret is substituted from KEYCLOAK_PROVISIONER_SECRET by import-realm.sh on the start of Keycloak.",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "__PROVISIONER_SECRET__",
+      "protocol": "openid-connect"
+    },
+    {
       "clientId": "reference-manager",
       "name": "Reference Manager API",
       "description": "Resource server, the audience of the tokens accepted by the service. It has no login flows.",
@@ -72,6 +85,14 @@
     }
   ],
   "users": [
+    {
+      "username": "service-account-reference-manager-provisioner",
+      "enabled": true,
+      "serviceAccountClientId": "reference-manager-provisioner",
+      "clientRoles": {
+        "realm-management": [ "manage-users", "view-users", "query-users", "view-realm" ]
+      }
+    },
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "username": "admin",

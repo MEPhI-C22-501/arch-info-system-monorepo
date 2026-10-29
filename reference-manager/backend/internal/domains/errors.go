@@ -18,6 +18,9 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 	// ErrRevisionNotFound means the resource exists, but has no revision with the requested number.
 	ErrRevisionNotFound = fmt.Errorf("revision %w", ErrNotFound)
+	// ErrUnavailable means a dependency of the operation (Keycloak) could not be reached, the operation stays
+	// pending and the client repeats it later (FR-RM-55).
+	ErrUnavailable = errors.New("dependency is unavailable")
 )
 
 // InvalidArgumentError describes a request argument the client has to fix, its message is safe to return to the client.

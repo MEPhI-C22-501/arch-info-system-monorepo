@@ -45,6 +45,11 @@ func NewApp(cfg *Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize keycloak token verifier: %w", err)
 	}
 
+	accounts, err := keycloak.NewAdmin(&cfg.Auth.Keycloak, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize keycloak admin client: %w", err)
+	}
+
 	txManager := postgres.NewTxManager(postgresClient)
 
 	currencyService := currencysrv.NewService(
@@ -59,8 +64,9 @@ func NewApp(cfg *Config) (*App, error) {
 		log,
 		readinessManager,
 		verifier,
+		&cfg.Transport.Limits,
 		currencyService,
-		catalogMounts(txManager, postgresClient)...,
+		catalogMounts(log, txManager, postgresClient, accounts)...,
 	))
 
 	log.Info("application initialized successfully")

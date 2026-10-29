@@ -14,3 +14,11 @@ auth:
       refresh_interval: 1h
       unknown_key_refresh_interval: 1m
       request_timeout: 5s
+
+    # the service client the accounts of employees are managed with (FR-RM-53..58),
+    # its secret comes from KEYCLOAK_PROVISIONER_SECRET of the environment
+    provisioner:
+      client_id: reference-manager-provisioner
+      request_timeout: 5s
+      # realm roles of a new account: a new employee reads the shared classifiers and HR references
+      default_realm_roles: [ reference-reader ]

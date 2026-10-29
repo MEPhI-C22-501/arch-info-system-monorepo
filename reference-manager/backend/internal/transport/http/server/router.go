@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"golang.org/x/time/rate"
 
 	currencyhndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/currency"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/health"
@@ -23,10 +24,20 @@ import (
 // Mount registers the handlers of one catalog on the authenticated router.
 type Mount func(r chi.Router)
 
+// Limits are the request limits of the router, they come from the configuration (K-07).
+type Limits struct {
+	// RequestsPerSecond is the sustained rate of requests the service accepts, Burst the size of the bucket.
+	RequestsPerSecond float64 `yaml:"requests_per_second" env-default:"10"`
+	Burst             int     `yaml:"burst" env-default:"100"`
+	// RequestTimeout cancels the context of a request that runs longer.
+	RequestTimeout time.Duration `yaml:"request_timeout" env-default:"1s"`
+}
+
 func NewRouter(
 	log *slog.Logger,
 	readinessChecker health.ReadinessChecker,
 	authenticator authmw.Authenticator,
+	limits *Limits,
 	currencyService currencyhndl.Service,
 	mounts ...Mount,
 ) *chi.Mux {
@@ -37,8 +48,8 @@ func NewRouter(
 		telemetrymw.NewMiddleware("reference-manager", "/v1/health"),
 		logmw.NewMiddleware(log),
 		recoverymw.NewMiddleware(log),
-		ratelimitmw.NewMiddleware(10, 100),     // TODO: implement middleware init via special configuration
-		timeoutmw.NewMiddleware(1*time.Second), // TODO: implement middleware init via special configuration
+		ratelimitmw.NewMiddleware(rate.Limit(limits.RequestsPerSecond), limits.Burst),
+		timeoutmw.NewMiddleware(limits.RequestTimeout),
 	)
 
 	// health endpoints are called by the infrastructure without a token

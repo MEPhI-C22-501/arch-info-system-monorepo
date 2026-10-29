@@ -7,10 +7,11 @@ import (
 )
 
 type Config struct {
-	Host         string              `yaml:"host" env-required:"true"`
-	Port         string              `yaml:"port" env-required:"true"`
-	User         string              `yaml:"user" env-required:"true"`
-	Password     string              `yaml:"password" env-required:"true"`
+	Host string `yaml:"host" env-required:"true"`
+	Port string `yaml:"port" env-required:"true"`
+	User string `yaml:"user" env-required:"true"`
+	// Password comes from the environment in every deployed configuration (NFR-RM-22), the YAML key is kept for tests.
+	Password     string              `yaml:"password" env:"POSTGRES_PASSWORD" env-required:"true"`
 	Database     string              `yaml:"database" env-required:"true"`
 	Pool         *PoolConfig         `yaml:"pool"`
 	ConnectRetry *ConnectRetryConfig `yaml:"connect_retry"`

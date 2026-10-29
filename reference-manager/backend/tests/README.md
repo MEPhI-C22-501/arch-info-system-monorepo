@@ -85,6 +85,21 @@ JSON-тела сравниваются семантически: порядок 
 Издатель токенов зафиксирован через `KC_HOSTNAME` (`http://localhost:8180`), поэтому он совпадает с `issuer_url`
 локальной конфигурации, с какого бы порта хоста тест ни получал токен.
 
+## Учётные записи Keycloak
+
+Сервис в тестах создаёт учётные записи сотрудников в том же Keycloak под клиентом `reference-manager-provisioner`
+(секрет `test-provisioner-secret` задан в `docker-compose.test.yaml` и подставляется в realm при старте). Шаги пакета
+`steps/keycloak` проверяют и готовят учётные записи через Admin REST API под администратором Keycloak,
+чьи имя и пароль тесты читают из окружения контейнера (`KC_BOOTSTRAP_ADMIN_USERNAME`, `KC_BOOTSTRAP_ADMIN_PASSWORD`):
+
+| Шаг | Что делает |
+| --- | --- |
+| `the Keycloak account "<login>" is enabled`, `is disabled`, `is missing` | Проверяет состояние учётной записи |
+| `the Keycloak account "<login>" has email "<email>"` | Проверяет адрес почты |
+| `the Keycloak account "<login>" has the realm role "<role>"` | Проверяет роль realm |
+| `the Keycloak account "<login>" is removed` | Удаляет учётную запись, если она есть; ставится в `Background`, потому что Keycloak между сценариями не очищается |
+| `a Keycloak account "<login>" exists with email "<email>"` | Создаёт отключённую учётную запись для сценариев повтора и конфликта |
+
 ## Ограничение частоты запросов
 
 Сервис ограничивает частоту запросов. Если он отвечает `429 Too Many Requests`, шаг

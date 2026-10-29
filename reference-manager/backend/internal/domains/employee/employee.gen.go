@@ -26,6 +26,8 @@ type Fields struct {
 	DismissalDate   *time.Time `json:"dismissal_date"`
 	OrgUnitID       *int64     `json:"org_unit_id"`
 	PositionID      *int64     `json:"position_id"`
+	AccountState    string     `json:"account_state"`
+	AccountUserID   *string    `json:"account_user_id"`
 }
 
 // snapshot is the JSON document the revision patches are computed against, its field names are stored
@@ -40,6 +42,8 @@ type snapshot struct {
 	HireDate        time.Time  `json:"hire_date"`
 	EmploymentState string     `json:"employment_state"`
 	DismissalDate   *time.Time `json:"dismissal_date"`
+	AccountState    string     `json:"account_state"`
+	AccountUserID   *string    `json:"account_user_id"`
 	IsDeleted       bool       `json:"is_deleted"`
 }
 
@@ -54,6 +58,8 @@ func newSnapshot(r *record.Record[Fields]) any {
 		HireDate:        r.Fields.HireDate,
 		EmploymentState: r.Fields.EmploymentState,
 		DismissalDate:   r.Fields.DismissalDate,
+		AccountState:    r.Fields.AccountState,
+		AccountUserID:   r.Fields.AccountUserID,
 		IsDeleted:       r.IsDeleted,
 	}
 }
@@ -167,6 +173,24 @@ var Descriptor = &record.Descriptor[Fields]{
 			Value:     func(f *Fields) any { return f.PositionID },
 			Ptr:       func(f *Fields) any { return &f.PositionID },
 		},
+		{
+			Name:      "account_state",
+			Type:      filtering.TypeString,
+			Stored:    true,
+			Updatable: false,
+			Value:     func(f *Fields) any { return f.AccountState },
+			Ptr:       func(f *Fields) any { return &f.AccountState },
+			Rules:     record.Rules{Required: true, Enum: []string{"PENDING", "ENABLED", "DISABLED"}},
+		},
+		{
+			Name:      "account_user_id",
+			Type:      filtering.TypeString,
+			Stored:    true,
+			Updatable: false,
+			Value:     func(f *Fields) any { return f.AccountUserID },
+			Ptr:       func(f *Fields) any { return &f.AccountUserID },
+			Rules:     record.Rules{MaxLen: 36},
+		},
 	},
 	Export: []record.ExportColumn[Fields]{
 		{Title: "Personnel number", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.PersonnelNumber) }},
@@ -180,6 +204,8 @@ var Descriptor = &record.Descriptor[Fields]{
 		{Title: "Dismissal date", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.DismissalDate) }},
 		{Title: "Org unit id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.OrgUnitID) }},
 		{Title: "Position id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.PositionID) }},
+		{Title: "Account state", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.AccountState) }},
+		{Title: "Account user id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.AccountUserID) }},
 	},
 	Snapshot: newSnapshot,
 	Validate: validate,

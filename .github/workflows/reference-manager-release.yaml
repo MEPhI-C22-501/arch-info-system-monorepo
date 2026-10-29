@@ -1,17 +1,91 @@
 name: Reference Manager Release
 
+# after a merge to main the images of the module are built and published to GHCR with the commit SHA as the tag,
+# a git tag reference-manager/vX.Y.Z on a published commit adds the version tag X.Y.Z to the same images,
+# the paths filter does not apply to tag pushes
 on:
   push:
     branches:
       - main
 
+    tags:
+      - 'reference-manager/v*'
+
     paths:
       - 'reference-manager/**'
+      - '.github/workflows/reference-manager-release.yaml'
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  dummy:
+  publish:
+    name: Publish ${{ matrix.image }}
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: reference-manager
+            context: reference-manager/backend
+            dockerfile: reference-manager/deployments/docker/reference-manager.dockerfile
+          - image: reference-manager-ui
+            context: reference-manager/frontend
+            dockerfile: reference-manager/deployments/docker/reference-manager-ui.dockerfile
+
     steps:
-      - name: Dummy step
-        run: echo "Dummy job for release changes in reference-manager"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR accepts lowercase names only, the organization name is mixed case
+      - name: Image name
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.name.outputs.image }}
+          tags: |
+            type=sha,format=long,prefix=
+            type=match,pattern=reference-manager/v(.*),group=1
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+      # the digest is what a deployment refers to
+      - name: Record the digest
+        run: |
+          {
+            echo "### ${{ steps.name.outputs.image }}"
+            echo
+            echo '```'
+            echo "digest: ${{ steps.build.outputs.digest }}"
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

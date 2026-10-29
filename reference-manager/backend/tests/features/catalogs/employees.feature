@@ -1,12 +1,15 @@
 Feature: Employees
 
-  An employee is hired as EMPLOYED, the unit and the position come from the assignment in effect today,
-  the dismissal closes the assignment and the salary in effect with the dismissal date (FR-RM-49, FR-RM-54).
+  An employee is hired as EMPLOYED with a Keycloak account, the unit and the position come from the assignment
+  in effect today, the dismissal closes the assignment and the salary in effect with the dismissal date
+  and blocks the account (FR-RM-49, FR-RM-53, FR-RM-54).
 
   Background:
     Given the SQL query from file "testdata/hr.sql" is executed
+    And the Keycloak account "m.petrova" is removed
+    And the Keycloak account "i.ivanov" is removed
 
-  Scenario: An employee is hired with the first revision
+  Scenario: An employee is hired with an account, the account result is the second revision
     Given a POST HTTP request
     And the HTTP request is authorized as "hr-admin"
     And the HTTP request contains a body
@@ -26,8 +29,10 @@ Feature: Employees
         "username": "m.petrova",
         "hire_date": "2026-11-02",
         "employment_state": "EMPLOYED",
+        "account_state": "ENABLED",
+        "account_user_id": "{{any}}",
         "is_deleted": false,
-        "revision": 1,
+        "revision": 2,
         "last_changer": "d81f4b6c-2e9a-4c35-b7d0-6a5e4f3c2b1d",
         "created_at": "{{any}}",
         "updated_at": "{{any}}",
@@ -107,9 +112,13 @@ Feature: Employees
       """
       "2026-10-31"
       """
+    And the HTTP response contains a value at "/account_state"
+      """
+      "DISABLED"
+      """
     And the HTTP response contains a value at "/revision"
       """
-      2
+      3
       """
     When the SQL query is executed
       """

@@ -113,6 +113,23 @@ tasks:
     cmds:
       - docker compose -f deployments/docker-compose.yaml down -v
 
+  demo:
+    desc: Load the demonstration data set and create the Keycloak accounts of its employees (after 'task up')
+    cmds:
+      - task: demo:data
+      - task: demo:accounts
+
+  demo:data:
+    desc: Load deployments/seed/demo.sql into the running local database, skipped when employees exist
+    cmds:
+      - docker compose -f deployments/docker-compose.yaml --profile demo run --rm reference-manager-seed
+
+  demo:accounts:
+    desc: Create or repeat the Keycloak accounts of every employee through the API as hr-admin
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      - go run ./tools/demoaccounts {{.CLI_ARGS}}
+
   swagger:
     desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
     dir: '{{.BACKEND_DIR}}'
