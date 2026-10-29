@@ -1,0 +1,233 @@
+[
+  {
+    "key": "TC-RM-01", "module": "RM", "priority": "HIGH", "severity": "BLOCKER", "type": "SMOKE",
+    "title": "Служебные точки livez и readyz Reference Manager",
+    "description": "Стартовый набор, vision 7.1. План: авто. API на 12.10.2026: есть. Автотест: не написан.",
+    "preconditions": "Сервис Reference Manager запущен, его БД доступна",
+    "steps": [
+      {"action": "Запросить GET /v1/health/livez", "expectedResult": "Успешный ответ"},
+      {"action": "Запросить GET /v1/health/readyz при доступной БД", "expectedResult": "Успешный ответ: сервис готов"},
+      {"action": "Остановить БД и повторить GET /v1/health/readyz", "expectedResult": "Ответ сообщает о неготовности сервиса"}
+    ]
+  },
+  {
+    "key": "TC-RM-02", "module": "RM", "priority": "HIGH", "severity": "CRITICAL", "type": "FUNCTIONAL",
+    "title": "Создание записи справочника и чтение по имени",
+    "description": "Стартовый набор, vision 7.1. План: авто. API на 12.10.2026: есть (валюты). Автотест: не написан.",
+    "preconditions": "Справочник валют; идентификатор записи с префиксом прогона",
+    "steps": [
+      {"action": "Создать запись справочника валют", "expectedResult": "Запись создана в состоянии ACTIVE, первая ревизия"},
+      {"action": "Прочитать запись по имени", "expectedResult": "Поля совпадают с отправленными"}
+    ]
+  },
+  {
+    "key": "TC-RM-03", "module": "RM", "priority": "HIGH", "severity": "MAJOR", "type": "NEGATIVE",
+    "title": "Удалённая запись: список, чтение по имени и повторное создание",
+    "description": "Стартовый набор, vision 7.1. План: авто. API на 12.10.2026: есть (валюты). Автотест: не написан.",
+    "preconditions": "Существует запись справочника валют, созданная прогоном",
+    "steps": [
+      {"action": "Удалить запись", "expectedResult": "Запись в состоянии DELETED"},
+      {"action": "Прочитать список записей без параметров", "expectedResult": "Удалённой записи в списке по умолчанию нет"},
+      {"action": "Прочитать запись по имени", "expectedResult": "Запись доступна в состоянии DELETED"},
+      {"action": "Создать запись с тем же идентификатором", "expectedResult": "Создание отклонено: идентификатор занят"}
+    ]
+  },
+  {
+    "key": "TC-RM-04", "module": "RM", "priority": "MEDIUM", "severity": "MAJOR", "type": "FUNCTIONAL",
+    "title": "Возврат удалённой записи справочника в работу",
+    "description": "Стартовый набор, vision 7.1. План: авто. API на 12.10.2026: нет — операции восстановления в спецификации пока нет. Автотест: не написан.",
+    "preconditions": "Существует удалённая запись справочника, созданная прогоном",
+    "steps": [
+      {"action": "Вернуть удалённую запись в работу", "expectedResult": "Запись снова в состоянии ACTIVE"},
+      {"action": "Прочитать запись по имени", "expectedResult": "Ревизия увеличена"}
+    ]
+  },
+  {
+    "key": "TC-RM-05", "module": "RM", "priority": "HIGH", "severity": "CRITICAL", "type": "NEGATIVE",
+    "title": "Запрос без токена и выгрузка списка в .xlsx",
+    "description": "Стартовый набор, vision 7.1. План: авто. API на 12.10.2026: есть (валюты). Автотест: не написан.",
+    "steps": [
+      {"action": "Запросить список валют без токена", "expectedResult": "Отказ в доступе"},
+      {"action": "С токеном выгрузить список валют в .xlsx с фильтром", "expectedResult": "Файл с заголовками и строками по фильтру"}
+    ]
+  },
+  {
+    "key": "TC-TT-01", "module": "TT", "priority": "HIGH", "severity": "MAJOR", "type": "NEGATIVE",
+    "title": "Задача без наименования и со сроком раньше начала отклоняется",
+    "description": "Стартовый набор, vision 7.2. План: авто. API на 12.10.2026: есть. Автотест: не написан.",
+    "steps": [
+      {"action": "Создать задачу без наименования", "expectedResult": "Запрос отклонён с указанием поля наименования"},
+      {"action": "Создать задачу со сроком раньше даты начала", "expectedResult": "Запрос отклонён с указанием поля срока"}
+    ]
+  },
+  {
+    "key": "TC-TT-02", "module": "TT", "priority": "MEDIUM", "severity": "MINOR", "type": "FUNCTIONAL",
+    "title": "Перемещение задачи по канбан-доске",
+    "description": "Стартовый набор, vision 7.2. План: ручной. API на 12.10.2026: есть интерфейс. Автотест: не требуется (ADR-013).",
+    "preconditions": "Задача на канбан-доске проекта",
+    "steps": [
+      {"action": "Переместить задачу в другую колонку канбан-доски", "expectedResult": "Задача отображается в новой колонке"},
+      {"action": "Открыть карточку задачи", "expectedResult": "Статус задачи сохранён и совпадает с колонкой"}
+    ]
+  },
+  {
+    "key": "TC-TT-03", "module": "TT", "priority": "HIGH", "severity": "MAJOR", "type": "FUNCTIONAL",
+    "title": "Учёт трудозатрат и перерасход",
+    "description": "Стартовый набор, vision 7.2. План: авто. API на 12.10.2026: есть. Автотест: не написан.",
+    "steps": [
+      {"action": "Задать задаче план 10 ч", "expectedResult": "План сохранён"},
+      {"action": "Зарегистрировать 4 ч и 8 ч", "expectedResult": "Факт 12 ч, остаток −2 ч отображается как перерасход"}
+    ]
+  },
+  {
+    "key": "TC-TT-04", "module": "TT", "priority": "HIGH", "severity": "MAJOR", "type": "NEGATIVE",
+    "title": "Задача не включается во вторую незавершённую итерацию",
+    "description": "Стартовый набор, vision 7.2. План: авто. API на 12.10.2026: есть. Автотест: не написан.",
+    "preconditions": "Задача входит в незавершённую итерацию; есть вторая незавершённая итерация",
+    "steps": [
+      {"action": "Включить задачу во вторую незавершённую итерацию", "expectedResult": "Операция отклонена"}
+    ]
+  },
+  {
+    "key": "TC-TT-05", "module": "TT", "priority": "MEDIUM", "severity": "MAJOR", "type": "REGRESSION",
+    "title": "Экспорт задач в .xlsx и импорт без изменений",
+    "description": "Стартовый набор, vision 7.2. План: авто. API на 12.10.2026: есть. Автотест: не написан.",
+    "steps": [
+      {"action": "Экспортировать задачи в .xlsx", "expectedResult": "Файл получен"},
+      {"action": "Импортировать файл без изменений", "expectedResult": "Импорт без ошибок, 0 созданных, данные задач не изменились"}
+    ]
+  },
+  {
+    "key": "TC-PS-01", "module": "PS", "priority": "HIGH", "severity": "CRITICAL", "type": "FUNCTIONAL",
+    "title": "Декомпозиция проекта на этап, веху, эпик и фичу",
+    "description": "Стартовый набор, vision 7.3. План: авто. API на 12.10.2026: нет, только спецификация. Автотест: не написан.",
+    "steps": [
+      {"action": "Создать проект", "expectedResult": "Проект создан"},
+      {"action": "Декомпозировать проект на этап, веху, эпик и фичу", "expectedResult": "Структура сохранена и отображается в иерархии"}
+    ]
+  },
+  {
+    "key": "TC-PS-02", "module": "PS", "priority": "MEDIUM", "severity": "MAJOR", "type": "FUNCTIONAL",
+    "title": "Конфликт загрузки при назначении сверх доступности",
+    "description": "Стартовый набор, vision 7.3. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Назначить сотрудника на объём сверх его доступности в календаре", "expectedResult": "Система показывает конфликт загрузки"}
+    ]
+  },
+  {
+    "key": "TC-PS-03", "module": "PS", "priority": "MEDIUM", "severity": "MAJOR", "type": "REGRESSION",
+    "title": "Сценарий «что если» не меняет утверждённую базовую линию",
+    "description": "Стартовый набор, vision 7.3. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "preconditions": "У проекта есть утверждённая базовая линия",
+    "steps": [
+      {"action": "Создать сценарий «что если»", "expectedResult": "Сценарий создан"},
+      {"action": "Изменить в сценарии сроки", "expectedResult": "Утверждённая базовая линия не изменилась"}
+    ]
+  },
+  {
+    "key": "TC-PS-04", "module": "PS", "priority": "HIGH", "severity": "CRITICAL", "type": "INTEGRATION",
+    "title": "Утверждение базовой линии создаёт проект в Task Tracker",
+    "description": "Стартовый набор, vision 7.3. План: авто, межсистемный (Planning System → Task Tracker). API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Утвердить базовую линию проекта в Planning System", "expectedResult": "Базовая линия утверждена"},
+      {"action": "Найти проект в Task Tracker по внешнему идентификатору", "expectedResult": "Проект с внешним идентификатором появился в Task Tracker"}
+    ]
+  },
+  {
+    "key": "TC-PS-05", "module": "PS", "priority": "HIGH", "severity": "MAJOR", "type": "INTEGRATION",
+    "title": "Трудозатраты из Task Tracker обновляют факт и прогноз",
+    "description": "Стартовый набор, vision 7.3. План: авто, межсистемный (Task Tracker → Planning System). API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Зарегистрировать время по задаче проекта в Task Tracker", "expectedResult": "Трудозатраты сохранены"},
+      {"action": "Прочитать проект в Planning System", "expectedResult": "Факт и прогноз остатка обновлены"}
+    ]
+  },
+  {
+    "key": "TC-REP-01", "module": "REP", "priority": "HIGH", "severity": "CRITICAL", "type": "NEGATIVE",
+    "title": "Отчёт без токена и без прав на проект",
+    "description": "Стартовый набор, vision 7.4. План: авто. API на 12.10.2026: нет, только спецификация. Автотест: не написан.",
+    "steps": [
+      {"action": "Запросить отчёт без токена", "expectedResult": "Отказ в доступе"},
+      {"action": "Запросить отчёт с токеном без прав на проект", "expectedResult": "Отказ в доступе"}
+    ]
+  },
+  {
+    "key": "TC-REP-02", "module": "REP", "priority": "HIGH", "severity": "MAJOR", "type": "INTEGRATION",
+    "title": "Сумма часов в отчёте R-01 равна трудозатратам Task Tracker",
+    "description": "Стартовый набор, vision 7.4. План: авто, межсистемный (Task Tracker → Reports). API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Зарегистрировать в Task Tracker 3 записи времени", "expectedResult": "Записи сохранены"},
+      {"action": "После истечения лага витрины сформировать R-01 за период", "expectedResult": "Сумма часов в отчёте равна сумме записей"}
+    ]
+  },
+  {
+    "key": "TC-REP-03", "module": "REP", "priority": "LOW", "severity": "MINOR", "type": "FUNCTIONAL",
+    "title": "Отчёт по параметрам без данных",
+    "description": "Стартовый набор, vision 7.4. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Сформировать отчёт по параметрам, для которых нет данных", "expectedResult": "Явное сообщение об отсутствии данных"}
+    ]
+  },
+  {
+    "key": "TC-REP-04", "module": "REP", "priority": "HIGH", "severity": "MAJOR", "type": "REGRESSION",
+    "title": "Повторная доставка события трудозатрат учитывается один раз",
+    "description": "Стартовый набор, vision 7.4. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Доставить одно событие трудозатрат дважды", "expectedResult": "События приняты"},
+      {"action": "Сформировать отчёт за период события", "expectedResult": "Часы учтены один раз"}
+    ]
+  },
+  {
+    "key": "TC-REP-05", "module": "REP", "priority": "MEDIUM", "severity": "MINOR", "type": "FUNCTIONAL",
+    "title": "Выгрузка отчёта в .xlsx",
+    "description": "Стартовый набор, vision 7.4. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Выгрузить отчёт в .xlsx", "expectedResult": "Файл содержит параметры формирования, дату и автора"}
+    ]
+  },
+  {
+    "key": "TC-INF-01", "module": "INF", "priority": "HIGH", "severity": "BLOCKER", "type": "SMOKE",
+    "title": "Служебный токен по client credentials",
+    "description": "Стартовый набор, vision 7.5. План: авто. API на 12.10.2026: нет, общий стенд не развёрнут. Автотест: не написан.",
+    "steps": [
+      {"action": "Получить служебный токен по client credentials в realm arch-info-system", "expectedResult": "Токен выдан"},
+      {"action": "Проверить подпись токена по JWKS", "expectedResult": "Подпись проверяется"}
+    ]
+  },
+  {
+    "key": "TC-INF-02", "module": "INF", "priority": "MEDIUM", "severity": "CRITICAL", "type": "REGRESSION",
+    "title": "Пользователь Keycloak сохраняется после пересоздания контейнера",
+    "description": "Стартовый набор, vision 7.5. План: ручной. API на 12.10.2026: нет. Автотест: не требуется.",
+    "steps": [
+      {"action": "Создать пользователя в Keycloak", "expectedResult": "Пользователь создан"},
+      {"action": "Пересоздать контейнер Keycloak", "expectedResult": "Keycloak снова готов"},
+      {"action": "Войти под созданным пользователем", "expectedResult": "Пользователь сохранился, вход успешен"}
+    ]
+  },
+  {
+    "key": "TC-INF-03", "module": "INF", "priority": "HIGH", "severity": "CRITICAL", "type": "NEGATIVE",
+    "title": "Свой бакет MinIO доступен, чужой — нет",
+    "description": "Стартовый набор, vision 7.5. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Записать и прочитать объект в своём бакете", "expectedResult": "Свой объект доступен"},
+      {"action": "Прочитать объект чужого бакета", "expectedResult": "Отказ в доступе"}
+    ]
+  },
+  {
+    "key": "TC-INF-04", "module": "INF", "priority": "HIGH", "severity": "CRITICAL", "type": "FUNCTIONAL",
+    "title": "Событие Kafka: разрешённый producer и чужой principal",
+    "description": "Стартовый набор, vision 7.5. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Отправить событие разрешённым producer и прочитать consumer", "expectedResult": "Событие получено"},
+      {"action": "Отправить событие от чужого principal", "expectedResult": "Чужой principal получает отказ"}
+    ]
+  },
+  {
+    "key": "TC-INF-05", "module": "INF", "priority": "MEDIUM", "severity": "MAJOR", "type": "REGRESSION",
+    "title": "Повторная инициализация realm, бакетов и топиков",
+    "description": "Стартовый набор, vision 7.5. План: авто. API на 12.10.2026: нет. Автотест: не написан.",
+    "steps": [
+      {"action": "Повторно выполнить инициализацию realm, бакетов и топиков", "expectedResult": "Ресурсы не задублированы, данные не удалены"}
+    ]
+  }
+]

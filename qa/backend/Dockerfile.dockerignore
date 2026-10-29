@@ -4,4 +4,5 @@
 !backend/alembic.ini
 !backend/migrations
 !backend/app
+!dev/demo-seed
 **/__pycache__

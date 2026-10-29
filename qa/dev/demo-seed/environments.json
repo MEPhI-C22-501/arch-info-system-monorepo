@@ -1,0 +1,10 @@
+[
+  {
+    "code": "dev",
+    "name": "Локальный стенд",
+    "baseUrls": {
+      "task-tracker": "http://localhost:8080",
+      "keycloak": "http://localhost:8081"
+    }
+  }
+]

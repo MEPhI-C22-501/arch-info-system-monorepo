@@ -45,6 +45,10 @@ def conflict(code: str, message: str, errors: list[dict[str, str]] | None = None
     return ApiError(409, code, message, errors)
 
 
+def validation_failed(errors: list[dict[str, str]], message: str = "Некорректные поля") -> ApiError:
+    return ApiError(422, "VALIDATION_FAILED", message, errors)
+
+
 def error_response(
     request: Request,
     status_code: int,

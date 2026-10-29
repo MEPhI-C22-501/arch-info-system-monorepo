@@ -5,7 +5,7 @@ Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 18 ([ADR-001, ADR-002](.
 ## Запуск
 
 ```bash
-# Всё в контейнерах; Swagger — http://127.0.0.1:8090/api/v1/docs
+# Всё в контейнерах, с демо-данными (сервис qa-seed); Swagger — http://127.0.0.1:8090/api/v1/docs
 docker compose -f qa/compose.yaml up -d --build --wait qa-api
 
 # Разработка: БД в контейнере с портом 127.0.0.1:5435, приложение локально
@@ -13,6 +13,7 @@ docker compose -f qa/compose.yaml -f qa/compose.dev.yaml up -d --wait qa-db
 cd qa/backend
 uv sync
 uv run python -m app migrate
+uv run python -m app seed   # демо-данные из qa/dev/demo-seed; повторный запуск ничего не меняет
 uv run uvicorn app.main:app --reload --port 8090
 
 # Проверки
@@ -37,6 +38,8 @@ Black и flake8 настроены на длину строки 100: [`pyproject
 | `app/auth.py` | `Role`, `require_roles(...)` | общий |
 | `app/schemas.py` | `ApiModel` (camelCase), `Page`, `PageParams`, `paginate` | общий |
 | `app/keys.py` | `next_key(session, "RUN")` → `RUN-01` | общий |
+| `app/cases/`, `app/templates/`, `app/suites/`, `app/admin/` | Модули: `/test-cases`, `/templates`, `/suites`, `/admin/classifiers` и `/admin/environments` | A |
+| `app/seed.py`, [`../dev/demo-seed/`](../dev/demo-seed/) | Демо-данные: классификаторы, окружение `dev`, шаблоны, 25 кейсов vision 7, наборы «Smoke» и «Приёмка стенда». Загрузка идемпотентна: недостающее добавляется, существующее не меняется; `key_counter` поднимается до последних номеров | A |
 | `app/models/` | Модели всех таблиц [120](../docs/120.data-model.md); `enums.py` — значения статусов | `cases.py`, `plans.py` — A; `runs.py`, `defects.py` — B |
 | `migrations/versions/` | Миграции Alembic | — |
 | `tests/` | `conftest.py`: фикстуры `db_session`, `client`, `auth` | общий |
