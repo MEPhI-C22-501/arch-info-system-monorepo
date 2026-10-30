@@ -28,6 +28,8 @@ Black и flake8 настроены на длину строки 100: [`pyproject
 
 Авторизация пока демонстрационная: `Authorization: Bearer demo-<роль>` или `demo-<роль>@<пользователь>`, например `demo-qa-lead@ivanov`. Роли — [070](../docs/070.role-matrix.md). В Swagger токен вводится кнопкой Authorize.
 
+Переменные: `TRACKER_SYNC_ENABLED` (по умолчанию `true`; `false` — опроса Task Tracker нет и статусы разработки вручную ставит QA-лид, так настроен `compose.yaml`), `UI_BASE_URL` — адрес интерфейса для ссылок в «Ошибке».
+
 ## Структура
 
 | Путь | Что | Владелец |
@@ -39,10 +41,11 @@ Black и flake8 настроены на длину строки 100: [`pyproject
 | `app/schemas.py` | `ApiModel` (camelCase), `Page`, `PageParams`, `paginate` | общий |
 | `app/keys.py` | `next_key(session, "RUN")` → `RUN-01` | общий |
 | `app/cases/`, `app/templates/`, `app/suites/`, `app/admin/` | Модули: `/test-cases`, `/templates`, `/suites`, `/admin/classifiers` и `/admin/environments` | A |
-| `app/seed.py`, [`../dev/demo-seed/`](../dev/demo-seed/) | Демо-данные: классификаторы, окружение `dev`, шаблоны, 25 кейсов vision 7, наборы «Smoke» и «Приёмка стенда». Загрузка идемпотентна: недостающее добавляется, существующее не меняется; `key_counter` поднимается до последних номеров | A |
+| `app/runs/`, `app/defects/`, `app/plans/` | Модули: `/runs`, `/defects`, `/test-plans`. Функции без фиксации транзакции (`insert_run`, `start`, `write_result`, `insert_plan`, `activate`) вызывают планы и демо-данные | B |
+| `app/seed.py`, [`../dev/demo-seed/`](../dev/demo-seed/) | Демо-данные: классификаторы, окружения `dev` и `staging`, шаблоны, 25 кейсов vision 7, наборы «Smoke» и «Приёмка стенда», маппинг статусов, план TP-01 с прогоном RUN-01 и дефектом DEF-01. Загрузка идемпотентна: недостающее добавляется, существующее не меняется; `key_counter` поднимается до последних номеров | A, B |
 | `app/models/` | Модели всех таблиц [120](../docs/120.data-model.md); `enums.py` — значения статусов | `cases.py`, `plans.py` — A; `runs.py`, `defects.py` — B |
 | `migrations/versions/` | Миграции Alembic | — |
-| `tests/` | `conftest.py`: фикстуры `db_session`, `client`, `auth` | общий |
+| `tests/` | `conftest.py`: фикстуры `db_session`, `client`, `auth`; `factories.py`: объекты через API | общий |
 
 ## Правила
 

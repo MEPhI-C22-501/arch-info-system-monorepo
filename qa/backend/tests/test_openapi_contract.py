@@ -35,6 +35,26 @@ SCHEMAS = [
     "EnvironmentInput",
     "EnvironmentUpdate",
     "Environment",
+    "TrackerStatusMappingItem",
+    "TrackerStatusMappingInput",
+    "TrackerStatusMappingRow",
+    "TrackerStatusMapping",
+    "TestPlanInput",
+    "TestPlan",
+    "PlanCasesInput",
+    "PlanSummary",
+    "RunInput",
+    "RunSummary",
+    "Run",
+    "ResultInput",
+    "RunResultStep",
+    "DefectLink",
+    "RunResult",
+    "DefectInput",
+    "DefectUpdate",
+    "Defect",
+    "DefectComment",
+    "DefectDetail",
 ]
 
 
@@ -80,9 +100,50 @@ def test_every_operation_is_specified(spec, generated):
     assert implemented - spec_operations(spec) == set()
 
 
+def test_query_parameters_and_success_codes_match(spec, generated):
+    for path, item in generated["paths"].items():
+        for method, operation in item.items():
+            concrete = path.removeprefix(API_PREFIX)
+            declared = _spec_operation(spec, method, concrete)
+            assert _query_names(spec, declared) == _query_names(generated, operation), (
+                method,
+                concrete,
+            )
+            assert _success_code(operation) in declared["responses"], (method, concrete)
+
+
 @pytest.mark.parametrize("name", SCHEMAS)
 def test_schema_fields_match(spec, generated, name):
     assert _properties(generated, _generated_name(generated, name)) == _properties(spec, name)
+
+
+def _spec_operation(spec: dict, method: str, concrete: str) -> dict:
+    for path, item in spec["paths"].items():
+        pattern = re.sub(r"\{\w+\}", r"[^/]+", path)
+        literal = "{" not in path and path == concrete
+        if method in item and (literal or re.fullmatch(pattern, concrete)):
+            enums = [
+                p["schema"]["enum"]
+                for p in item.get("parameters", [])
+                if p.get("in") == "path" and "enum" in p.get("schema", {})
+            ]
+            if all(concrete.rsplit("/", 1)[-1] in values for values in enums):
+                return item[method]
+    raise AssertionError(f"{method} {concrete} нет в спецификации")
+
+
+def _query_names(document: dict, operation: dict) -> set[str]:
+    names = set()
+    for parameter in operation.get("parameters", []):
+        if "$ref" in parameter:
+            parameter = document["components"]["parameters"][parameter["$ref"].rsplit("/", 1)[-1]]
+        if parameter.get("in") == "query":
+            names.add(parameter["name"])
+    return names
+
+
+def _success_code(operation: dict) -> str:
+    return next(code for code in operation["responses"] if code.startswith("2"))
 
 
 def _generated_name(document: dict, name: str) -> str:

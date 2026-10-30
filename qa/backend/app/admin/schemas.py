@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import StringConstraints
 
-from app.models.enums import ClassifierKind
+from app.models.enums import ClassifierKind, DefectStatus
 from app.schemas import ApiModel, NonEmptyStr
 
 ClassifierCode = Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{0,31}$")]
@@ -55,3 +56,28 @@ class EnvironmentUpdate(ApiModel):
     name: NonEmptyStr | None = None
     base_urls: dict[SubsystemName, HttpUrl] | None = None
     is_active: bool | None = None
+
+
+class TrackerStatusMappingItem(ApiModel):
+    """qaStatus null — статус Task Tracker дефект не меняет."""
+
+    tracker_status_id: NonEmptyStr
+    tracker_status_name: NonEmptyStr
+    qa_status: DefectStatus | None = None
+    requires_assignee: bool = False
+    is_active: bool = True
+
+
+class TrackerStatusMappingInput(ApiModel):
+    """Вся таблица: строки, которых нет в запросе, удаляются."""
+
+    items: list[TrackerStatusMappingItem]
+
+
+class TrackerStatusMappingRow(TrackerStatusMappingItem):
+    updated_by: str
+    updated_at: datetime
+
+
+class TrackerStatusMapping(ApiModel):
+    items: list[TrackerStatusMappingRow]

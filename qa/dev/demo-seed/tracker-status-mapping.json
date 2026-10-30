@@ -1,0 +1,7 @@
+[
+  {"trackerStatusId": "00000000-0000-0000-0000-000000000101", "trackerStatusName": "Бэклог", "qaStatus": "OPEN", "requiresAssignee": true},
+  {"trackerStatusId": "00000000-0000-0000-0000-000000000102", "trackerStatusName": "В работе", "qaStatus": "IN_PROGRESS"},
+  {"trackerStatusId": "00000000-0000-0000-0000-000000000103", "trackerStatusName": "На проверке", "qaStatus": "FIXED"},
+  {"trackerStatusId": "00000000-0000-0000-0000-000000000104", "trackerStatusName": "Завершена", "qaStatus": null},
+  {"trackerStatusId": "00000000-0000-0000-0000-000000000105", "trackerStatusName": "Архивирована", "qaStatus": null}
+]

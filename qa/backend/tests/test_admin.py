@@ -280,3 +280,61 @@ def test_role_matrix(client, auth, role, can_read, can_write):
 
     assert reads == ({200} if can_read else {403})
     assert writes == ({201, 200} if can_write else {403})
+
+
+MAPPING = "/api/v1/admin/tracker-status-mapping"
+
+
+def mapping_row(status_id="s-1", qa_status="OPEN", **fields):
+    return {
+        "trackerStatusId": status_id,
+        "trackerStatusName": "Бэклог",
+        "qaStatus": qa_status,
+        **fields,
+    }
+
+
+def test_tracker_mapping_is_replaced_whole(client, auth):
+    admin = auth(Role.ADMIN, "root")
+    first = [mapping_row(requiresAssignee=True), mapping_row("s-2", None)]
+
+    saved = client.put(MAPPING, json={"items": first}, headers=admin)
+    replaced = client.put(MAPPING, json={"items": [mapping_row("s-2", "FIXED")]}, headers=admin)
+
+    assert saved.status_code == 200
+    assert [(r["trackerStatusId"], r["qaStatus"]) for r in saved.json()["items"]] == [
+        ("s-1", "OPEN"),
+        ("s-2", None),
+    ]
+    assert saved.json()["items"][0]["requiresAssignee"] is True
+    assert saved.json()["items"][0]["updatedBy"] == "root"
+    assert [r["qaStatus"] for r in replaced.json()["items"]] == ["FIXED"]
+    assert client.get(MAPPING, headers=admin).json() == replaced.json()
+
+
+@pytest.mark.parametrize("qa_status", ["NEW", "READY_FOR_TEST", "CLOSED", "REOPENED"])
+def test_testing_status_is_not_mappable(client, auth, qa_status):
+    body = {"items": [mapping_row(qa_status=qa_status)]}
+
+    response = client.put(MAPPING, json=body, headers=auth(Role.ADMIN))
+
+    assert (response.status_code, response.json()["code"]) == (422, "QA_STATUS_NOT_MAPPABLE")
+    assert response.json()["errors"] == [{"field": "items.0.qaStatus", "reason": qa_status}]
+
+
+def test_tracker_mapping_validation(client, auth):
+    admin = auth(Role.ADMIN)
+
+    duplicate = client.put(MAPPING, json={"items": [mapping_row(), mapping_row()]}, headers=admin)
+    unknown = client.put(MAPPING, json={"items": [mapping_row(qa_status="NOPE")]}, headers=admin)
+
+    assert duplicate.json()["errors"] == [
+        {"field": "items.1.trackerStatusId", "reason": "duplicate"}
+    ]
+    assert unknown.json()["code"] == "VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize("role", [r for r in Role if r != Role.ADMIN])
+def test_tracker_mapping_is_admin_only(client, auth, role):
+    assert client.get(MAPPING, headers=auth(role)).status_code == 403
+    assert client.put(MAPPING, json={"items": []}, headers=auth(role)).status_code == 403

@@ -6,6 +6,8 @@ x-runtime: &runtime
   DATABASE_URL: postgresql+psycopg://qa:${QA_DB_PASSWORD:-qa-local}@qa-db:5432/qa
   APP_ENV: development
   AUTH_MODE: demo
+  # Опроса Task Tracker ещё нет: статусы разработки вручную ставит QA-лид (ADR-008).
+  TRACKER_SYNC_ENABLED: "false"
 services:
   qa-db:
     image: postgres:18.6-alpine
