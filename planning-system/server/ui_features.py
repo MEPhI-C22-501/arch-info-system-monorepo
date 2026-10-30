@@ -1,6 +1,7 @@
 """Project cards, resource choices and user XLSX exports (separate from Reports ETL)."""
 import copy
 import math
+import os
 from datetime import date
 from io import BytesIO
 
@@ -154,6 +155,39 @@ def workbook_response(title, columns, rows, f, filename):
 
 def register(app, command_tx):
     from .app import allowed, get, changed, read_json
+
+    @app.get('/api/v1/planning-options')
+    def planning_options(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            portfolio=req.query_params.get('portfolioId','')
+            get(c,'portfolio',portfolio,a)
+            managers={r['data']['managerSubject']:r['data']['managerSubject'] for r in db.all_rows(c,'project',portfolio)}
+            for r in db.all_rows(c,'manager',portfolio):
+                managers[r['data']['subject']]=r['data']['displayName']
+            if os.environ.get('APP_ENV')=='development':
+                managers['demo-R-03']='Руководитель проекта · manager (учебная учётная запись)'
+            if 'R-03' in a.roles:managers[a.subject]=managers.get(a.subject,'Моя учётная запись')
+            if 'R-03' in a.roles and not a.roles & {'R-01','R-02'}:
+                managers={a.subject:managers[a.subject]}
+            return {'managers':[{'id':k,'name':v} for k,v in sorted(managers.items(),key=lambda x:x[1])],
+                    'specialties':[{'id':k,'name':v} for k,v in [
+                        ('developer','Разработчик'),('analyst','Аналитик'),('tester','Тестировщик'),
+                        ('designer','Дизайнер'),('devops','DevOps-инженер'),('architect','Архитектор'),
+                        ('project-manager','Руководитель проекта')]],
+                    'grades':[{'id':k,'name':v} for k,v in [('intern','Стажёр'),('junior','Junior'),
+                        ('middle','Middle'),('senior','Senior'),('lead','Ведущий специалист')]],
+                    'source':'Локальный справочник Planning System; руководители — из проектов и кадрового кэша'}
+
+    @app.get('/api/v1/project-timeline')
+    def timeline(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            plans=latest_plans(c)
+            pid=req.query_params.get('projectId','')
+            if pid not in {p['id'] for p in visible_projects(c,a,plans)}:fail(404,'Проект не найден')
+            v=plans.get(pid)
+            return {k:v[k] for k in ['id','revision','status','items','dependencies','horizonStart','horizonEnd']} if v else {'items':[],'dependencies':[]}
 
     @app.get('/api/v1/project-cards')
     def cards(req:Request):

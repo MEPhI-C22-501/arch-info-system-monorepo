@@ -52,6 +52,10 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: /tmp/planning-browser/node_modules/playwright/index.mjs
           APP_URL: http://127.0.0.1:8080
+      - run: node planning-system/scripts/check-workflows.mjs
+        env:
+          PLAYWRIGHT_MODULE: /tmp/planning-browser/node_modules/playwright/index.mjs
+          APP_URL: http://127.0.0.1:8080
       - run: python planning-system/scripts/check-restore.py --project planning-ci
       - run: node planning-system/scripts/check-prototype.mjs
         env:

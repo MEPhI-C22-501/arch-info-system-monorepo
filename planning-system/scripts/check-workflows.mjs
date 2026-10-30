@@ -1,0 +1,66 @@
+// Run against an isolated demo-auth instance: APP_URL=... PLAYWRIGHT_MODULE=... node this-file
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const out=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../artifacts');
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'planning-workflows-'));
+const run=Date.now();
+fs.mkdirSync(out,{recursive:true});
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch({headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1000}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const base=process.env.APP_URL||'http://127.0.0.1:8082';
+const go=async screen=>{await page.locator(`nav a[href="#${screen}"]`).click();await page.locator(`nav a[aria-current=page][href="#${screen}"]`).waitFor()};
+const commit=async (action,path)=>{const result=page.waitForResponse(r=>r.request().method()!=='GET'&&r.url().includes(path));await action();const response=await result;assert.ok(response.ok(),await response.text());await page.waitForResponse(r=>r.url().includes('/workspace')&&r.ok());await page.waitForTimeout(100)};
+try{
+ await page.goto(base);await page.locator('.project-card').first().waitFor();
+ const ids=[];
+ for(const label of ['Первый','Второй']){
+  await go('portfolio');await page.locator('.create-project summary').click();
+  await page.waitForFunction(()=>document.querySelector('#new-manager')?.disabled===false);
+  assert.equal(await page.locator('#new-manager').evaluate(e=>e.tagName),'SELECT');
+  await page.locator('#new-code').fill('FLOW-'+label+'-'+Date.now());await page.locator('#new-name').fill(label+' тестовый проект '+run);
+  await page.locator('#new-goal').fill('Проверка полного маршрута');await page.locator('#new-manager').selectOption('demo-R-03');
+  await commit(()=>page.locator('[data-extra=new-project]').click(),'/projects');
+  await go('structure');await page.locator('#new-item-name').waitFor();
+  ids.push(await page.locator('#working-project').inputValue());
+  await page.locator('#new-item-name').fill(label+' анализ');await page.locator('#new-item-type').selectOption('FEATURE');
+  await page.locator('#new-item-start').fill('2026-10-05');await page.locator('#new-item-finish').fill('2026-10-06');
+  await commit(()=>page.locator('[data-extra=new-item]').click(),'/draft');
+  assert.equal(await page.locator('[data-item][data-field=name]').count(),1);
+ }
+ // Switch project inside decomposition; changes must remain isolated.
+ await page.locator('#working-project').selectOption(ids[0]);await page.waitForFunction(()=>document.querySelector('[data-item][data-field=name]')?.value==='Первый анализ');
+ await page.locator('#new-item-name').fill('Тестирование');await page.locator('#new-item-type').selectOption('FEATURE');
+ await page.locator('#new-item-start').fill('2026-10-07');await page.locator('#new-item-finish').fill('2026-10-09');
+ await commit(()=>page.locator('[data-extra=new-item]').click(),'/draft');
+ const works=await page.locator('[data-item][data-field=name]').evaluateAll(es=>es.map(e=>e.dataset.item));
+ await page.locator('#dependency-from').selectOption(works[0]);await page.locator('#dependency-to').selectOption(works[1]);
+ await commit(()=>page.locator('#add-dependency').click(),'/draft');
+ await go('demand');await page.waitForFunction(()=>document.querySelector('#new-demand-role')?.disabled===false);
+ await page.locator('#new-demand-role').selectOption('analyst');await page.locator('#new-demand-grade').selectOption('senior');
+ await commit(()=>page.locator('[data-extra=new-demand]').click(),'/draft');
+ await page.waitForFunction(()=>document.querySelector('#new-demand-role')?.disabled===false);
+ await page.locator('#new-demand-role').selectOption('tester');await page.locator('#new-demand-grade').selectOption('junior');
+ await commit(()=>page.locator('[data-extra=new-demand]').click(),'/draft');
+ assert.equal(await page.locator('[data-demand-hours]').count(),2);
+ await go('gantt');await page.locator('.gantt-bar').first().waitFor();assert.equal(await page.locator('.gantt-bar').count(),2);
+ assert.equal(await page.locator('.gantt-links path[marker-end]').count(),1);
+ for(const zoom of ['day','month','week']){await page.locator('#gantt-zoom').selectOption(zoom);await page.waitForFunction(z=>document.querySelector('#gantt-zoom')?.value===z,zoom)}
+ await page.locator('[data-gantt-work]').nth(1).click();await page.locator('#gantt-finish').waitFor();
+ await page.locator('#gantt-finish').fill('2026-10-12');await commit(()=>page.locator('#gantt-save').click(),'/draft');
+ await page.locator('.gantt-bar').first().waitFor();assert.ok((await page.locator('[data-gantt-work]').nth(1).getAttribute('aria-label')).includes('2026-10-12'));
+ await page.screenshot({path:path.join(out,'app-gantt.png'),fullPage:true});
+ await go('resources');await page.locator('#assignment-employee').waitFor();await page.locator('#assignment-employee').selectOption('employees/demo-2');
+ await commit(()=>page.locator('#add-assignment').click(),'/assignments');
+ await page.locator('#filter-employee').selectOption('employees/demo-2');await page.locator('#assignments-from').fill('2026-10-05');await page.locator('#assignments-to').fill('2026-10-05');await page.locator('#assignments-apply').click();
+ await page.locator('#assignment-count').filter({hasText:'1'}).waitFor();
+ const download=page.waitForEvent('download');await page.locator('#export-assignments').click();await (await download).saveAs(path.join(temp,'assignments.xlsx'));
+ await go('portfolio');await page.locator('#cards-search').fill('Первый тестовый проект '+run);await page.locator('#cards-apply').click();await page.waitForFunction(()=>document.querySelectorAll('.project-card').length===1);
+ const projects=page.waitForEvent('download');await page.locator('#export-projects').click();await (await projects).saveAs(path.join(temp,'projects.xlsx'));
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'workflows-report.json'),JSON.stringify({passed:true,checks:['manager-dropdown','two-project-isolation','work-dates','specialty-grade-dropdowns','multiple-demands','gantt-real-dates','gantt-zoom','gantt-dependencies','gantt-save','filtered-project-xlsx','filtered-assignment-xlsx'],errors},null,2));
+ console.log('All workflow checks passed');
+}finally{await browser.close()}

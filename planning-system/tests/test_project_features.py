@@ -141,3 +141,31 @@ def test_excel_keeps_user_text_literal_and_excludes_other_portfolios(client):
     assert book['Проекты'].max_row==2
     assert book['Проекты']['B2'].value==name and book['Проекты']['B2'].data_type=='s'
     assert not any(cell.data_type=='f' for row in book['Проекты'] for cell in row)
+
+
+def test_planning_choices_scope_and_manager_identity(client,monkeypatch):
+    data=call(client,'GET','planning-options?portfolioId='+PORT)
+    assert {'id':'developer','name':'Разработчик'} in data['specialties']
+    assert len(data['grades'])>=4
+    assert any(x['id']=='demo-R-03' for x in data['managers'])
+    assert call(client,'GET','planning-options?portfolioId='+PORT,role='R-03')['managers'][0]['id']=='demo-R-03'
+    call(client,'GET','planning-options?portfolioId='+str(uuid4()),expected=404)
+    call(client,'GET','planning-options?portfolioId='+PORT,role='R-05',expected=403)
+    with db.engine.begin() as c:
+        db.put(c,'manager',{'id':str(uuid4()),'subject':'another-manager','displayName':'Второй руководитель'},PORT)
+    assert {'id':'another-manager','name':'Второй руководитель'} in call(client,'GET','planning-options?portfolioId='+PORT)['managers']
+    monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('planner',{'R-02'},set(),{PORT},{PID},set()))
+    monkeypatch.setenv('APP_ENV','production')
+    # Existing manager subjects remain available without creating imaginary accounts.
+    assert any(x['id']=='demo-R-03' for x in call(client,'GET','planning-options?portfolioId='+PORT)['managers'])
+
+
+def test_project_timeline_real_records_and_scope(client,monkeypatch):
+    timeline=call(client,'GET','project-timeline?projectId='+PID)
+    assert timeline['id']==VID and len(timeline['items'])==4
+    assert any(x['name']=='Интерфейс' and x['start']=='2026-10-05' for x in timeline['items'])
+    assert 'allocations' not in timeline and 'baselineBudget' not in timeline
+    call(client,'GET','project-timeline?projectId='+str(uuid4()),expected=404)
+    call(client,'GET','project-timeline?projectId='+PID,role='R-05',expected=403)
+    monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('other',{'R-03'},set(),{PORT},set(),set()))
+    call(client,'GET','project-timeline?projectId='+PID,expected=404)
