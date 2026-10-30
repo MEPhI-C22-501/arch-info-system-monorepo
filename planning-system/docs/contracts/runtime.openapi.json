@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Planning System resource and UI contracts",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "servers": [
     {
@@ -1278,6 +1278,108 @@
           },
           "404": {
             "description": "Объект недоступен"
+          }
+        }
+      }
+    },
+    "/api/v1/versions/{versionId}/timeline": {
+      "patch": {
+        "operationId": "rescheduleTimeline",
+        "summary": "Атомарно перенести работу, FS-последователей, потребности и назначения",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "itemId",
+                  "start",
+                  "finish"
+                ],
+                "properties": {
+                  "itemId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "finish": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Сроки синхронизированы; назначения требуют подтверждения",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer"
+                    },
+                    "changedItemIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав"
+          },
+          "404": {
+            "description": "Работа или проект недоступны"
+          },
+          "409": {
+            "description": "Версия не является черновиком"
+          },
+          "412": {
+            "description": "Версия была изменена"
+          },
+          "422": {
+            "description": "Некорректные даты, горизонт или зависимости"
           }
         }
       }

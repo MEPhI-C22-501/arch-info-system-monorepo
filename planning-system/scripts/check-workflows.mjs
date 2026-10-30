@@ -51,7 +51,7 @@ try{
  assert.equal(await page.locator('.gantt-links path[marker-end]').count(),1);
  for(const zoom of ['day','month','week']){await page.locator('#gantt-zoom').selectOption(zoom);await page.waitForFunction(z=>document.querySelector('#gantt-zoom')?.value===z,zoom)}
  await page.locator('[data-gantt-work]').nth(1).click();await page.locator('#gantt-finish').waitFor();
- await page.locator('#gantt-finish').fill('2026-10-12');await commit(()=>page.locator('#gantt-save').click(),'/draft');
+ await page.locator('#gantt-finish').fill('2026-10-12');await commit(()=>page.locator('#gantt-save').click(),'/timeline');
  await page.locator('.gantt-bar').first().waitFor();assert.ok((await page.locator('[data-gantt-work]').nth(1).getAttribute('aria-label')).includes('2026-10-12'));
  await page.screenshot({path:path.join(out,'app-gantt.png'),fullPage:true});
  await go('resources');await page.locator('#assignment-employee').waitFor();await page.locator('#assignment-employee').selectOption('employees/demo-2');
@@ -61,6 +61,23 @@ try{
  const download=page.waitForEvent('download');await page.locator('#export-assignments').click();await (await download).saveAs(path.join(temp,'assignments.xlsx'));
  await go('portfolio');await page.locator('#cards-search').fill('Первый тестовый проект '+run);await page.locator('#cards-apply').click();await page.waitForFunction(()=>document.querySelectorAll('.project-card').length===1);
  const projects=page.waitForEvent('download');await page.locator('#export-projects').click();await (await projects).saveAs(path.join(temp,'projects.xlsx'));
- assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'workflows-report.json'),JSON.stringify({passed:true,checks:['manager-dropdown','two-project-isolation','work-dates','specialty-grade-dropdowns','multiple-demands','gantt-real-dates','gantt-zoom','gantt-dependencies','gantt-save','filtered-project-xlsx','filtered-assignment-xlsx'],errors},null,2));
+ await go('gantt');await page.locator('.gantt-bar').first().waitFor();
+ await page.locator('#gantt-scale-slider').fill('32');await page.locator('#gantt-scale-slider').dispatchEvent('change');
+ await page.waitForFunction(()=>document.querySelector('#gantt-scale-slider')?.value==='32');
+ const drag=async (selector,delta)=>{const bounds=await page.locator(selector).first().boundingBox();const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+delta,y,{steps:10});await page.mouse.up()};
+ await commit(()=>drag('[data-gantt-work]',96),'/timeline');
+ await page.waitForFunction(()=>document.querySelector('[data-gantt-work]')?.getAttribute('aria-label').includes('2026-10-08'));
+ assert.ok((await page.locator('[data-gantt-work]').nth(1).getAttribute('aria-label')).includes('2026-10-12'));
+ await commit(()=>drag('[data-gantt-work] [data-resize=finish]',64),'/timeline');
+ await page.waitForFunction(()=>document.querySelector('[data-gantt-work]')?.getAttribute('aria-label').includes('2026-10-11'));
+ await go('structure');await page.locator('[data-item][data-field=start]').first().waitFor();
+ assert.equal(await page.locator('[data-item][data-field=start]').first().inputValue(),'2026-10-08');
+ assert.equal(await page.locator('[data-item][data-field=finish]').first().inputValue(),'2026-10-11');
+ await go('demand');await page.locator('[data-demand-hours]').first().waitFor();assert.ok((await page.locator('#content').innerText()).includes('2026-10-08 — 2026-10-11'));
+ await go('resources');await page.locator('#assignment-count').waitFor();await page.locator('#assignments-from').fill('');await page.locator('#assignments-to').fill('');await page.locator('#assignments-apply').click();await page.waitForFunction(()=>document.querySelector('#content')?.innerText.includes('2026-10-08'));
+ await go('gantt');await page.locator('.gantt-bar').first().waitFor();
+ await page.reload();await page.locator('.gantt-bar').first().waitFor();assert.ok((await page.locator('[data-gantt-work]').first().getAttribute('aria-label')).includes('2026-10-11'));
+ await page.screenshot({path:path.join(out,'app-gantt.png'),fullPage:true});
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'workflows-report.json'),JSON.stringify({passed:true,checks:['manager-dropdown','two-project-isolation','work-dates','specialty-grade-dropdowns','multiple-demands','gantt-real-dates','gantt-zoom','gantt-dependencies','gantt-save','drag-and-resize','fs-auto-shift','cross-screen-date-sync','reload-persistence','filtered-project-xlsx','filtered-assignment-xlsx'],errors},null,2));
  console.log('All workflow checks passed');
 }finally{await browser.close()}

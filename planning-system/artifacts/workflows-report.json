@@ -10,6 +10,10 @@
     "gantt-zoom",
     "gantt-dependencies",
     "gantt-save",
+    "drag-and-resize",
+    "fs-auto-shift",
+    "cross-screen-date-sync",
+    "reload-persistence",
     "filtered-project-xlsx",
     "filtered-assignment-xlsx"
   ],

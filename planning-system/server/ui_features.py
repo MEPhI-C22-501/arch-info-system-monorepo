@@ -179,6 +179,25 @@ def register(app, command_tx):
                         ('middle','Middle'),('senior','Senior'),('lead','Ведущий специалист')]],
                     'source':'Локальный справочник Planning System; руководители — из проектов и кадрового кэша'}
 
+    @app.patch('/api/v1/versions/{versionId}/timeline')
+    async def change_timeline(req:Request):
+        from .scheduling import reschedule
+        a=actor(req);allowed(a,['R-02','R-03']);b=await read_json(req)
+        if set(b)!={'itemId','start','finish'} or not all(isinstance(x,str) for x in b.values()):
+            fail(422,'Нужны работа, начало и окончание')
+        try:
+            for key in ['start','finish']:
+                if date.fromisoformat(b[key]).isoformat()!=b[key]:raise ValueError()
+        except ValueError:fail(422,'Неверная дата')
+        with command_tx(req,a,b) as (c,cached,complete):
+            if cached:return cached
+            v=get(c,'plan',req.path_params['versionId'],a);p=get(c,'project',v['projectId'],a)
+            if v['status']!='DRAFT' or p['status']=='ARCHIVED':fail(409,'Сроки изменяются только в черновике действующего проекта')
+            try:v,moved=reschedule(v,b['itemId'],b['start'],b['finish'])
+            except (OverflowError,ValueError):fail(422,'Сроки вышли за допустимые границы')
+            v['contentRevision']+=1;changed(c,'plan',v,req,a)
+            return complete({'revision':v['revision'],'changedItemIds':moved},p['portfolioId'],p['id'])
+
     @app.get('/api/v1/project-timeline')
     def timeline(req:Request):
         a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
