@@ -35,12 +35,31 @@ jobs:
       - run: uv run black --check .
       - run: uv run flake8
       - run: uv run pytest
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: qa/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: qa/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
   stack:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker compose -f qa/compose.yaml up -d --build --wait qa-api
       - run: curl --fail --silent --show-error http://127.0.0.1:8090/readyz
+      - run: docker compose -f qa/compose.yaml up -d --build --wait qa-frontend
+      - run: curl --fail --silent --show-error http://127.0.0.1:8091/ | grep -q '<title>QA System</title>'
+      - run: curl --fail --silent --show-error http://127.0.0.1:8091/api/v1/readyz
       - run: docker compose -f qa/compose.yaml logs
         if: failure()
       - run: docker compose -f qa/compose.yaml down -v
