@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: QA System API
-  version: 0.3.0-draft
+  version: 0.4.0-draft
   description: >
     Draft contract of the QA System (test management). Described in
     qa/docs/130.api-contracts.md. Role names refer to qa/docs/070.role-matrix.md.
@@ -187,7 +187,7 @@ paths:
     post:
       tags: [test-cases]
       operationId: exportTestCases
-      summary: Export filtered test cases as CSV or XLSX
+      summary: Planned, not implemented yet - export filtered test cases as CSV or XLSX
       requestBody:
         required: true
         content:
@@ -210,7 +210,7 @@ paths:
     post:
       tags: [test-cases]
       operationId: importTestCases
-      summary: Validate and, when apply=true, import a CSV or XLSX file
+      summary: Planned, not implemented yet - validate and, when apply=true, import a CSV or XLSX file
       parameters:
         - { name: apply, in: query, schema: { type: boolean, default: false } }
       requestBody:
@@ -496,14 +496,49 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+  /admin/tracker-status-mapping:
+    get:
+      tags: [admin]
+      operationId: getTrackerStatusMapping
+      summary: Bug status mapping table (qa-admin)
+      responses:
+        '200':
+          description: Mapping table
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackerStatusMapping' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [admin]
+      operationId: replaceTrackerStatusMapping
+      summary: Replace the whole mapping table (qa-admin)
+      description: >
+        Rows missing from the request are removed. qaStatus is OPEN, IN_PROGRESS, FIXED or null
+        (the Task Tracker status does not change the defect). A testing status -
+        422 QA_STATUS_NOT_MAPPABLE, one entry per offending row in errors[].
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrackerStatusMappingInput' }
+      responses:
+        '200':
+          description: Saved table
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackerStatusMapping' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /test-plans:
     get:
       tags: [test-plans]
       operationId: listTestPlans
-      summary: List test plans
+      summary: List test plans, newest first
       parameters:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/TestPlanStatus' } }
         - { name: trackerIterationId, in: query, schema: { type: string } }
+        - { name: planningProjectId, in: query, schema: { type: string } }
+        - { name: planningReleaseId, in: query, schema: { type: string } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/PageSize' }
       responses:
@@ -512,10 +547,15 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TestPlanPage' }
+        '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [test-plans]
       operationId: createTestPlan
-      summary: Create a test plan in DRAFT
+      summary: Create a test plan in DRAFT (qa-lead)
+      description: >
+        External references are stored as given and refsVerified stays false (ADR-010, ADR-015).
+        422 VALIDATION_FAILED - endDate before startDate; planningProjectId is required for
+        RELEASE and PROJECT, planningReleaseId for RELEASE.
       requestBody:
         required: true
         content:
@@ -527,6 +567,41 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TestPlan' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /test-plans/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [test-plans]
+      operationId: getTestPlan
+      summary: Plan with its composition
+      responses:
+        '200':
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TestPlan' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [test-plans]
+      operationId: updateTestPlan
+      summary: Replace plan fields (qa-lead)
+      description: Resets refsVerified. A COMPLETED or CANCELLED plan - 409 PLAN_CLOSED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TestPlanInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TestPlan' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /test-plans/{id}/cases:
     parameters:
@@ -534,25 +609,40 @@ paths:
     post:
       tags: [test-plans]
       operationId: addPlanCases
-      summary: Add cases to the plan by ids or by filter
+      summary: Add cases to the plan by ids or by filter (qa-lead)
+      description: >
+        Exactly one of ids and filter. New cases must be ACTUAL, otherwise nothing is added and
+        409 CASE_NOT_ACTUAL lists them in errors[] (reason `<key>:<status>`); this also applies to
+        filter, which selects drafts unless filter.status is set. Cases already in the plan are
+        kept whatever their status. saveAsSuite (with filter only) saves the filter as a FILTER
+        suite in the same transaction. 409 PLAN_CLOSED - the plan is closed.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                ids:
-                  type: array
-                  items: { type: string, format: uuid }
-                filter: { type: object, additionalProperties: true }
-                saveAsSuite: { type: string, description: Suite name to save the filter under }
+            schema: { $ref: '#/components/schemas/PlanCasesInput' }
       responses:
         '200':
-          description: Plan with updated case count
+          description: Plan with the updated composition
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TestPlan' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /test-plans/{id}/cases/{caseId}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { name: caseId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [test-plans]
+      operationId: removePlanCase
+      summary: Remove a case from the plan (qa-lead)
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /test-plans/{id}/{action}:
     parameters:
@@ -564,19 +654,42 @@ paths:
     post:
       tags: [test-plans]
       operationId: changeTestPlanStatus
-      summary: Activate, complete or cancel the plan
+      summary: Activate, complete or cancel the plan (qa-lead)
+      description: >
+        Transitions of qa/docs/050.entities.md, section 3. 409 INVALID_TRANSITION - not allowed
+        from the current status; 409 PLAN_EMPTY - activation without cases; 409 RUNS_NOT_FINISHED -
+        completion with runs in CREATED or IN_PROGRESS. Cancelling aborts the unfinished runs.
       responses:
         '200':
           description: Status changed
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TestPlan' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /test-plans/{id}/summary:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [test-plans]
+      operationId: getTestPlanSummary
+      summary: Last result of each case and open defects of the plan cases
+      description: >
+        lastResult is the latest result of the case in any run, as on the case card. A case
+        without results counts as notRun.
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanSummary' }
+        '404': { $ref: '#/components/responses/Error' }
   /runs:
     get:
       tags: [runs]
       operationId: listRuns
-      summary: List runs
+      summary: List runs, newest first; qa-ci sees only its own
       parameters:
         - { name: planId, in: query, schema: { type: string, format: uuid } }
         - { name: suiteId, in: query, schema: { type: string, format: uuid } }
@@ -589,16 +702,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RunPage' }
+        '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [runs]
       operationId: createRun
-      summary: Create a run from a plan or a suite; with start=true also start it and queue autotests
+      summary: Create a run from a plan or a suite; with start=true also start it
+      description: >
+        Takes the current versions of ACTUAL and NEEDS_UPDATE cases. qa-ci - from a suite only.
+        422 RUN_EMPTY - no cases; 422 VALIDATION_FAILED - not exactly one of planId, suiteId,
+        suiteName; unknown or inactive environment; unknown or archived suite (reason archived).
+        409 PLAN_NOT_ACTIVE - the plan is not ACTIVE. 409 SUITE_ALREADY_RUNNING - start=true while
+        the suite is IN_PROGRESS on this environment.
       parameters:
         - name: Idempotency-Key
           in: header
           required: false
-          description: Repeated call with the same key by the same client returns the same run (pipeline uses the deployment commit SHA)
-          schema: { type: string, maxLength: 128 }
+          description: >
+            A repeated call with the same key by the same client returns the same run with
+            status 200 and does not repeat the checks (the pipeline uses the deployment commit SHA)
+          schema: { type: string, minLength: 1, maxLength: 128 }
       requestBody:
         required: true
         content:
@@ -606,6 +728,11 @@ paths:
             schema: { $ref: '#/components/schemas/RunInput' }
             example: { suiteName: Smoke, environment: staging, start: true }
       responses:
+        '200':
+          description: The run created earlier with this Idempotency-Key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Run' }
         '201':
           description: Run created
           content:
@@ -620,13 +747,14 @@ paths:
     get:
       tags: [runs]
       operationId: getRun
-      summary: Run with summary counters
+      summary: Run with summary counters; another client's run is 404 for qa-ci
       responses:
         '200':
           description: Run
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Run' }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
   /runs/{id}/{action}:
     parameters:
@@ -634,14 +762,34 @@ paths:
       - name: action
         in: path
         required: true
-        schema: { type: string, enum: [start, complete, abort, rerun] }
+        schema: { type: string, enum: [start, complete, abort] }
     post:
       tags: [runs]
-      operationId: changeRun
-      summary: Start, complete, abort the run or create a rerun of failed and blocked cases
+      operationId: changeRunStatus
+      summary: Start, complete or abort the run
+      description: >
+        Transitions of qa/docs/050.entities.md, section 4. start - qa-tester, qa-automation,
+        qa-lead, qa-ci (own runs); complete and abort - qa-lead. 409 INVALID_TRANSITION - not
+        allowed from the current status; 409 SUITE_ALREADY_RUNNING - on start.
       responses:
         '200':
-          description: The run, or the new run for rerun
+          description: Status changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Run' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /runs/{id}/rerun:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [runs]
+      operationId: rerunRun
+      summary: Planned, not implemented yet - create a rerun of failed and blocked cases
+      responses:
+        '200':
+          description: The new run
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Run' }
@@ -652,22 +800,20 @@ paths:
     get:
       tags: [runs]
       operationId: listRunResults
-      summary: Results of the run
+      summary: Results of the run with the steps of the fixed case version, by case key
       parameters:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/ResultStatus' } }
         - { name: assignee, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
       responses:
         '200':
-          description: Results
+          description: Page of results
           content:
             application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items: { $ref: '#/components/schemas/RunResult' }
+              schema: { $ref: '#/components/schemas/RunResultPage' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /runs/{id}/results/{resultId}:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -676,6 +822,14 @@ paths:
       tags: [runs]
       operationId: recordResult
       summary: Record the result of a case and of its steps
+      description: >
+        Allowed while the run is IN_PROGRESS: 409 RUN_FINISHED for a finished run,
+        409 INVALID_TRANSITION for a run not started. qa-tester - own or unassigned results,
+        qa-lead - any (403 otherwise). FAILED needs actualResult here or on the failed step; a
+        FAILED step requires status FAILED; stepId must belong to the fixed version of the case
+        (422 VALIDATION_FAILED). FAILED creates an AUTO defect or links the open one and returns
+        it in `defect`. steps replaces the step results recorded earlier. When no result is left
+        in NOT_RUN the run becomes COMPLETED.
       requestBody:
         required: true
         content:
@@ -683,10 +837,12 @@ paths:
             schema: { $ref: '#/components/schemas/ResultInput' }
       responses:
         '200':
-          description: Result recorded; defect is present when one was created or linked
+          description: Result recorded
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RunResult' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /runs/{id}/results/bulk-status:
@@ -695,7 +851,7 @@ paths:
     post:
       tags: [runs]
       operationId: bulkChangeResultStatus
-      summary: Change the status of several results atomically
+      summary: Planned, not implemented yet - change the status of several results atomically
       requestBody:
         required: true
         content:
@@ -725,13 +881,16 @@ paths:
     get:
       tags: [defects]
       operationId: listDefects
-      summary: Search defects
+      summary: Search defects, newest first
+      description: planningProjectId, planningReleaseId and trackerIterationId are read through the defect's plan.
       parameters:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/DefectStatus' } }
         - { name: severity, in: query, schema: { $ref: '#/components/schemas/Severity' } }
-        - { name: planningProjectId, in: query, schema: { type: string } }
-        - { name: trackerIterationId, in: query, schema: { type: string } }
         - { name: author, in: query, schema: { type: string } }
+        - { name: trackerMismatch, in: query, schema: { type: boolean } }
+        - { name: planningProjectId, in: query, schema: { type: string } }
+        - { name: planningReleaseId, in: query, schema: { type: string } }
+        - { name: trackerIterationId, in: query, schema: { type: string } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/PageSize' }
       responses:
@@ -740,10 +899,16 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DefectPage' }
+        '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [defects]
       operationId: createDefect
       summary: Create a defect manually from a case, a step or a run result
+      description: >
+        origin=MANUAL, status NEW; the Task Tracker request is queued in the same transaction.
+        testCaseId or runResultId is required; environment is required without runResultId.
+        priority defaults to the priority of the case version. stepId must belong to the fixed
+        version of the result, or to the current version of the case.
       requestBody:
         required: true
         content:
@@ -754,7 +919,8 @@ paths:
           description: Created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Defect' }
+              schema: { $ref: '#/components/schemas/DefectDetail' }
+        '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /defects/{id}:
     parameters:
@@ -762,14 +928,35 @@ paths:
     get:
       tags: [defects]
       operationId: getDefect
-      summary: Defect with links
+      summary: Defect with its runs and comments
       responses:
         '200':
           description: Defect
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Defect' }
+              schema: { $ref: '#/components/schemas/DefectDetail' }
         '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [defects]
+      operationId: updateDefect
+      summary: Change the fields sent in the request
+      description: >
+        Every change is written to the history. title, actualResult, severity and priority cannot
+        be cleared. priority is read-only after the Bug is created in Task Tracker.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DefectUpdate' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DefectDetail' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /defects/{id}/transitions:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -777,6 +964,12 @@ paths:
       tags: [defects]
       operationId: transitionDefect
       summary: Move the defect to another status
+      description: >
+        Transitions of qa/docs/050.entities.md, section 6. READY_FOR_TEST, CLOSED, REOPENED -
+        qa-tester, qa-lead. OPEN, IN_PROGRESS, FIXED - qa-lead (403 otherwise) and only with
+        TRACKER_SYNC_ENABLED=false, otherwise 409 STATUS_OWNED_BY_TRACKER. 409 INVALID_TRANSITION
+        lists the allowed targets in errors[].reason; reopening an AUTO defect while the case has
+        another open AUTO defect gives reason `open-auto:<key>`.
       requestBody:
         required: true
         content:
@@ -786,14 +979,15 @@ paths:
               required: [to]
               properties:
                 to: { $ref: '#/components/schemas/DefectStatus' }
-                comment: { type: string }
+                comment: { type: string, minLength: 1 }
       responses:
         '200':
           description: Status changed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Defect' }
+              schema: { $ref: '#/components/schemas/DefectDetail' }
         '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /defects/{id}/history:
     parameters:
@@ -814,13 +1008,14 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/DefectHistoryEntry' }
+        '404': { $ref: '#/components/responses/Error' }
   /defects/{id}/comments:
     parameters:
       - { $ref: '#/components/parameters/Id' }
     post:
       tags: [defects]
       operationId: addDefectComment
-      summary: Add a comment
+      summary: Add a comment (qa-viewer to qa-lead)
       requestBody:
         required: true
         content:
@@ -831,7 +1026,13 @@ paths:
               properties:
                 body: { type: string, minLength: 1 }
       responses:
-        '201': { description: Comment added }
+        '201':
+          description: Comment added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DefectComment' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /reports/{resource}:
     parameters:
@@ -842,7 +1043,7 @@ paths:
     get:
       tags: [reports]
       operationId: listReportData
-      summary: Read-only paginated data for the reporting service (role qa-reports-reader)
+      summary: Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
       parameters:
         - { name: updatedSince, in: query, schema: { type: string, format: date-time } }
         - { $ref: '#/components/parameters/Page' }
@@ -1182,37 +1383,74 @@ components:
         page: { type: integer }
         pageSize: { type: integer }
         totalPages: { type: integer }
+    TrackerStatusMappingItem:
+      type: object
+      required: [trackerStatusId, trackerStatusName]
+      properties:
+        trackerStatusId: { type: string, minLength: 1 }
+        trackerStatusName: { type: string, minLength: 1 }
+        qaStatus:
+          description: OPEN, IN_PROGRESS, FIXED, or null - the status does not change the defect
+          oneOf:
+            - { $ref: '#/components/schemas/DefectStatus' }
+            - { type: 'null' }
+        requiresAssignee: { type: boolean, default: false, description: The mapping applies only when the Bug has an assignee }
+        isActive: { type: boolean, default: true }
+    TrackerStatusMappingInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TrackerStatusMappingItem' }
+    TrackerStatusMappingRow:
+      allOf:
+        - $ref: '#/components/schemas/TrackerStatusMappingItem'
+        - type: object
+          required: [updatedBy, updatedAt]
+          properties:
+            updatedBy: { type: string }
+            updatedAt: { type: string, format: date-time }
+    TrackerStatusMapping:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TrackerStatusMappingRow' }
     TestPlanInput:
       type: object
       required: [name, scopeKind, owner, startDate, endDate]
       properties:
         name: { type: string, minLength: 1 }
         scopeKind: { type: string, enum: [RELEASE, ITERATION, PROJECT, MODULE] }
-        scopeRef: { type: string }
-        owner: { type: string }
-        teamRef: { type: string }
+        scopeRef: { type: [string, 'null'], description: Module for scopeKind MODULE }
+        owner: { type: string, minLength: 1 }
+        teamRef: { type: [string, 'null'] }
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
-        trackerIterationId: { type: string }
-        planningMilestoneId: { type: string, description: logicalItemId of the MILESTONE in Planning System }
-        planningProjectId: { type: string }
-        planningReleaseId: { type: string, description: logicalItemId of the RELEASE in Planning System; required when scopeKind is RELEASE }
-        planningPlanVersionId: { type: string, description: Planning System plan version the release was selected from }
-      if:
-        properties: { scopeKind: { const: RELEASE } }
-      then:
-        required: [planningProjectId, planningReleaseId]
+        trackerIterationId: { type: [string, 'null'] }
+        planningMilestoneId: { type: [string, 'null'], description: logicalItemId of the MILESTONE in Planning System }
+        planningProjectId: { type: [string, 'null'], description: Required when scopeKind is RELEASE or PROJECT }
+        planningReleaseId: { type: [string, 'null'], description: logicalItemId of the RELEASE in Planning System; required when scopeKind is RELEASE }
+        planningPlanVersionId: { type: [string, 'null'], description: Planning System plan version the release was selected from }
     TestPlan:
       allOf:
         - $ref: '#/components/schemas/TestPlanInput'
         - type: object
-          required: [id, key, status, caseCount]
+          required: [id, key, status, refsVerified, createdAt, updatedAt, caseIds, caseCount]
           properties:
             id: { type: string, format: uuid }
-            key: { type: string }
+            key: { type: string, examples: [TP-12] }
             status: { $ref: '#/components/schemas/TestPlanStatus' }
-            caseCount: { type: integer }
             refsVerified: { type: boolean }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+            caseIds:
+              type: array
+              description: Composition of the plan, by case key
+              items: { type: string, format: uuid }
+            caseCount: { type: integer }
     TestPlanPage:
       type: object
       required: [items, page, pageSize, totalPages]
@@ -1223,14 +1461,64 @@ components:
         page: { type: integer }
         pageSize: { type: integer }
         totalPages: { type: integer }
+    PlanCasesInput:
+      type: object
+      description: Exactly one of ids and filter
+      properties:
+        ids:
+          type: array
+          items: { type: string, format: uuid }
+        filter: { $ref: '#/components/schemas/CaseFilter' }
+        saveAsSuite: { type: string, minLength: 1, description: Name of the FILTER suite to save the filter under }
+    PlanSummary:
+      type: object
+      required: [planId, counters, cases, openDefects]
+      properties:
+        planId: { type: string, format: uuid }
+        counters:
+          type: object
+          required: [total, passed, failed, blocked, skipped, notRun]
+          properties:
+            total: { type: integer }
+            passed: { type: integer }
+            failed: { type: integer }
+            blocked: { type: integer }
+            skipped: { type: integer }
+            notRun: { type: integer }
+        cases:
+          type: array
+          items:
+            type: object
+            required: [testCaseId, testCaseKey, title, status, lastResult]
+            properties:
+              testCaseId: { type: string, format: uuid }
+              testCaseKey: { type: string }
+              title: { type: string }
+              status: { $ref: '#/components/schemas/TestCaseStatus' }
+              lastResult:
+                oneOf:
+                  - { $ref: '#/components/schemas/LastResult' }
+                  - { type: 'null' }
+        openDefects:
+          type: array
+          items:
+            type: object
+            required: [id, key, title, status, severity, testCaseId]
+            properties:
+              id: { type: string, format: uuid }
+              key: { type: string }
+              title: { type: string }
+              status: { $ref: '#/components/schemas/DefectStatus' }
+              severity: { type: string }
+              testCaseId: { type: string, format: uuid }
     RunInput:
       type: object
       required: [environment]
       properties:
         planId: { type: string, format: uuid }
         suiteId: { type: string, format: uuid }
-        suiteName: { type: string, description: Alternative to suiteId for CI }
-        environment: { type: string, description: Environment code }
+        suiteName: { type: string, minLength: 1, description: Alternative to suiteId for CI }
+        environment: { type: string, minLength: 1, description: Code of an active environment }
         start: { type: boolean, default: false }
         automatedOnly: { type: boolean, default: false, description: Take only cases with an implemented autotest }
       oneOf:
@@ -1239,7 +1527,7 @@ components:
         - required: [suiteName]
     RunSummary:
       type: object
-      required: [total, passed, failed, blocked, notRun, skipped]
+      required: [total, passed, failed, blocked, notRun, skipped, unverified]
       properties:
         total: { type: integer }
         passed: { type: integer }
@@ -1247,30 +1535,33 @@ components:
         blocked: { type: integer }
         notRun: { type: integer }
         skipped: { type: integer }
-        unverified: { type: integer, description: SKIPPED because the subsystem API is not available yet }
+        unverified: { type: integer, description: 'SKIPPED with failureReason "проверка невозможна"' }
     Run:
       type: object
-      required: [id, key, status, environment, trigger, summary]
+      required: [id, key, status, environment, trigger, startedBy, createdAt, summary, smokeVerdict, verdict]
       properties:
         id: { type: string, format: uuid }
-        key: { type: string }
-        planId: { type: string, format: uuid }
-        suiteId: { type: string, format: uuid }
-        parentRunId: { type: string, format: uuid }
+        key: { type: string, examples: [RUN-87] }
+        planId: { type: [string, 'null'], format: uuid }
+        suiteId: { type: [string, 'null'], format: uuid }
+        parentRunId: { type: [string, 'null'], format: uuid }
         environment: { type: string }
         status: { $ref: '#/components/schemas/RunStatus' }
         trigger: { type: string, enum: [MANUAL, SCHEDULE, CI] }
         startedBy: { type: string }
-        autotestsCommitSha: { type: string }
-        sutVersions: { type: object, additionalProperties: { type: string } }
-        startedAt: { type: string, format: date-time }
-        finishedAt: { type: string, format: date-time }
-        durationMs: { type: integer }
+        autotestsCommitSha: { type: [string, 'null'] }
+        sutVersions:
+          type: [object, 'null']
+          additionalProperties: { type: string }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        durationMs: { type: [integer, 'null'] }
         summary: { $ref: '#/components/schemas/RunSummary' }
-        smokeVerdict: { type: [string, 'null'], enum: [GREEN, RED, null], description: GREEN when the finished run has no FAILED results }
+        smokeVerdict: { type: [string, 'null'], enum: [GREEN, RED, null], description: GREEN when the finished run has no FAILED results; null until it finishes }
         verdict: { type: [string, 'null'], enum: [ACCEPTED, REJECTED, null], description: Stand acceptance verdict, only for the acceptance suite }
-        verdictBy: { type: string }
-        verdictAt: { type: string, format: date-time }
+        verdictBy: { type: [string, 'null'] }
+        verdictAt: { type: [string, 'null'], format: date-time }
     RunPage:
       type: object
       required: [items, page, pageSize, totalPages]
@@ -1286,77 +1577,177 @@ components:
       required: [status]
       properties:
         status: { $ref: '#/components/schemas/ResultStatus' }
-        actualResult: { type: string }
-        comment: { type: string }
+        actualResult: { type: [string, 'null'] }
+        comment: { type: [string, 'null'] }
+        failureReason: { type: [string, 'null'] }
+        durationMs: { type: [integer, 'null'], minimum: 0 }
         steps:
-          type: array
+          type: [array, 'null']
+          description: Full set of step results; replaces the one recorded earlier
           items:
             type: object
             required: [stepId, status]
             properties:
               stepId: { type: string, format: uuid }
               status: { $ref: '#/components/schemas/ResultStatus' }
-              actualResult: { type: string }
+              actualResult: { type: [string, 'null'] }
+              comment: { type: [string, 'null'] }
+    RunResultStep:
+      type: object
+      required: [stepId, position, action, expectedResult, status]
+      description: Step of the fixed case version with its result; NOT_RUN when none was recorded
+      properties:
+        stepId: { type: string, format: uuid }
+        position: { type: integer }
+        action: { type: string }
+        expectedResult: { type: string }
+        status: { $ref: '#/components/schemas/ResultStatus' }
+        actualResult: { type: [string, 'null'] }
+        comment: { type: [string, 'null'] }
+    DefectLink:
+      type: object
+      required: [id, key, created]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        created: { type: boolean, description: true only in the PUT that created the defect }
     RunResult:
       type: object
-      required: [id, testCaseId, testCaseKey, caseVersion, status]
+      required: [id, testCaseId, testCaseKey, title, caseVersion, status, steps]
       properties:
         id: { type: string, format: uuid }
         testCaseId: { type: string, format: uuid }
         testCaseKey: { type: string }
+        title: { type: string, description: Title in the fixed case version }
         caseVersion: { type: integer }
-        assignee: { type: string }
+        assignee: { type: [string, 'null'] }
         status: { $ref: '#/components/schemas/ResultStatus' }
-        failedStepPosition: { type: integer }
-        actualResult: { type: string }
-        failureReason: { type: string }
-        durationMs: { type: integer }
+        failedStepPosition: { type: [integer, 'null'] }
+        actualResult: { type: [string, 'null'] }
+        comment: { type: [string, 'null'] }
+        failureReason: { type: [string, 'null'] }
+        executedBy: { type: [string, 'null'] }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        durationMs: { type: [integer, 'null'] }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/RunResultStep' }
         defect:
-          type: object
-          properties:
-            id: { type: string, format: uuid }
-            key: { type: string }
-            created: { type: boolean, description: false when an existing open defect was linked }
+          description: The defect created or linked for this result
+          oneOf:
+            - { $ref: '#/components/schemas/DefectLink' }
+            - { type: 'null' }
+    RunResultPage:
+      type: object
+      required: [items, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RunResult' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
     DefectInput:
       type: object
       required: [title, actualResult, severity]
       properties:
         title: { type: string, minLength: 1 }
-        description: { type: string }
-        reproSteps: { type: string }
-        expectedResult: { type: string }
+        description: { type: [string, 'null'] }
+        reproSteps: { type: [string, 'null'] }
+        expectedResult: { type: [string, 'null'] }
         actualResult: { type: string, minLength: 1 }
         severity: { $ref: '#/components/schemas/Severity' }
-        priority: { type: string, description: Proposed priority; after the Bug is created Task Tracker owns the fix priority }
-        testCaseId: { type: string, format: uuid }
-        runResultId: { type: string, format: uuid }
-        stepId: { type: string, format: uuid }
-        environment: { type: string }
-        requirementRef: { type: string }
-        epicRef: { type: string }
+        priority: { type: [string, 'null'], description: Proposed priority; after the Bug is created Task Tracker owns the fix priority }
+        testCaseId: { type: [string, 'null'], format: uuid }
+        runResultId: { type: [string, 'null'], format: uuid }
+        stepId: { type: [string, 'null'], format: uuid }
+        environment: { type: [string, 'null'], description: Environment code }
+        requirementRef: { type: [string, 'null'] }
+        epicRef: { type: [string, 'null'] }
+    DefectUpdate:
+      type: object
+      description: Only the fields sent are changed
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: [string, 'null'] }
+        reproSteps: { type: [string, 'null'] }
+        expectedResult: { type: [string, 'null'] }
+        actualResult: { type: string, minLength: 1 }
+        severity: { $ref: '#/components/schemas/Severity' }
+        priority: { type: string }
+        environment: { type: [string, 'null'], description: Environment code }
+        buildVersion: { type: [string, 'null'] }
+        requirementRef: { type: [string, 'null'] }
+        epicRef: { type: [string, 'null'] }
     Defect:
+      type: object
+      required: [id, key, origin, title, actualResult, severity, priority, status, author, trackerSyncState, trackerMismatch, reopenCount, createdAt, updatedAt, runIds]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string, examples: [DEF-45] }
+        origin: { type: string, enum: [AUTO, MANUAL] }
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        reproSteps: { type: [string, 'null'] }
+        expectedResult: { type: [string, 'null'] }
+        actualResult: { type: string }
+        severity: { type: string }
+        priority: { type: string, description: Proposed priority }
+        status: { $ref: '#/components/schemas/DefectStatus' }
+        environment: { type: [string, 'null'] }
+        buildVersion: { type: [string, 'null'] }
+        author: { type: string }
+        testCaseId: { type: [string, 'null'], format: uuid }
+        testCaseKey: { type: [string, 'null'] }
+        caseVersion: { type: [integer, 'null'] }
+        stepId: { type: [string, 'null'], format: uuid }
+        planId: { type: [string, 'null'], format: uuid }
+        requirementRef: { type: [string, 'null'] }
+        epicRef: { type: [string, 'null'] }
+        trackerWorkItemId: { type: [string, 'null'] }
+        trackerWorkItemUrl: { type: [string, 'null'] }
+        trackerSyncState: { type: string, enum: [PENDING, SYNCED, FAILED] }
+        trackerStatus: { type: [string, 'null'], description: Read-only copy of the Bug status in Task Tracker }
+        trackerPriority: { type: [string, 'null'], description: Read-only copy of the Bug priority in Task Tracker }
+        trackerAssignee: { type: [string, 'null'] }
+        trackerMismatch: { type: boolean, description: Statuses of the two systems differ according to the mapping table }
+        reopenCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        closedAt: { type: [string, 'null'], format: date-time }
+        runIds:
+          type: array
+          items: { type: string, format: uuid }
+    DefectComment:
+      type: object
+      required: [id, author, source, body, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        author: { type: string }
+        source: { type: string, enum: [QA, TRACKER, SYSTEM] }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+    DefectDetail:
       allOf:
-        - $ref: '#/components/schemas/DefectInput'
+        - $ref: '#/components/schemas/Defect'
         - type: object
-          required: [id, key, origin, status, trackerSyncState]
+          required: [runs, comments]
           properties:
-            id: { type: string, format: uuid }
-            key: { type: string, examples: [DEF-45] }
-            origin: { type: string, enum: [AUTO, MANUAL] }
-            status: { $ref: '#/components/schemas/DefectStatus' }
-            buildVersion: { type: string }
-            author: { type: string }
-            trackerWorkItemId: { type: string }
-            trackerWorkItemUrl: { type: string }
-            trackerSyncState: { type: string, enum: [PENDING, SYNCED, FAILED] }
-            trackerStatus: { type: string, description: Read-only copy of the Bug status in Task Tracker }
-            trackerPriority: { type: string, description: Read-only copy of the Bug priority in Task Tracker }
-            trackerAssignee: { type: string }
-            trackerMismatch: { type: boolean, description: Statuses of the two systems differ according to the mapping table }
-            reopenCount: { type: integer }
-            runIds:
+            runs:
               type: array
-              items: { type: string, format: uuid }
+              items:
+                type: object
+                required: [runId, runKey, resultId, resultStatus, linkedAt]
+                properties:
+                  runId: { type: string, format: uuid }
+                  runKey: { type: string }
+                  resultId: { type: string, format: uuid }
+                  resultStatus: { $ref: '#/components/schemas/ResultStatus' }
+                  linkedAt: { type: string, format: date-time }
+            comments:
+              type: array
+              items: { $ref: '#/components/schemas/DefectComment' }
     DefectPage:
       type: object
       required: [items, page, pageSize, totalPages]

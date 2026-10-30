@@ -4,7 +4,10 @@ from app import health
 from app.admin.router import router as admin_router
 from app.cases.router import router as cases_router
 from app.config import get_settings
+from app.defects.router import router as defects_router
 from app.errors import install_error_handling
+from app.plans.router import router as plans_router
+from app.runs.router import router as runs_router
 from app.suites.router import router as suites_router
 from app.templates.router import router as templates_router
 
@@ -16,6 +19,9 @@ MODULE_ROUTERS: list[APIRouter] = [
     templates_router,
     suites_router,
     admin_router,
+    runs_router,
+    defects_router,
+    plans_router,
 ]
 
 
@@ -23,7 +29,7 @@ def create_app() -> FastAPI:
     get_settings()  # неверная конфигурация останавливает запуск
     app = FastAPI(
         title="QA System API",
-        version="0.3.0-draft",  # = info.version в openapi.yaml (test_openapi_contract)
+        version="0.4.0-draft",  # = info.version в openapi.yaml (test_openapi_contract)
         docs_url=f"{API_PREFIX}/docs",
         openapi_url=f"{API_PREFIX}/openapi.json",
         redoc_url=None,

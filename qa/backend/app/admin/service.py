@@ -15,6 +15,9 @@ from app.admin.schemas import (
     Environment,
     EnvironmentInput,
     EnvironmentUpdate,
+    TrackerStatusMappingInput,
+    TrackerStatusMappingItem,
+    TrackerStatusMappingRow,
 )
 from app.errors import ApiError, conflict, not_found, validation_failed
 from app.models import (
@@ -27,7 +30,14 @@ from app.models import (
     TestRun,
 )
 from app.models import Environment as EnvironmentRow
-from app.models.enums import CaseStatus, ClassifierKind, DefectStatus, RunStatus
+from app.models import TrackerStatusMapping as TrackerStatusMappingRecord
+from app.models.enums import (
+    TRACKER_OWNED_STATUSES,
+    CaseStatus,
+    ClassifierKind,
+    DefectStatus,
+    RunStatus,
+)
 from app.schemas import Page, PageParams, paginate
 
 # Сколько мест использования перечислять в ответе VALUE_IN_USE.
@@ -205,3 +215,66 @@ def _in_use(message: str, usages: list[str]) -> ApiError:
         f"{message}: отключить можно только неиспользуемое значение",
         [{"field": "isActive", "reason": f"used-by:{usage}"} for usage in usages],
     )
+
+
+def list_tracker_mapping(session: Session) -> list[TrackerStatusMappingRow]:
+    rows = session.scalars(
+        select(TrackerStatusMappingRecord).order_by(TrackerStatusMappingRecord.tracker_status_id)
+    )
+    return [TrackerStatusMappingRow.model_validate(row) for row in rows]
+
+
+def replace_tracker_mapping(
+    session: Session, data: TrackerStatusMappingInput, author: str
+) -> list[TrackerStatusMappingRow]:
+    """Заменяет таблицу целиком (vision 4.4, ADR-008)."""
+    write_tracker_mapping(session, data.items, author, remove_missing=True)
+    session.commit()
+    return list_tracker_mapping(session)
+
+
+def write_tracker_mapping(
+    session: Session,
+    items: list[TrackerStatusMappingItem],
+    author: str,
+    remove_missing: bool = False,
+) -> int:
+    """Возвращает число новых строк; транзакцию фиксирует вызывающий код."""
+    errors = []
+    not_mappable = []
+    seen = set()
+    for i, item in enumerate(items):
+        if item.tracker_status_id in seen:
+            errors.append({"field": f"items.{i}.trackerStatusId", "reason": "duplicate"})
+        seen.add(item.tracker_status_id)
+        if item.qa_status is not None and item.qa_status not in TRACKER_OWNED_STATUSES:
+            not_mappable.append({"field": f"items.{i}.qaStatus", "reason": str(item.qa_status)})
+    if not_mappable:
+        raise ApiError(
+            422,
+            "QA_STATUS_NOT_MAPPABLE",
+            "Статусы тестирования ведёт QA System: сопоставить с ними статус Task Tracker нельзя",
+            not_mappable,
+        )
+    if errors:
+        raise validation_failed(errors)
+    created = 0
+    existing = {
+        row.tracker_status_id: row for row in session.scalars(select(TrackerStatusMappingRecord))
+    }
+    for item in items:
+        row = existing.pop(item.tracker_status_id, None)
+        if row is None:
+            created += 1
+            row = TrackerStatusMappingRecord(tracker_status_id=item.tracker_status_id)
+            session.add(row)
+        row.tracker_status_name = item.tracker_status_name
+        row.qa_status = item.qa_status
+        row.requires_assignee = item.requires_assignee
+        row.is_active = item.is_active
+        row.updated_by = author
+    if remove_missing:
+        for row in existing.values():
+            session.delete(row)
+    session.flush()
+    return created

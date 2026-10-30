@@ -1,7 +1,8 @@
 """Общие схемы API: camelCase в JSON и постраничные списки (130, раздел 2)."""
 
 import math
-from typing import Annotated, Generic, TypeVar
+from collections.abc import Callable
+from typing import Annotated, Any, Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, ConfigDict, StringConstraints
@@ -44,6 +45,27 @@ def paginate(session: Session, stmt: Select, params: PageParams, schema: type[T]
     ).all()
     return Page[schema](
         items=[schema.model_validate(row) for row in rows],
+        page=params.page,
+        page_size=params.page_size,
+        total_pages=math.ceil(total / params.page_size),
+    )
+
+
+def paginate_rows(
+    session: Session,
+    stmt: Select,
+    params: PageParams,
+    schema: type[T],
+    build: Callable[[list[Any]], list[T]],
+) -> Page[T]:
+    """Как paginate(), но строки страницы превращаются в схемы разом: build делает один запрос
+    на страницу вместо запросов на каждую строку."""
+    total = session.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
+    rows = session.scalars(
+        stmt.limit(params.page_size).offset((params.page - 1) * params.page_size)
+    ).all()
+    return Page[schema](
+        items=build(list(rows)),
         page=params.page,
         page_size=params.page_size,
         total_pages=math.ceil(total / params.page_size),
