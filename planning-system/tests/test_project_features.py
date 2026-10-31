@@ -141,3 +141,86 @@ def test_excel_keeps_user_text_literal_and_excludes_other_portfolios(client):
     assert book['Проекты'].max_row==2
     assert book['Проекты']['B2'].value==name and book['Проекты']['B2'].data_type=='s'
     assert not any(cell.data_type=='f' for row in book['Проекты'] for cell in row)
+
+
+def test_planning_choices_scope_and_manager_identity(client,monkeypatch):
+    data=call(client,'GET','planning-options?portfolioId='+PORT)
+    assert {'id':'developer','name':'Разработчик'} in data['specialties']
+    assert len(data['grades'])>=4
+    assert any(x['id']=='demo-R-03' for x in data['managers'])
+    assert call(client,'GET','planning-options?portfolioId='+PORT,role='R-03')['managers'][0]['id']=='demo-R-03'
+    call(client,'GET','planning-options?portfolioId='+str(uuid4()),expected=404)
+    call(client,'GET','planning-options?portfolioId='+PORT,role='R-05',expected=403)
+    with db.engine.begin() as c:
+        db.put(c,'manager',{'id':str(uuid4()),'subject':'another-manager','displayName':'Второй руководитель'},PORT)
+    assert {'id':'another-manager','name':'Второй руководитель'} in call(client,'GET','planning-options?portfolioId='+PORT)['managers']
+    monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('planner',{'R-02'},set(),{PORT},{PID},set()))
+    monkeypatch.setenv('APP_ENV','production')
+    # Existing manager subjects remain available without creating imaginary accounts.
+    assert any(x['id']=='demo-R-03' for x in call(client,'GET','planning-options?portfolioId='+PORT)['managers'])
+
+
+def test_project_timeline_real_records_and_scope(client,monkeypatch):
+    timeline=call(client,'GET','project-timeline?projectId='+PID)
+    assert timeline['id']==VID and len(timeline['items'])==4
+    assert any(x['name']=='Интерфейс' and x['start']=='2026-10-05' for x in timeline['items'])
+    assert 'allocations' not in timeline and 'baselineBudget' not in timeline
+    call(client,'GET','project-timeline?projectId='+str(uuid4()),expected=404)
+    call(client,'GET','project-timeline?projectId='+PID,role='R-05',expected=403)
+    monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('other',{'R-03'},set(),{PORT},set(),set()))
+    call(client,'GET','project-timeline?projectId='+PID,expected=404)
+
+
+def test_all_project_workbook_has_detailed_rows_people_and_unstaffed_projects(client):
+    call(client,'POST','projects',{'portfolioId':PORT,'programId':None,'code':'EMPTY','name':'Проект без работ',
+         'goal':'Проверка полного отчёта','managerSubject':'someone-else'},expected=201)
+    call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    book=workbook(client,'projects.xlsx')
+    assert book.active.title=='Работы и сотрудники'
+    assert set(book.sheetnames)=={'Проекты','Работы и сотрудники','Назначения','Сотрудники','Фильтры'}
+    assert book['Проекты'].max_row==3
+    detail=list(book['Работы и сотрудники'].values)
+    assert len(detail)>book['Проекты'].max_row
+    headers=list(detail[0]);work=headers.index('Работа');person=headers.index('Сотрудник')
+    task_rows=[r for r in detail[1:] if r[work]=='Интерфейс']
+    assert len(task_rows)==2 and {r[person] for r in task_rows}=={'Демо-сотрудник 1','Демо-сотрудник 2'}
+    assert any(r[work]=='Работы ещё не добавлены' for r in detail[1:])
+    assert book['Назначения'].max_row==3
+    people=list(book['Сотрудники'].values)
+    assert len(people)==3 and sorted(r[4] for r in people[1:])==[2,6]
+    for name in ['Проекты','Работы и сотрудники','Назначения','Сотрудники']:
+        assert book[name].freeze_panes=='A2' and book[name].auto_filter.ref
+    assert workbook(client,'projects.xlsx?q=EMPTY')['Назначения'].max_row==1
+    assert workbook(client,'projects.xlsx',role='R-03')['Проекты'].max_row==2
+    call(client,'GET','downloads/projects.xlsx',role='R-04',expected=403)
+
+
+def test_project_export_employee_formula_and_cancelled_hours(client):
+    created=call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    call(client,'PATCH',f'versions/{VID}/assignments/'+created['assignment']['id'],
+         {**assignment_body(),'status':'CANCELLED'},revision=revision())
+    with db.engine.begin() as c:
+        db.put(c,'employee',{'id':'employees/demo-2','displayName':'=HYPERLINK("x")'},PORT)
+    book=workbook(client,'projects.xlsx')
+    rows=list(book['Сотрудники'].values)
+    row=next(r for r in rows[1:] if r[1]=='employees/demo-2')
+    assert row[4]==0 and row[5]==2
+    sheet=book['Сотрудники'];cell=next(c for c in sheet['A'] if c.value=='=HYPERLINK("x")')
+    assert cell.data_type=='s'
+
+
+def test_employee_filtered_project_export_contains_only_their_work(client):
+    call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    options=call(client,'GET','export-options')['employees']
+    assert {x['id'] for x in options}=={'employees/demo-1','employees/demo-2'}
+    book=workbook(client,'projects.xlsx?employeeId=employees/demo-2')
+    detail=list(book['Работы и сотрудники'].values)
+    assert len(detail)==2
+    assert detail[1][10]=='Демо-сотрудник 2' and detail[1][4]=='Интерфейс'
+    assert book['Назначения'].max_row==2 and book['Сотрудники'].max_row==2
+    assert book['Сотрудники']['B2'].value=='employees/demo-2'
+    assert call(client,'GET','project-cards?employeeId=employees/demo-2')['total']==1
+    assert call(client,'GET','project-cards?employeeId=employees/absent')['total']==0
+    assert workbook(client,'projects.xlsx?employeeId=employees/absent')['Проекты'].max_row==1
+    assert workbook(client,'projects.xlsx')['Назначения'].max_row==3  # general export unchanged
+    call(client,'GET','export-options',role='R-05',expected=403)

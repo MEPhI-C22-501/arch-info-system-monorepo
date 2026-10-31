@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "checks": [
+    "manager-dropdown",
+    "two-project-isolation",
+    "work-dates",
+    "specialty-grade-dropdowns",
+    "multiple-demands",
+    "gantt-real-dates",
+    "gantt-zoom",
+    "gantt-dependencies",
+    "gantt-save",
+    "drag-and-resize",
+    "fs-auto-shift",
+    "cross-screen-date-sync",
+    "reload-persistence",
+    "filtered-project-xlsx",
+    "filtered-assignment-xlsx"
+  ],
+  "errors": []
+}

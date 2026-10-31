@@ -1,6 +1,7 @@
 """Project cards, resource choices and user XLSX exports (separate from Reports ETL)."""
 import copy
 import math
+import os
 from datetime import date
 from io import BytesIO
 
@@ -8,7 +9,7 @@ from fastapi import Request
 from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.cell.cell import Cell, ILLEGAL_CHARACTERS_RE
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from . import storage as db
 from .auth import actor
@@ -19,7 +20,7 @@ ALLOCATION_STATUSES = {'PROPOSED', 'CONFIRMED', 'CANCELLED'}
 
 
 def filters(req, assignment=False):
-    permitted = {'q', 'projectId', 'portfolioId', 'status', 'dateFrom', 'dateTo'}
+    permitted = {'q', 'projectId', 'portfolioId', 'status', 'dateFrom', 'dateTo', 'employeeId'}
     if assignment:permitted.add('employeeId')
     if set(req.query_params)-permitted:fail(422, 'Неизвестный фильтр')
     if any(len(req.query_params.getlist(k)) != 1 for k in req.query_params):fail(422, 'Повтор фильтра')
@@ -63,6 +64,7 @@ def project_rows(c, a, f):
     rows = []
     for p in visible_projects(c, a, plans):
         v = plans.get(p['id'])
+        if f.get('employeeId') and not any(x['employeeId']==f['employeeId'] for x in (v or {}).get('allocations',[])):continue
         if f.get('projectId') and p['id'] != f['projectId']:continue
         if f.get('portfolioId') and p['portfolioId'] != f['portfolioId']:continue
         if f.get('status') and p['status'] != f['status']:continue
@@ -113,11 +115,8 @@ def assignment_rows(c, a, f):
     return sorted(rows, key=lambda r:(r['date'],r['projectCode'],r['workName'],r['employeeId'],r['id']))
 
 
-def workbook_response(title, columns, rows, f, filename):
-    if len(rows)>50000:fail(422, 'Слишком много строк: сузьте фильтры (максимум 50000)')
-    book = Workbook()
-    sheet = book.active
-    sheet.title = title
+def fill_sheet(sheet, columns, rows):
+    if len(rows)>50000:fail(422, 'Слишком много строк: сузьте фильтры (максимум 50000 на лист)')
     sheet.append([label for _,label in columns])
     for row in rows:
         cells=[]
@@ -132,12 +131,28 @@ def workbook_response(title, columns, rows, f, filename):
             if key=='hours':cell.number_format='0.00'
             cells.append(cell)
         sheet.append(cells)
+    sheet.sheet_view.showGridLines=False
+    sheet.row_dimensions[1].height=32
+    sheet.sheet_properties.pageSetUpPr.fitToPage=True
+    sheet.page_setup.orientation='landscape'
+    sheet.page_setup.fitToWidth=1
+    sheet.page_setup.fitToHeight=0
+    sheet.print_title_rows='1:1'
     sheet.freeze_panes='A2'
     sheet.auto_filter.ref=sheet.dimensions
     for cell in sheet[1]:
-        cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='235CCA')
+        cell.alignment=Alignment(wrap_text=True,vertical='center');cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='235CCA')
     for index,(key,_) in enumerate(columns,1):
         sheet.column_dimensions[sheet.cell(1,index).column_letter].width=18 if key in {'date','start','finish','hours','status'} else 32
+
+
+def workbook_response(title, columns, rows, f, filename, extra_sheets=()):
+    book=Workbook()
+    sheet=book.active;sheet.title=title
+    fill_sheet(sheet,columns,rows)
+    for name,fields,data in extra_sheets:
+        fill_sheet(book.create_sheet(name),fields,data)
+    if extra_sheets:book.active=1  # Detailed work/employee rows are visible on opening.
     meta=book.create_sheet('Фильтры')
     meta.append(['Параметр','Значение'])
     for key,value in [('Сформировано UTC',db.now()),('Строк',len(rows)),('Версии','Последняя версия каждого доступного проекта'),*sorted(f.items())]:
@@ -152,8 +167,104 @@ def workbook_response(title, columns, rows, f, filename):
                     headers={'Content-Disposition':f'attachment; filename="{filename}.xlsx"'})
 
 
+
+def project_export_details(c,a,projects,employee_id=None):
+    plans=latest_plans(c);detail=[];assignments=[];people={}
+    for p in projects:
+        v=plans.get(p['id'])
+        names={x['id']:x['name'] for x in employee_options(c,a,p['portfolioId'])}
+        base={'projectCode':p['code'],'projectName':p['name'],'versionNumber':p['versionNumber'],'planStatus':p['planStatus']}
+        if not v or not v['items']:
+            detail.append({**base,'workName':'Работы ещё не добавлены','status':'Нет назначений'})
+            continue
+        for item in v['items']:
+            if employee_id and not any(x['employeeId']==employee_id and any(d['id']==x['demandId'] and d['planItemId']==item['id'] for d in v['demands']) for x in v['allocations']):continue
+            work={**base,'workName':item['name'],'workType':item['type'],'start':item['start'],'finish':item['finish'],'plannedHours':item['plannedHours']}
+            demands=[d for d in v['demands'] if d['planItemId']==item['id']]
+            if not demands:detail.append({**work,'status':'Потребность не задана'});continue
+            for demand in demands:
+                required={**work,'roleCode':demand['roleCode'],'gradeCode':demand['gradeCode'],'demandHours':demand['hours']}
+                allocations=[x for x in v['allocations'] if x['demandId']==demand['id'] and (not employee_id or x['employeeId']==employee_id)]
+                if employee_id and not allocations:continue
+                if not allocations:detail.append({**required,'status':'Сотрудник не назначен'});continue
+                for allocation in allocations:
+                    row={**required,**allocation,'employeeName':names.get(allocation['employeeId'],allocation['employeeId'])}
+                    detail.append(row);assignments.append(row)
+                    person=people.setdefault(allocation['employeeId'],{'employeeId':allocation['employeeId'],'employeeName':row['employeeName'],'projects':set(),'works':set(),'hours':0,'cancelledHours':0})
+                    if allocation['status']=='CANCELLED':person['cancelledHours']+=allocation['hours']
+                    else:
+                        person['projects'].add(p['code']);person['works'].add((p['id'],item['id']));person['hours']+=allocation['hours']
+    employees=[{**x,'projects':', '.join(sorted(x['projects'])),'workCount':len(x['works'])} for x in people.values()]
+    return detail,assignments,sorted(employees,key=lambda x:(x['employeeName'],x['employeeId']))
+
+
 def register(app, command_tx):
     from .app import allowed, get, changed, read_json
+
+    @app.get('/api/v1/planning-options')
+    def planning_options(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            portfolio=req.query_params.get('portfolioId','')
+            get(c,'portfolio',portfolio,a)
+            managers={r['data']['managerSubject']:r['data']['managerSubject'] for r in db.all_rows(c,'project',portfolio)}
+            for r in db.all_rows(c,'manager',portfolio):
+                managers[r['data']['subject']]=r['data']['displayName']
+            if os.environ.get('APP_ENV')=='development':
+                managers['demo-R-03']='Руководитель проекта · manager (учебная учётная запись)'
+            if 'R-03' in a.roles:managers[a.subject]=managers.get(a.subject,'Моя учётная запись')
+            if 'R-03' in a.roles and not a.roles & {'R-01','R-02'}:
+                managers={a.subject:managers[a.subject]}
+            return {'managers':[{'id':k,'name':v} for k,v in sorted(managers.items(),key=lambda x:x[1])],
+                    'specialties':[{'id':k,'name':v} for k,v in [
+                        ('developer','Разработчик'),('analyst','Аналитик'),('tester','Тестировщик'),
+                        ('designer','Дизайнер'),('devops','DevOps-инженер'),('architect','Архитектор'),
+                        ('project-manager','Руководитель проекта')]],
+                    'grades':[{'id':k,'name':v} for k,v in [('intern','Стажёр'),('junior','Junior'),
+                        ('middle','Middle'),('senior','Senior'),('lead','Ведущий специалист')]],
+                    'source':'Локальный справочник Planning System; руководители — из проектов и кадрового кэша'}
+
+    @app.patch('/api/v1/versions/{versionId}/timeline')
+    async def change_timeline(req:Request):
+        from .scheduling import reschedule
+        a=actor(req);allowed(a,['R-02','R-03']);b=await read_json(req)
+        if set(b)!={'itemId','start','finish'} or not all(isinstance(x,str) for x in b.values()):
+            fail(422,'Нужны работа, начало и окончание')
+        try:
+            for key in ['start','finish']:
+                if date.fromisoformat(b[key]).isoformat()!=b[key]:raise ValueError()
+        except ValueError:fail(422,'Неверная дата')
+        with command_tx(req,a,b) as (c,cached,complete):
+            if cached:return cached
+            v=get(c,'plan',req.path_params['versionId'],a);p=get(c,'project',v['projectId'],a)
+            if v['status']!='DRAFT' or p['status']=='ARCHIVED':fail(409,'Сроки изменяются только в черновике действующего проекта')
+            try:v,moved=reschedule(v,b['itemId'],b['start'],b['finish'])
+            except (OverflowError,ValueError):fail(422,'Сроки вышли за допустимые границы')
+            v['contentRevision']+=1;changed(c,'plan',v,req,a)
+            return complete({'revision':v['revision'],'changedItemIds':moved},p['portfolioId'],p['id'])
+
+    @app.get('/api/v1/project-timeline')
+    def timeline(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            plans=latest_plans(c)
+            pid=req.query_params.get('projectId','')
+            if pid not in {p['id'] for p in visible_projects(c,a,plans)}:fail(404,'Проект не найден')
+            v=plans.get(pid)
+            return {k:v[k] for k in ['id','revision','status','items','dependencies','horizonStart','horizonEnd']} if v else {'items':[],'dependencies':[]}
+
+    @app.get('/api/v1/export-options')
+    def export_options(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            plans=latest_plans(c);people={}
+            for p in visible_projects(c,a,plans):
+                names={x['id']:x['name'] for x in employee_options(c,a,p['portfolioId'])}
+                for allocation in plans.get(p['id'],{}).get('allocations',[]):
+                    identifier=allocation['employeeId']
+                    if 'R-04' in a.roles and not a.roles & {'R-01','R-02','R-03'} and identifier not in a.employees:continue
+                    people[identifier]=names.get(identifier,identifier)
+            return {'employees':[{'id':k,'name':v} for k,v in sorted(people.items(),key=lambda x:(x[1],x[0]))]}
 
     @app.get('/api/v1/project-cards')
     def cards(req:Request):
@@ -228,8 +339,16 @@ def register(app, command_tx):
         f=filters(req)
         with db.engine.begin() as c:
             rows=project_rows(c,a,f)
+            detail,assignments,employees=project_export_details(c,a,rows,f.get('employeeId'))
+            common=[('projectCode','Код проекта'),('projectName','Проект'),('versionNumber','Версия'),('planStatus','Статус плана'),
+                    ('workName','Работа'),('workType','Тип работы'),('start','Начало работы'),('finish','Окончание работы'),
+                    ('roleCode','Специализация'),('gradeCode','Грейд'),('employeeName','Сотрудник'),('employeeId','ID сотрудника'),
+                    ('date','Дата назначения'),('hours','Назначено часов'),('status','Статус назначения')]
             return workbook_response('Проекты',[('code','Код'),('name','Проект'),('status','Статус проекта'),('goal','Цель'),
-                ('managerSubject','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание')],rows,f,'projects')
+                ('managerSubject','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание')],rows,f,'projects',[
+                    ('Работы и сотрудники',common,detail),('Назначения',common,assignments),
+                    ('Сотрудники',[('employeeName','Сотрудник'),('employeeId','ID сотрудника'),('projects','Проекты'),('workCount','Количество работ'),
+                                  ('hours','Часы без отменённых'),('cancelledHours','Отменённые часы')],employees)])
 
     @app.get('/api/v1/downloads/assignments.xlsx')
     def export_assignments(req:Request):

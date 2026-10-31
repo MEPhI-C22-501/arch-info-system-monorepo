@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Planning System resource and UI contracts",
-    "version": "1.1.0"
+    "version": "1.5.0"
   },
   "servers": [
     {
@@ -667,6 +667,15 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Проекты с назначениями сотрудника; в XLSX только его работы и назначения"
           }
         ]
       }
@@ -1104,8 +1113,18 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Проекты с назначениями сотрудника; в XLSX только его работы и назначения"
           }
-        ]
+        ],
+        "description": "Многостраничная XLSX-книга всех доступных проектов или проектов по фильтрам: проекты, работы и сотрудники, назначения, сотрудники, фильтры. Каждое назначение — отдельная строка. При открытии активен подробный лист."
       }
     },
     "/api/v1/downloads/assignments.xlsx": {
@@ -1204,6 +1223,198 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/planning-options": {
+      "get": {
+        "operationId": "getPlanningOptions",
+        "summary": "Руководители, специализации и грейды для форм планирования",
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные в пределах прав пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Недостаточно прав"
+          },
+          "404": {
+            "description": "Объект недоступен"
+          }
+        }
+      }
+    },
+    "/api/v1/project-timeline": {
+      "get": {
+        "operationId": "getProjectTimeline",
+        "summary": "Реальные работы, вехи и зависимости последней версии проекта",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные в пределах прав пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Недостаточно прав"
+          },
+          "404": {
+            "description": "Объект недоступен"
+          }
+        }
+      }
+    },
+    "/api/v1/versions/{versionId}/timeline": {
+      "patch": {
+        "operationId": "rescheduleTimeline",
+        "summary": "Атомарно перенести работу, FS-последователей, потребности и назначения",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "itemId",
+                  "start",
+                  "finish"
+                ],
+                "properties": {
+                  "itemId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "finish": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Сроки синхронизированы; назначения требуют подтверждения",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer"
+                    },
+                    "changedItemIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав"
+          },
+          "404": {
+            "description": "Работа или проект недоступны"
+          },
+          "409": {
+            "description": "Версия не является черновиком"
+          },
+          "412": {
+            "description": "Версия была изменена"
+          },
+          "422": {
+            "description": "Некорректные даты, горизонт или зависимости"
+          }
+        }
+      }
+    },
+    "/api/v1/export-options": {
+      "get": {
+        "operationId": "getExportEmployeeOptions",
+        "summary": "Сотрудники с назначениями в доступных проектах",
+        "responses": {
+          "200": {
+            "description": "Сотрудники для фильтра отчёта"
+          },
+          "403": {
+            "description": "Недостаточно прав"
+          }
+        }
       }
     }
   },
