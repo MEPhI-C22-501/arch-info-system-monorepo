@@ -20,7 +20,7 @@ ALLOCATION_STATUSES = {'PROPOSED', 'CONFIRMED', 'CANCELLED'}
 
 
 def filters(req, assignment=False):
-    permitted = {'q', 'projectId', 'portfolioId', 'status', 'dateFrom', 'dateTo'}
+    permitted = {'q', 'projectId', 'portfolioId', 'status', 'dateFrom', 'dateTo', 'employeeId'}
     if assignment:permitted.add('employeeId')
     if set(req.query_params)-permitted:fail(422, 'Неизвестный фильтр')
     if any(len(req.query_params.getlist(k)) != 1 for k in req.query_params):fail(422, 'Повтор фильтра')
@@ -64,6 +64,7 @@ def project_rows(c, a, f):
     rows = []
     for p in visible_projects(c, a, plans):
         v = plans.get(p['id'])
+        if f.get('employeeId') and not any(x['employeeId']==f['employeeId'] for x in (v or {}).get('allocations',[])):continue
         if f.get('projectId') and p['id'] != f['projectId']:continue
         if f.get('portfolioId') and p['portfolioId'] != f['portfolioId']:continue
         if f.get('status') and p['status'] != f['status']:continue
@@ -167,7 +168,7 @@ def workbook_response(title, columns, rows, f, filename, extra_sheets=()):
 
 
 
-def project_export_details(c,a,projects):
+def project_export_details(c,a,projects,employee_id=None):
     plans=latest_plans(c);detail=[];assignments=[];people={}
     for p in projects:
         v=plans.get(p['id'])
@@ -177,12 +178,14 @@ def project_export_details(c,a,projects):
             detail.append({**base,'workName':'Работы ещё не добавлены','status':'Нет назначений'})
             continue
         for item in v['items']:
+            if employee_id and not any(x['employeeId']==employee_id and any(d['id']==x['demandId'] and d['planItemId']==item['id'] for d in v['demands']) for x in v['allocations']):continue
             work={**base,'workName':item['name'],'workType':item['type'],'start':item['start'],'finish':item['finish'],'plannedHours':item['plannedHours']}
             demands=[d for d in v['demands'] if d['planItemId']==item['id']]
             if not demands:detail.append({**work,'status':'Потребность не задана'});continue
             for demand in demands:
                 required={**work,'roleCode':demand['roleCode'],'gradeCode':demand['gradeCode'],'demandHours':demand['hours']}
-                allocations=[x for x in v['allocations'] if x['demandId']==demand['id']]
+                allocations=[x for x in v['allocations'] if x['demandId']==demand['id'] and (not employee_id or x['employeeId']==employee_id)]
+                if employee_id and not allocations:continue
                 if not allocations:detail.append({**required,'status':'Сотрудник не назначен'});continue
                 for allocation in allocations:
                     row={**required,**allocation,'employeeName':names.get(allocation['employeeId'],allocation['employeeId'])}
@@ -249,6 +252,19 @@ def register(app, command_tx):
             if pid not in {p['id'] for p in visible_projects(c,a,plans)}:fail(404,'Проект не найден')
             v=plans.get(pid)
             return {k:v[k] for k in ['id','revision','status','items','dependencies','horizonStart','horizonEnd']} if v else {'items':[],'dependencies':[]}
+
+    @app.get('/api/v1/export-options')
+    def export_options(req:Request):
+        a=actor(req);allowed(a,['R-01','R-02','R-03','R-04'])
+        with db.engine.begin() as c:
+            plans=latest_plans(c);people={}
+            for p in visible_projects(c,a,plans):
+                names={x['id']:x['name'] for x in employee_options(c,a,p['portfolioId'])}
+                for allocation in plans.get(p['id'],{}).get('allocations',[]):
+                    identifier=allocation['employeeId']
+                    if 'R-04' in a.roles and not a.roles & {'R-01','R-02','R-03'} and identifier not in a.employees:continue
+                    people[identifier]=names.get(identifier,identifier)
+            return {'employees':[{'id':k,'name':v} for k,v in sorted(people.items(),key=lambda x:(x[1],x[0]))]}
 
     @app.get('/api/v1/project-cards')
     def cards(req:Request):
@@ -323,7 +339,7 @@ def register(app, command_tx):
         f=filters(req)
         with db.engine.begin() as c:
             rows=project_rows(c,a,f)
-            detail,assignments,employees=project_export_details(c,a,rows)
+            detail,assignments,employees=project_export_details(c,a,rows,f.get('employeeId'))
             common=[('projectCode','Код проекта'),('projectName','Проект'),('versionNumber','Версия'),('planStatus','Статус плана'),
                     ('workName','Работа'),('workType','Тип работы'),('start','Начало работы'),('finish','Окончание работы'),
                     ('roleCode','Специализация'),('gradeCode','Грейд'),('employeeName','Сотрудник'),('employeeId','ID сотрудника'),

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Planning System resource and UI contracts",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "servers": [
     {
@@ -667,6 +667,15 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Проекты с назначениями сотрудника; в XLSX только его работы и назначения"
           }
         ]
       }
@@ -1104,6 +1113,15 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Проекты с назначениями сотрудника; в XLSX только его работы и назначения"
           }
         ],
         "description": "Многостраничная XLSX-книга всех доступных проектов или проектов по фильтрам: проекты, работы и сотрудники, назначения, сотрудники, фильтры. Каждое назначение — отдельная строка. При открытии активен подробный лист."
@@ -1381,6 +1399,20 @@
           },
           "422": {
             "description": "Некорректные даты, горизонт или зависимости"
+          }
+        }
+      }
+    },
+    "/api/v1/export-options": {
+      "get": {
+        "operationId": "getExportEmployeeOptions",
+        "summary": "Сотрудники с назначениями в доступных проектах",
+        "responses": {
+          "200": {
+            "description": "Сотрудники для фильтра отчёта"
+          },
+          "403": {
+            "description": "Недостаточно прав"
           }
         }
       }

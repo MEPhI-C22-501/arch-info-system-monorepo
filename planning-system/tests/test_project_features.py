@@ -207,3 +207,20 @@ def test_project_export_employee_formula_and_cancelled_hours(client):
     assert row[4]==0 and row[5]==2
     sheet=book['Сотрудники'];cell=next(c for c in sheet['A'] if c.value=='=HYPERLINK("x")')
     assert cell.data_type=='s'
+
+
+def test_employee_filtered_project_export_contains_only_their_work(client):
+    call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    options=call(client,'GET','export-options')['employees']
+    assert {x['id'] for x in options}=={'employees/demo-1','employees/demo-2'}
+    book=workbook(client,'projects.xlsx?employeeId=employees/demo-2')
+    detail=list(book['Работы и сотрудники'].values)
+    assert len(detail)==2
+    assert detail[1][10]=='Демо-сотрудник 2' and detail[1][4]=='Интерфейс'
+    assert book['Назначения'].max_row==2 and book['Сотрудники'].max_row==2
+    assert book['Сотрудники']['B2'].value=='employees/demo-2'
+    assert call(client,'GET','project-cards?employeeId=employees/demo-2')['total']==1
+    assert call(client,'GET','project-cards?employeeId=employees/absent')['total']==0
+    assert workbook(client,'projects.xlsx?employeeId=employees/absent')['Проекты'].max_row==1
+    assert workbook(client,'projects.xlsx')['Назначения'].max_row==3  # general export unchanged
+    call(client,'GET','export-options',role='R-05',expected=403)
