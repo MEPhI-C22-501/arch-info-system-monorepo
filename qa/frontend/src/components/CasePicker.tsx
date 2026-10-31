@@ -5,7 +5,7 @@ import { Column, DataTable } from './DataTable';
 import { FilterBar } from './FilterBar';
 import { Pagination } from './Pagination';
 import { StatusBadge } from './StatusBadge';
-import { MODULES } from '../labels';
+import { MODULE_OPTIONS } from '../labels';
 
 const COLUMNS: Column<TestCase>[] = [
   { header: 'Ключ', render: (row) => row.key },
@@ -26,7 +26,7 @@ export function CasePicker({ selected, onChange }: { selected: Set<string>; onCh
       <FilterBar
         fields={[
           { name: 'q', label: 'Поиск', type: 'text', placeholder: 'Ключ или название' },
-          { name: 'module', label: 'Модуль', type: 'text', suggestions: MODULES, upperCase: true },
+          { name: 'module', label: 'Модуль', type: 'select', emptyLabel: 'Все модули', options: MODULE_OPTIONS },
         ]}
         values={filters}
         onChange={(name, value) => { setFilters({ ...filters, [name]: value }); setPage(1); }}

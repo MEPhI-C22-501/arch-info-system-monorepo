@@ -3,7 +3,7 @@ import type { Option } from '../useReferenceData';
 
 export type FilterField =
   | { name: string; label: string; type: 'select'; options: Option[]; emptyLabel: string }
-  | { name: string; label: string; type: 'text'; placeholder?: string; suggestions?: string[]; upperCase?: boolean };
+  | { name: string; label: string; type: 'text'; placeholder?: string };
 
 type Props = {
   fields: FilterField[];
@@ -14,7 +14,7 @@ type Props = {
 
 const TYPING_DELAY_MS = 300;
 
-function TextFilter({ value, onChange, upperCase, ...rest }: { value: string; onChange: (value: string) => void; upperCase?: boolean; placeholder?: string; list?: string }) {
+function TextFilter({ value, onChange, ...rest }: { value: string; onChange: (value: string) => void; placeholder?: string }) {
   const [text, setText] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -32,7 +32,7 @@ function TextFilter({ value, onChange, upperCase, ...rest }: { value: string; on
       {...rest}
       value={text}
       onChange={(event) => {
-        const next = upperCase ? event.target.value.toUpperCase() : event.target.value;
+        const next = event.target.value;
         setText(next);
         clearTimeout(timer.current);
         timer.current = setTimeout(() => onChange(next.trim()), TYPING_DELAY_MS);
@@ -62,20 +62,11 @@ export function FilterBar({ fields, values, onChange, onReset }: Props) {
               {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           ) : (
-            <>
-              <TextFilter
-                value={values[field.name] ?? ''}
-                onChange={(value) => onChange(field.name, value)}
-                placeholder={field.placeholder}
-                upperCase={field.upperCase}
-                list={field.suggestions ? `${field.name}-suggestions` : undefined}
-              />
-              {field.suggestions && (
-                <datalist id={`${field.name}-suggestions`}>
-                  {field.suggestions.map((value) => <option key={value} value={value} />)}
-                </datalist>
-              )}
-            </>
+            <TextFilter
+              value={values[field.name] ?? ''}
+              onChange={(value) => onChange(field.name, value)}
+              placeholder={field.placeholder}
+            />
           )}
         </label>
       ))}

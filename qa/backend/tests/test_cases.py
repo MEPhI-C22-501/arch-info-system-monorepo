@@ -129,6 +129,7 @@ def test_keys_are_numbered_per_module(create):
     [
         ({"title": "  "}, "title", None),
         ({"module": "rm"}, "module", None),
+        ({"module": "RNM"}, "module", "unknown"),
         ({"priority": "URGENT"}, "priority", "unknown"),
         ({"severity": "HUGE"}, "severity", None),
         ({"type": None}, "type", "required"),
@@ -328,6 +329,21 @@ def test_module_is_immutable(client, auth, create):
 
     assert response.status_code == 422
     assert response.json()["errors"] == [{"field": "module", "reason": "immutable"}]
+
+
+def test_case_of_module_outside_list_stays_editable(client, auth, create, db_session):
+    case = create()
+    db_session.get(TestCase, uuid.UUID(case["id"])).module = "QA"
+    db_session.commit()
+
+    response = client.put(
+        f"{URL}/{case['id']}",
+        json=payload(module="QA", title="Новое название"),
+        headers=auth(Role.TESTER),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["version"] == 2
 
 
 def test_actual_case_keeps_at_least_one_step(client, auth, create):

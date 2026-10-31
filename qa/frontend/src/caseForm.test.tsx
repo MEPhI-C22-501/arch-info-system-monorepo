@@ -170,7 +170,7 @@ test('создание из шаблона заполняет форму и пе
   fireEvent.change(screen.getByLabelText('Шаблон'), { target: { value: 't1' } });
   expect((screen.getByLabelText('Действие шага 1') as HTMLTextAreaElement).value).toBe('Запрос');
   fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Из шаблона' } });
-  fireEvent.change(screen.getByLabelText(/^Модуль/), { target: { value: 'rm' } });
+  fireEvent.change(screen.getByLabelText(/^Модуль/), { target: { value: 'RM' } });
   fireEvent.click(screen.getByRole('button', { name: 'Создать кейс' }));
   await screen.findByText('другой экран');
   expect(calls.find((call) => call.method === 'POST')!.body).toMatchObject({ title: 'Из шаблона', module: 'RM', templateId: 't1', severity: 'MINOR' });

@@ -47,6 +47,9 @@ paths:
       tags: [test-cases]
       operationId: createTestCase
       summary: Create a test case (version 1, status DRAFT)
+      description: >
+        The module is one of RM, TT, PS, REP, INF: otherwise 422 VALIDATION_FAILED with reason
+        unknown.
       requestBody:
         required: true
         content:

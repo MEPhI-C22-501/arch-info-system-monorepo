@@ -1,14 +1,14 @@
 import type { CaseFilter } from './api/cases';
 import type { Classifier } from './api/admin';
 import type { FilterField } from './components/FilterBar';
-import { CASE_STATUSES, MODULES, statusLabel } from './labels';
+import { CASE_STATUSES, MODULE_OPTIONS, statusLabel } from './labels';
 import { optionsOf } from './useReferenceData';
 
 // Поля отбора кейсов: одни и те же для списка, набора FILTER и добавления в план (050, CaseFilter).
 export function caseFilterFields(classifiers: Classifier[] | undefined, statusEmptyLabel = 'Все, кроме архивных'): FilterField[] {
   return [
     { name: 'q', label: 'Поиск', type: 'text', placeholder: 'Ключ или название' },
-    { name: 'module', label: 'Модуль', type: 'text', suggestions: MODULES, upperCase: true },
+    { name: 'module', label: 'Модуль', type: 'select', emptyLabel: 'Все модули', options: MODULE_OPTIONS },
     {
       name: 'status', label: 'Статус', type: 'select', emptyLabel: statusEmptyLabel,
       options: CASE_STATUSES.map((value) => ({ value, label: statusLabel(value) })),

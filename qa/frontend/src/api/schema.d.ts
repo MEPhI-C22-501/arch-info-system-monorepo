@@ -14,7 +14,10 @@ export interface paths {
         /** List test cases with filters */
         get: operations["listTestCases"];
         put?: never;
-        /** Create a test case (version 1, status DRAFT) */
+        /**
+         * Create a test case (version 1, status DRAFT)
+         * @description The module is one of RM, TT, PS, REP, INF: otherwise 422 VALIDATION_FAILED with reason unknown.
+         */
         post: operations["createTestCase"];
         delete?: never;
         options?: never;

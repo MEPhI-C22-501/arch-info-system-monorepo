@@ -61,6 +61,9 @@ CLASSIFIER_FIELDS = {
     "type": ClassifierKind.CASE_TYPE,
 }
 TEMPLATE_FIELDS = ("description", "preconditions", "priority", "severity", "type")
+# Подсистемы стартового набора (vision 7). Проверяются только при создании: модуль входит в
+# неизменяемый ключ, а уже созданный кейс с другим модулем должен оставаться доступным.
+MODULES = ("RM", "TT", "PS", "REP", "INF")
 
 # 050, раздел 2. Удаление черновика — отдельная операция DELETE.
 TRANSITIONS = {
@@ -225,6 +228,8 @@ def create_case(session: Session, data: TestCaseInput, principal: Principal) -> 
         steps = _apply_template(session, data.template_id, content, steps)
     steps = steps or []
     errors = _content_errors(content)
+    if data.module not in MODULES:
+        errors.append({"field": "module", "reason": "unknown"})
     errors += check_codes(
         session,
         {

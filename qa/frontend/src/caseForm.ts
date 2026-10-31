@@ -1,6 +1,7 @@
 import type { TestCase, TestCaseInput } from './api/cases';
 import type { Template } from './api/templates';
 import { newStep } from './components/StepsEditor';
+import { MODULE_OPTIONS } from './labels';
 
 export type StepDraft = { draftId: number; action: string; expectedResult: string };
 
@@ -23,8 +24,9 @@ export type CaseFormValues = {
 
 export type FieldErrors = Record<string, string>;
 
-const MODULE_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/;
 const REQUIRED = 'Обязательное поле';
+
+export const isKnownModule = (module: string) => MODULE_OPTIONS.some((option) => option.value === module);
 
 export function emptyCaseForm(): CaseFormValues {
   return {
@@ -69,7 +71,7 @@ export function applyTemplate(values: CaseFormValues, template: Template): CaseF
 export function validateCase(values: CaseFormValues, options: { isNew: boolean; requireSteps?: boolean }): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.title.trim()) errors.title = REQUIRED;
-  if (options.isNew && !MODULE_PATTERN.test(values.module)) errors.module = 'Заглавные латинские буквы и цифры, 2–10 символов: RM, TT, INF';
+  if (options.isNew && !isKnownModule(values.module)) errors.module = 'Выберите модуль';
   for (const field of ['priority', 'severity', 'type'] as const) {
     if (!values[field]) errors[field] = REQUIRED;
   }
