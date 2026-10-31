@@ -75,7 +75,7 @@ def register(app):
                 key=(x['employeeId'],x['date']);assigned[key]=assigned.get(key,0)+x['hours']
             per_demand={}
             for x in allocations:per_demand[x['demandId']]=per_demand.get(x['demandId'],0)+x['hours']
-            response={'projectId':pid,'portfolioId':p['portfolioId'],'projectRevision':p['revision'],'finalApprover':get(c,'portfolio',p['portfolioId'],a).get('ownerSubject'),'name':p['name'],'goal':p['goal'],'role':next(iter(a.roles)),
+            response={'projectStatus':p['status'],'projectId':pid,'portfolioId':p['portfolioId'],'projectRevision':p['revision'],'finalApprover':get(c,'portfolio',p['portfolioId'],a).get('ownerSubject'),'name':p['name'],'goal':p['goal'],'role':next(iter(a.roles)),
                 'versionId':v['id'] if v else None,'version':v['versionNumber'] if v else 0,'revision':v['revision'] if v else 0,
                 'contentRevision':v['contentRevision'] if v else 0,'reviewRound':v['reviewRound'] if v else 0,'status':v['status'] if v else 'DRAFT',
                 'scenario':v['kind']=='SCENARIO' if v else False,'demand':sum(x['hours'] for x in v['demands']) if v else 0,
