@@ -15,13 +15,14 @@ type Props<T> = {
   onRetry?: () => void;
   emptyText: ReactNode;
   selection?: Selection;
+  isSelectable?: (row: T) => boolean;
   isCurrent?: (row: T) => boolean;
 };
 
 const INTERACTIVE = 'a, button, input, select, textarea, label';
 
 // Все списки устроены одинаково (110, раздел 1): строка открывается щелчком и по Enter.
-export function DataTable<T>({ columns, rows, rowKey, onOpen, loading, error, onRetry, emptyText, selection, isCurrent }: Props<T>) {
+export function DataTable<T>({ columns, rows, rowKey, onOpen, loading, error, onRetry, emptyText, selection, isSelectable = () => true, isCurrent }: Props<T>) {
   if (error && !rows) return <ErrorMessage error={error} onRetry={onRetry} />;
 
   const span = columns.length + (selection ? 1 : 0);
@@ -31,7 +32,7 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, loading, error, on
     if (!next.delete(key)) next.add(key);
     selection.onChange(next);
   };
-  const keys = (rows ?? []).map(rowKey);
+  const keys = (rows ?? []).filter(isSelectable).map(rowKey);
   const allSelected = keys.length > 0 && keys.every((key) => selection?.selected.has(key));
   const toggleAll = () => {
     if (!selection) return;
@@ -67,7 +68,7 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, loading, error, on
             const classes = [onOpen ? 'row' : '', isCurrent?.(row) ? 'current' : ''].join(' ').trim();
             return (
               <tr key={key} className={classes || undefined} tabIndex={onOpen ? 0 : undefined} onClick={open(row)} onKeyDown={openByKey(row)}>
-                {selection && <td><input type="checkbox" aria-label={`Выбрать ${key}`} checked={selection.selected.has(key)} onChange={() => toggle(key)} /></td>}
+                {selection && <td>{isSelectable(row) && <input type="checkbox" aria-label={`Выбрать ${key}`} checked={selection.selected.has(key)} onChange={() => toggle(key)} />}</td>}
                 {columns.map((column) => <td key={column.header}>{column.render(row)}</td>)}
               </tr>
             );

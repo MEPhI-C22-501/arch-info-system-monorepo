@@ -52,6 +52,15 @@ describe('DataTable', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать все на странице' }));
     expect([...onChange.mock.calls[0][0]]).toEqual(['1']);
   });
+
+  test('строка, которую нельзя выбрать, остаётся без галочки и не входит в «выбрать все»', () => {
+    const onChange = vi.fn();
+    const rows = [...ROWS, { id: '2', title: 'Вторая' }];
+    render(<DataTable columns={COLUMNS} rows={rows} rowKey={(row) => row.id} emptyText="Пусто" selection={{ selected: new Set(), onChange }} isSelectable={(row) => row.id === '1'} />);
+    expect(screen.queryByRole('checkbox', { name: 'Выбрать 2' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать все на странице' }));
+    expect([...onChange.mock.calls[0][0]]).toEqual(['1']);
+  });
 });
 
 describe('ErrorMessage', () => {

@@ -70,8 +70,10 @@ export function runActions(role: Role, status: RunStatus): RunAction[] {
 }
 
 // Только прогон без записанных результатов (120, раздел 8); остальное отклонит сервер.
+export const canDeleteRuns = (role: Role) => role === 'qa-lead';
+
 export function canDeleteRun(role: Role, run: Pick<Run, 'summary'>): boolean {
-  return role === 'qa-lead' && run.summary.notRun === run.summary.total;
+  return canDeleteRuns(role) && run.summary.notRun === run.summary.total;
 }
 
 export function canRecordResult(session: Session, runStatus: RunStatus, result: Pick<RunResult, 'assignee'>): boolean {

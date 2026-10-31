@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { listAllPlans } from '../api/plans';
-import { Run, listRuns } from '../api/runs';
+import { Run, deleteRun, listRuns } from '../api/runs';
 import { listAllSuites } from '../api/suites';
 import { Column, DataTable } from '../components/DataTable';
+import { ErrorMessage } from '../components/ErrorMessage';
 import { FilterBar } from '../components/FilterBar';
 import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
+import { useToast } from '../components/Toast';
 import { RUN_STATUSES, statusLabel } from '../labels';
-import { canCreateRun } from '../permissions';
+import { canCreateRun, canDeleteRun, canDeleteRuns } from '../permissions';
 import { useSession } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
@@ -15,7 +18,11 @@ import { useLoad } from '../useLoad';
 export function RunsList() {
   const { role } = useSession();
   const navigate = useNavigate();
+  const toast = useToast();
   const { values, page, setFilter, setPage, reset } = useListParams();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteError, setDeleteError] = useState<unknown>(null);
+  const [deleting, setDeleting] = useState(false);
   const runs = useLoad(() => listRuns({ ...values, page }), [values, page]);
   // В прогоне только идентификаторы источника; названия берутся из списков наборов и планов.
   const suites = useLoad(() => listAllSuites(), ['suites']);
@@ -25,6 +32,26 @@ export function RunsList() {
     if (run.suiteId) return `Набор «${suites.data?.find((suite) => suite.id === run.suiteId)?.name ?? '…'}»`;
     if (run.planId) return `План ${plans.data?.find((plan) => plan.id === run.planId)?.key ?? '…'}`;
     return '—';
+  };
+
+  // Отдельной массовой операции в API нет: прогоны удаляются по одному, неудачные остаются выбранными.
+  const remove = async () => {
+    if (!window.confirm(`Удалить выбранные прогоны (${selected.size})? Это действие нельзя отменить.`)) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const failed = new Set<string>();
+    for (const id of selected) {
+      try {
+        await deleteRun(id);
+      } catch (failure) {
+        failed.add(id);
+        setDeleteError(failure);
+      }
+    }
+    if (failed.size < selected.size) toast(`Удалено прогонов: ${selected.size - failed.size}`);
+    setSelected(failed);
+    setDeleting(false);
+    runs.reload();
   };
 
   const columns: Column<Run>[] = [
@@ -51,7 +78,15 @@ export function RunsList() {
         onChange={setFilter}
         onReset={reset}
       />
-      {canCreateRun(role) && <div className="bar"><Link className="btn primary" to="/runs/new">Создать прогон</Link></div>}
+      {canCreateRun(role) && (
+        <div className="bar">
+          <Link className="btn primary" to="/runs/new">Создать прогон</Link>
+          {canDeleteRuns(role) && (
+            <button type="button" disabled={!selected.size || deleting} onClick={remove}>Удалить выбранные ({selected.size})</button>
+          )}
+        </div>
+      )}
+      <ErrorMessage error={deleteError} />
       <div className="panel">
         <DataTable
           columns={columns}
@@ -62,7 +97,10 @@ export function RunsList() {
           error={runs.error}
           onRetry={runs.reload}
           emptyText="Прогонов пока нет. Создайте прогон из плана или набора."
+          selection={canDeleteRuns(role) ? { selected, onChange: setSelected } : undefined}
+          isSelectable={(row) => canDeleteRun(role, row)}
         />
+        {canDeleteRuns(role) && <p className="muted" style={{ margin: '8px 0 0' }}>Выбрать для удаления можно только прогоны без результатов.</p>}
         {runs.data && <Pagination page={page} totalPages={runs.data.totalPages} onChange={setPage} />}
       </div>
     </>
