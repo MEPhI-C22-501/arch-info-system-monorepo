@@ -498,12 +498,78 @@ def test_role_matrix(client, auth, lead, dev, cases, role, read, create, record_
     assert (client.post(f"{RUNS}/{run['id']}/abort", headers=headers).status_code == 200) is manage
 
 
+@pytest.mark.parametrize(
+    "start, action", [(False, None), (True, None), (True, "abort"), (True, "complete")]
+)
+def test_delete_empty_run(client, lead, dev, cases, db_session, start, action):
+    run = new_run(client, lead, cases, start=start)
+    if action:
+        assert client.post(f"{RUNS}/{run['id']}/{action}", headers=lead).status_code == 200
+
+    assert client.delete(f"{RUNS}/{run['id']}", headers=lead).status_code == 204
+
+    assert client.get(f"{RUNS}/{run['id']}", headers=lead).status_code == 404
+    assert not db_session.scalar(select(RunResultRow).where(RunResultRow.run_id == run["id"]))
+
+
+def test_deleted_run_frees_suite_on_environment(client, lead, dev, cases):
+    run = new_run(client, lead, cases)
+    client.delete(f"{RUNS}/{run['id']}", headers=lead)
+
+    body = {"suiteId": run["suiteId"], "environment": "dev", "start": True}
+    assert client.post(RUNS, json=body, headers=lead).status_code == 201
+
+
+def test_delete_run_with_results_is_rejected(client, lead, dev, cases, run):
+    result = run_results(client, lead, run)[cases[0]["key"]]
+    assert record(client, lead, run, result, status="PASSED").status_code == 200
+
+    response = client.delete(f"{RUNS}/{run['id']}", headers=lead)
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "RUN_HAS_RESULTS"
+    assert client.get(f"{RUNS}/{run['id']}", headers=lead).status_code == 200
+
+
+def test_delete_run_keeps_records_of_reset_result(client, lead, dev, cases, run):
+    result = run_results(client, lead, run)[cases[0]["key"]]
+    step = {"stepId": result["steps"][0]["stepId"], "status": "PASSED"}
+    assert record(client, lead, run, result, status="NOT_RUN", steps=[step]).status_code == 200
+    response = client.delete(f"{RUNS}/{run['id']}", headers=lead)
+    assert (response.status_code, response.json()["code"]) == (409, "RUN_HAS_RESULTS")
+
+    assert record(client, lead, run, result, status="NOT_RUN").status_code == 200
+    fail(client, lead, run, result)
+    assert record(client, lead, run, result, status="NOT_RUN").status_code == 200
+    response = client.delete(f"{RUNS}/{run['id']}", headers=lead)
+    assert (response.status_code, response.json()["code"]) == (409, "RUN_HAS_RESULTS")
+
+
+def test_delete_completed_run_with_results_is_rejected(client, lead, dev, cases, run):
+    result = run_results(client, lead, run)[cases[0]["key"]]
+    assert record(client, lead, run, result, status="PASSED").status_code == 200
+    finish_run(client, lead, run)
+
+    response = client.delete(f"{RUNS}/{run['id']}", headers=lead)
+
+    assert (response.status_code, response.json()["code"]) == (409, "RUN_HAS_RESULTS")
+
+
+@pytest.mark.parametrize(
+    "role", [Role.VIEWER, Role.TESTER, Role.AUTOMATION, Role.ADMIN, Role.CI, Role.REPORTS_READER]
+)
+def test_delete_run_is_for_lead_only(client, auth, lead, dev, cases, run, role):
+    assert client.delete(f"{RUNS}/{run['id']}", headers=auth(role)).status_code == 403
+    assert client.get(f"{RUNS}/{run['id']}", headers=lead).status_code == 200
+
+
 def test_unknown_objects(client, lead, dev, cases, run):
     missing = "00000000-0000-0000-0000-000000000000"
     other = new_run(client, lead, cases[:1])
     foreign = run_results(client, lead, other)[cases[0]["key"]]
 
     assert client.get(f"{RUNS}/{missing}", headers=lead).status_code == 404
+    assert client.delete(f"{RUNS}/{missing}", headers=lead).status_code == 404
     assert client.get(f"{RUNS}/{missing}/results", headers=lead).status_code == 404
     assert record(client, lead, run, foreign, status="PASSED").status_code == 404
     assert client.get(RUNS).status_code == 401
