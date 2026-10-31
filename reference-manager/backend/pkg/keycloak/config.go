@@ -22,6 +22,9 @@ type Config struct {
 	Leeway time.Duration `yaml:"leeway" env-default:"30s"`
 
 	JWKS JWKSConfig `yaml:"jwks"`
+
+	// Provisioner is the service client the accounts of employees are managed with (FR-RM-53..58).
+	Provisioner AdminConfig `yaml:"provisioner"`
 }
 
 type JWKSConfig struct {

@@ -1,0 +1,15 @@
+[
+  {"kind": "SEVERITY", "code": "BLOCKER", "name": "Блокирующий", "sortOrder": 1},
+  {"kind": "SEVERITY", "code": "CRITICAL", "name": "Критический", "sortOrder": 2},
+  {"kind": "SEVERITY", "code": "MAJOR", "name": "Значительный", "sortOrder": 3},
+  {"kind": "SEVERITY", "code": "MINOR", "name": "Незначительный", "sortOrder": 4},
+  {"kind": "SEVERITY", "code": "TRIVIAL", "name": "Тривиальный", "sortOrder": 5},
+  {"kind": "PRIORITY", "code": "HIGH", "name": "Высокий", "sortOrder": 1},
+  {"kind": "PRIORITY", "code": "MEDIUM", "name": "Средний", "sortOrder": 2},
+  {"kind": "PRIORITY", "code": "LOW", "name": "Низкий", "sortOrder": 3},
+  {"kind": "CASE_TYPE", "code": "FUNCTIONAL", "name": "Функциональный", "sortOrder": 1},
+  {"kind": "CASE_TYPE", "code": "REGRESSION", "name": "Регрессионный", "sortOrder": 2},
+  {"kind": "CASE_TYPE", "code": "SMOKE", "name": "Smoke", "sortOrder": 3},
+  {"kind": "CASE_TYPE", "code": "INTEGRATION", "name": "Интеграционный", "sortOrder": 4},
+  {"kind": "CASE_TYPE", "code": "NEGATIVE", "name": "Негативный", "sortOrder": 5}
+]

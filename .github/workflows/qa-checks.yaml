@@ -1,0 +1,66 @@
+name: QA System checks
+on:
+  pull_request:
+    paths: ['qa/**', '.github/workflows/qa-checks.yaml']
+  push:
+    branches: ['**']
+    paths: ['qa/**', '.github/workflows/qa-checks.yaml']
+concurrency:
+  group: qa-checks-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: qa/backend
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env: {POSTGRES_DB: qa_test, POSTGRES_USER: qa, POSTGRES_PASSWORD: qa-local}
+        ports: ['5435:5432']
+        options: --health-cmd "pg_isready -U qa -d qa_test" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://qa:qa-local@localhost:5435/qa_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: qa/backend/uv.lock
+      - run: uv sync
+      - run: uv run black --check .
+      - run: uv run flake8
+      - run: uv run pytest
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: qa/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: qa/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f qa/compose.yaml up -d --build --wait qa-api
+      - run: curl --fail --silent --show-error http://127.0.0.1:8090/readyz
+      - run: docker compose -f qa/compose.yaml up -d --build --wait qa-frontend
+      - run: curl --fail --silent --show-error http://127.0.0.1:8091/ | grep -q '<title>QA System</title>'
+      - run: curl --fail --silent --show-error http://127.0.0.1:8091/api/v1/readyz
+      - run: docker compose -f qa/compose.yaml logs
+        if: failure()
+      - run: docker compose -f qa/compose.yaml down -v
+        if: always()

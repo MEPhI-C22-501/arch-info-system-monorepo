@@ -122,6 +122,11 @@ func (r *Repository[F]) Update(ctx context.Context, m *record.Record[F]) error {
 func (r *Repository[F]) Delete(ctx context.Context, id int64) error {
 	tag, err := r.db.Querier(ctx).Exec(ctx, r.deleteQuery, id)
 	if err != nil {
+		// records of other catalogs refer to this one, they have to go first (FR-RM-11)
+		if postgresrepo.HasErrorCode(err, postgresrepo.ForeignKeyViolationCode) {
+			return fmt.Errorf("%s %d is referenced by records of other catalogs: %w", r.desc.Singular, id, domains.ErrFailedPrecondition)
+		}
+
 		return fmt.Errorf("delete %s: %w", r.desc.Singular, err)
 	}
 

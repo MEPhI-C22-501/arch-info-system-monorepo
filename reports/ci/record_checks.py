@@ -68,7 +68,7 @@ def main():
               'real_source_integrations_verified': False,
               'local_restore_verified': args.native_postgres and json.loads((ARTIFACTS/'restore-verification.json').read_text()).get('passed', False),
               'product_verified': args.bi and any(c['name']=='reports-product' and c['exit_code']==0 for c in checks),
-              'github_workflow_registered': False, 'passed': all(c['exit_code'] == 0 for c in checks)}
+              'github_workflow_registered': (ROOT/'.github/workflows/reports-checks.yaml').is_file(), 'passed': all(c['exit_code'] == 0 for c in checks)}
     path.write_text(json.dumps(output, ensure_ascii=False, indent=2)+'\n')
     (ARTIFACTS/'checks.log').write_text('\n'.join(logs))
     return 0 if output['passed'] else 1

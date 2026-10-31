@@ -73,6 +73,7 @@ Feature: Currency creation
     And the HTTP response contains a body
       """
       {
+        "id": 1,
         "code": "<code>",
         "number": "<number>",
         "name": "<name>",

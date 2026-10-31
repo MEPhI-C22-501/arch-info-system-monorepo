@@ -22,7 +22,13 @@ def migrate() -> None:
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
 
 
-COMMANDS = {"api": api, "migrate": migrate}
+def seed() -> None:
+    from app.seed import main as load_demo_data
+
+    load_demo_data()
+
+
+COMMANDS = {"api": api, "migrate": migrate, "seed": seed}
 
 
 def main(argv: list[str]) -> int:

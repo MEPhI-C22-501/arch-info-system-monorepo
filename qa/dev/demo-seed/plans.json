@@ -1,0 +1,25 @@
+[
+  {
+    "key": "TP-01",
+    "name": "Приёмка релиза ERP 1.0",
+    "scopeKind": "RELEASE",
+    "owner": "demo-seed",
+    "startDate": "2026-10-05",
+    "endDate": "2026-12-14",
+    "planningProjectId": "10000000-0000-4000-8000-000000000002",
+    "planningReleaseId": "1370b284-f899-5125-92f6-5941c176a164",
+    "casesFromSuite": "Приёмка стенда",
+    "run": {
+      "environment": "dev",
+      "passed": [
+        "TC-RM-01", "TC-RM-02", "TC-RM-03", "TC-RM-05",
+        "TC-TT-01", "TC-TT-02", "TC-TT-03", "TC-TT-05"
+      ],
+      "failed": {
+        "case": "TC-TT-04",
+        "step": 1,
+        "actualResult": "201 Created: задача включена во вторую незавершённую итерацию"
+      }
+    }
+  }
+]

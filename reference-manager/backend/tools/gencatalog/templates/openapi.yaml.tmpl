@@ -193,12 +193,14 @@ paths:
       x-required-roles: {{$.WriteRoles}}
       parameters:
         - $ref: '#/components/parameters/{{$.ParamType}}'
+{{- if .BodySchema}}
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/{{.BodySchema}}'
+{{- end}}
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpanded{{$.Title}}'
@@ -454,10 +456,10 @@ components:
           description: The date and time when the change was applied.
           readOnly: true
           example: "2026-10-05T07:54:00Z"
-{{range .Custom}}
+{{range .Custom}}{{if .BodySchema}}
     {{.BodySchema}}:
 {{.BodyYAML}}
-{{- end}}
+{{- end}}{{end}}
   parameters:
     {{.ParamType}}:
       name: {{.PathParam}}

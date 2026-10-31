@@ -52,7 +52,82 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  qa-db:
+    profiles: ["modules"]
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: qa
+      POSTGRES_USER: qa
+      POSTGRES_PASSWORD: qa-local
+    volumes: [qa-db:/var/lib/postgresql]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qa -d qa"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  qa-migrations:
+    profiles: ["modules"]
+    image: qa-system:local
+    pull_policy: never
+    command: ["python", "-m", "app", "migrate"]
+    environment: &qa-runtime
+      DATABASE_URL: postgresql+psycopg://qa:qa-local@qa-db:5432/qa
+      APP_ENV: development
+      AUTH_MODE: demo
+      TRACKER_SYNC_ENABLED: "false"
+      UI_BASE_URL: http://127.0.0.1:8091
+    depends_on:
+      qa-db:
+        condition: service_healthy
+    networks: [data]
+    restart: "no"
+  qa-seed:
+    profiles: ["modules"]
+    image: qa-system:local
+    pull_policy: never
+    command: ["python", "-m", "app", "seed"]
+    environment: *qa-runtime
+    depends_on:
+      qa-migrations:
+        condition: service_completed_successfully
+    networks: [data]
+    restart: "no"
+  qa-api:
+    profiles: ["modules"]
+    image: qa-system:local
+    pull_policy: build
+    build:
+      context: ./qa
+      dockerfile: backend/Dockerfile
+    environment: *qa-runtime
+    ports: ["127.0.0.1:8090:8000"]
+    depends_on:
+      qa-migrations:
+        condition: service_completed_successfully
+      qa-seed:
+        condition: service_completed_successfully
+    networks: [edge, data]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  qa-frontend:
+    profiles: ["modules"]
+    build: ./qa/frontend
+    ports: ["127.0.0.1:8091:80"]
+    depends_on:
+      qa-api:
+        condition: service_healthy
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   task-tracker-db:
   reference-manager-db:
+  qa-db:

@@ -278,8 +278,11 @@ func TestVerifierPicksUpRotatedKey(t *testing.T) {
 
 	server.setKeys(newKey)
 
-	_, err = verifier.Authenticate(context.Background(), newKey.sign(t, accessTokenClaims()))
-	require.NoError(t, err)
+	// the unknown key triggers a refresh, which the limiter may delay beyond the wait of one request
+	require.Eventually(t, func() bool {
+		_, err := verifier.Authenticate(context.Background(), newKey.sign(t, accessTokenClaims()))
+		return err == nil
+	}, 5*time.Second, 10*time.Millisecond, "the rotated key is not picked up")
 }
 
 func TestVerifierUsesCachedKeysWhileKeycloakIsDown(t *testing.T) {
@@ -309,8 +312,11 @@ func TestVerifierStartsWhileKeycloakIsDown(t *testing.T) {
 
 	server.setDown(false)
 
-	_, err = verifier.Authenticate(context.Background(), key.sign(t, accessTokenClaims()))
-	require.NoError(t, err)
+	// the first request has used the refresh allowed by the limiter, the next refresh may come after a wait
+	require.Eventually(t, func() bool {
+		_, err := verifier.Authenticate(context.Background(), key.sign(t, accessTokenClaims()))
+		return err == nil
+	}, 5*time.Second, 10*time.Millisecond, "the keys are not fetched once Keycloak is back")
 }
 
 func TestVerifierWithoutClientRoles(t *testing.T) {

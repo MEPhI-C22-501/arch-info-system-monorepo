@@ -2,8 +2,8 @@ databases:
   postgres:
     host: reference-manager-database
     port: 5432
-    user: reference_manager
-    password: reference_manager
+    # the account with data rights only, the password comes from POSTGRES_PASSWORD of the environment (K-08, K-12)
+    user: reference_manager_app
     database: reference_manager
 
     connect_retry:

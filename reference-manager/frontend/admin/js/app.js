@@ -1,37 +1,33 @@
-// screens S-01..S-05 of document 110 on top of the mock API, the route lives in the location hash
+// screens S-01..S-05 of document 110 on top of the service API, the route lives in the path under /admin/
 (function () {
   'use strict';
 
   const { el, replace, clear, $ } = RM.dom;
-  const { CATALOGS, GROUPS, USERS, can, storedFields, queryFields, refTarget } = RM.catalogs;
-  const { ApiError } = RM.mockApi;
-  const api = RM.mockApi.createApi();
+  const { CATALOGS, GROUPS, COMMON, can, hasAnyRole, inputFields, readOnlyFields, fieldByName, queryFields, fieldLabel, listColumns, recordLabel, toBody, updateMask, normalize } = RM.catalogs;
+  const { ApiError } = RM.api;
+  const { stateAt, fieldOf } = RM.jsonpatch;
 
+  const config = window.RM_CONFIG || { apiBase: '/v1', keycloak: {} };
+  const auth = RM.auth.createAuth(config.keycloak, sessionStorage, window);
+  const api = RM.api.createApi({ base: config.apiBase, token: () => auth.token(), onUnauthenticated: () => relogin() });
+
+  const PREFIX = '/admin';
   const PAGE_SIZES = [10, 20, 50, 100];
   const DATED_TABS = [['assignments', 'Назначения'], ['salaries', 'Оклады'], ['absences', 'Отсутствия']];
+  const ZERO_TIME = '0001-01-01T00:00:00Z';
   const STATUS_HINTS = {
-    INVALID_ARGUMENT: 'Запрос отклонён: проверьте отмеченные поля.',
-    FAILED_PRECONDITION: 'Действие невозможно в текущем состоянии записи.',
-    NOT_FOUND: 'Запись не найдена.',
-    ALREADY_EXISTS: 'Запись с таким идентификатором уже есть.',
-    PERMISSION_DENIED: 'Нет доступа: у роли нет нужного уровня на эту группу справочников.',
-    UNAUTHENTICATED: 'Требуется вход: запрос пришёл без токена.',
-    UNAVAILABLE: 'Keycloak не подтвердил операцию: профиль сохранён, состояние учётной записи PENDING. Повторите операцию позже.',
-  };
-  const REASON_HINTS = {
-    EXPORT_TOO_LARGE: 'Сузьте отбор фильтром и повторите выгрузку.',
-    ACCOUNT_CONFLICT: 'Логин занят чужой учётной записью в Keycloak. Нужен администратор Keycloak.',
-    EMPLOYEE_ACTIVE: 'Сначала уволите сотрудника.',
-    RECORD_DELETED: 'Сначала восстановите запись.',
-    RECORD_EXISTS: 'Выберите другой идентификатор или восстановите удалённую запись.',
-    ALREADY_DISMISSED: 'Сотрудник уже уволен.',
-    ACCOUNT_PENDING: 'Повторите операцию с учётной записью, когда Keycloak будет доступен.',
+    400: 'Запрос отклонён: проверьте поля или состояние записи.',
+    401: 'Сессия истекла, выполняется повторный вход.',
+    403: 'Нет доступа: у роли нет нужного уровня на эту группу справочников.',
+    404: 'Запись не найдена.',
+    409: 'Запись изменена параллельно или такая запись уже есть: перечитайте и повторите.',
+    503: 'Keycloak не подтвердил операцию: запись сохранена, учётная запись в состоянии PENDING. Повторите операцию позже.',
   };
 
-  const session = { user: USERS[0], flash: null, pager: {} };
+  const session = { user: null, flash: null, pager: {}, labels: {} };
   let renderSequence = 0;
 
-  // ---- storage of per-browser conveniences: the chosen role and unsent drafts ----
+  // ---- storage of per-browser conveniences: unsent drafts ----
 
   function storageGet(key) {
     try { return sessionStorage.getItem(key); } catch (e) { return null; }
@@ -50,22 +46,15 @@
     try { return text ? JSON.parse(text) : null; } catch (e) { return null; }
   }
 
-  function setUser(key) {
-    session.user = USERS.find((u) => u.key === key) || USERS[0];
-    storageSet('rm.user', session.user.key);
-    $('#who').textContent = session.user.username || 'нет токена';
-  }
-
-  // ---- routes: #/{collection}?filter=..., #/{collection}/{id}, #/{collection}/new ----
+  // ---- routes: /admin/, /admin/{collection}?filter=..., /admin/{collection}/{id}, /admin/{collection}/new ----
 
   function route() {
-    const hash = location.hash.replace(/^#/, '') || '/';
-    const [path, query] = hash.split('?');
+    const path = location.pathname.startsWith(PREFIX) ? location.pathname.slice(PREFIX.length) : location.pathname;
     const parts = path.split('/').filter(Boolean);
     return {
       collection: parts[0] || null,
       id: parts[1] ? decodeURIComponent(parts[1]) : null,
-      query: new URLSearchParams(query || ''),
+      query: new URLSearchParams(location.search),
     };
   }
 
@@ -75,21 +64,21 @@
       if (value !== undefined && value !== null && value !== '' && value !== false) query.set(key, String(value));
     }
     const text = query.toString();
-    return `#${path}${text ? `?${text}` : ''}`;
+    return `${PREFIX}${path === '/' ? '/' : path}${text ? `?${text}` : ''}`;
   }
 
   function go(target) {
-    if (location.hash === target) render();
-    else location.hash = target;
+    if (`${location.pathname}${location.search}` !== target) history.pushState(null, '', target);
+    render();
   }
 
-  function idOf(name) {
-    return name.split('/').pop();
+  function recordHref(collection, id, params) {
+    return href(`/${collection}/${encodeURIComponent(String(id))}`, params);
   }
 
-  function recordHref(name) {
-    const target = refTarget(name);
-    return target ? href(`/${target.collection}/${encodeURIComponent(target.id)}`) : '#/';
+  function relogin() {
+    auth.forget();
+    auth.login(`${location.pathname}${location.search}`);
   }
 
   // ---- small presentational helpers ----
@@ -98,20 +87,19 @@
     return el('span', { class: `badge badge-${String(value)}` }, String(value));
   }
 
+  function stateBadge(rec) {
+    return badge(rec.is_deleted ? 'DELETED' : 'ACTIVE');
+  }
+
   function fmtValue(value) {
     if (value === null || value === undefined || value === '') return el('span', { class: 'muted' }, 'пусто');
+    if (typeof value === 'boolean') return value ? 'да' : 'нет';
     return String(value);
   }
 
   function fmtTime(iso) {
-    if (!iso) return el('span', { class: 'muted' }, '-');
+    if (!iso || iso === ZERO_TIME) return el('span', { class: 'muted' }, '-');
     return el('time', { datetime: iso, title: `${iso} (UTC)` }, new Date(iso).toLocaleString('ru-RU'));
-  }
-
-  function refLink(value) {
-    const target = refTarget(value);
-    if (!target || !CATALOGS[target.collection]) return fmtValue(value);
-    return el('a', { href: recordHref(value), class: 'mono' }, value);
   }
 
   function banner(kind, ...content) {
@@ -120,19 +108,20 @@
 
   function explain(error) {
     if (!(error instanceof ApiError)) return `Ошибка интерфейса: ${error && error.message ? error.message : error}`;
-    const hint = REASON_HINTS[error.reason] || STATUS_HINTS[error.status] || '';
-    return `${error.status} (${error.code}): ${error.message}. ${hint}`.trim();
+    const hint = STATUS_HINTS[error.status] || '';
+    return `${error.status}: ${error.message}. ${hint}`.trim();
   }
 
-  function errorBanner(error) {
+  function errorBanner(error, extra) {
     if (!(error instanceof ApiError)) {
       console.error(error);
       return banner('error', explain(error));
     }
-    const hint = REASON_HINTS[error.reason] || STATUS_HINTS[error.status] || '';
+    const details = error.details.filter((d) => !d.field).map((d) => d.message);
     return banner('error',
-      el('b', {}, `${error.status} ${error.code}`), ' ', error.message,
-      el('div', { class: 'hint' }, hint, ' ', el('span', { class: 'mono' }, `request_id: ${error.requestId}`)));
+      el('b', {}, `${error.status}`), ' ', error.message, details.length ? ` ${details.join('. ')}` : '',
+      el('div', { class: 'hint' }, STATUS_HINTS[error.status] || '', ' ', error.traceId ? el('span', { class: 'mono' }, `trace: ${error.traceId}`) : null),
+      extra || null);
   }
 
   function flash(kind, text) {
@@ -174,6 +163,36 @@
       el('tbody', {}, rows));
   }
 
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  // ---- names of referenced records: one list per catalog, cached for the page ----
+
+  async function labelsOf(collection) {
+    if (!session.labels[collection]) {
+      session.labels[collection] = api.listAll(collection, { allowDeleted: true })
+        .then((items) => {
+          const map = new Map();
+          for (const item of items) map.set(String(item.id), recordLabel(collection, item));
+          return map;
+        })
+        .catch(() => new Map());
+    }
+    return session.labels[collection];
+  }
+
+  function forgetLabels(collection) {
+    delete session.labels[collection];
+  }
+
+  async function refCell(field, value) {
+    if (value === null || value === undefined) return fmtValue(value);
+    const labels = await labelsOf(field.ref);
+    const label = labels.get(String(value));
+    return el('a', { href: recordHref(field.ref, value) }, label ? `${label} ` : '', el('span', { class: 'mono muted small' }, `#${value}`));
+  }
+
   // ---- rendering ----
 
   async function render() {
@@ -184,7 +203,7 @@
     const current = route();
     let node;
     try {
-      if (session.user.anonymous) node = screenNoAccess('UNAUTHENTICATED');
+      if (!hasAnyRole(session.user)) node = screenNoAccess();
       else if (!current.collection) node = await screenCatalogs();
       else if (!CATALOGS[current.collection]) node = screenUnknown(current.collection);
       else if (!current.id) node = await screenTable(current);
@@ -192,7 +211,7 @@
       else if (CATALOGS[current.collection].card) node = await screenCard(current);
       else node = await screenForm(current.collection, current.id, current.query);
     } catch (error) {
-      if (error instanceof ApiError && (error.status === 'PERMISSION_DENIED' || error.status === 'UNAUTHENTICATED')) node = screenNoAccess(error.status, error);
+      if (error instanceof ApiError && error.status === 401) node = el('div', { class: 'card' }, el('p', {}, 'Сессия истекла, выполняется повторный вход…'));
       else node = el('div', {}, errorBanner(error), el('p', {}, el('a', { href: href('/') }, 'К списку справочников')));
     }
     if (sequence !== renderSequence) return;
@@ -203,29 +222,21 @@
   function screenUnknown(collection) {
     crumbs([['Справочники', href('/')], [collection, null]]);
     return el('div', { class: 'card' }, el('h2', {}, 'Нет такого справочника'),
-      el('p', {}, 'Коллекции ', el('code', {}, `/v1/${collection}`), ' нет в спецификации. ', el('a', { href: href('/') }, 'К списку справочников')));
+      el('p', {}, 'Коллекции ', el('code', {}, `/v1/${collection}/`), ' нет в спецификации. ', el('a', { href: href('/') }, 'К списку справочников')));
   }
 
-  // S-04: the screen for a token without roles and for a request without a token
-  function screenNoAccess(status, error) {
+  // S-04: a signed-in user without a role of the service
+  function screenNoAccess() {
     crumbs([['Нет доступа', null]]);
-    if (status === 'UNAUTHENTICATED') {
-      return el('div', { class: 'card' },
-        el('h2', {}, 'Требуется вход'),
-        el('p', {}, 'Запрос без токена отклонён (UNAUTHENTICATED). В интерфейсе, подключённом к API, здесь происходит перенаправление в Keycloak (Authorization Code с PKCE) и возврат на прежний экран. На шаге 1 выберите роль в шапке.'),
-        error ? errorBanner(error) : null);
-    }
     return el('div', { class: 'card' },
       el('h2', {}, 'Нет доступа'),
-      el('p', {}, 'У учётной записи нет роли с нужным уровнем доступа (PERMISSION_DENIED). Роли сервиса: reference-reader, reference-hr-reader, reference-admin, reference-hr-admin. Обратитесь к команде справочников.'),
-      error ? errorBanner(error) : null,
-      el('p', {}, el('a', { href: href('/') }, 'К списку справочников')));
+      el('p', {}, 'Учётная запись ', el('b', {}, session.user ? session.user.username : ''), ' вошла, но у неё нет роли сервиса справочников. Роли: reference-reader, reference-hr-reader, reference-admin, reference-hr-admin. Обратитесь к команде справочников.'),
+      el('p', {}, el('button', { type: 'button', on: { click: () => auth.logout() } }, 'Выйти и войти другой учётной записью')));
   }
 
   // S-01: catalogs by group with the number of active records
   async function screenCatalogs() {
     crumbs([['Справочники', null]]);
-    if (!session.user.roles.length) return screenNoAccess('PERMISSION_DENIED');
     const search = el('input', { type: 'search', id: 'catalogSearch', placeholder: 'Название справочника' });
     const sections = [];
     for (const [groupId, group] of Object.entries(GROUPS)) {
@@ -234,22 +245,22 @@
       const rows = collections.map((collection) => {
         const cat = CATALOGS[collection];
         const count = el('td', { class: 'num' }, '…');
-        api.list(session.user, collection, { pageSize: 1 })
-          .then((page) => { count.textContent = String(page.total_size); })
+        api.list(collection, { pageSize: 100 })
+          .then((page) => { count.textContent = `${page.items.length}${page.nextPageToken ? '+' : ''}`; })
           .catch(() => { count.textContent = '-'; });
         return el('tr', { dataset: { title: cat.title.toLowerCase() } },
-          el('td', {}, el('a', { href: href(`/${collection}`), class: 'mono' }, `/v1/${collection}`)),
-          el('td', {}, cat.title),
+          el('td', {}, el('a', { href: href(`/${collection}`) }, cat.title)),
+          el('td', {}, el('span', { class: 'mono muted' }, `/v1/${collection}/`)),
           count);
       });
       sections.push(el('section', { class: 'card' },
         el('h2', {}, group.title, ' ', el('span', { class: 'muted small' }, groupId)),
-        table([{ label: 'Коллекция' }, { label: 'Название' }, { label: 'Активных записей', class: 'num' }], rows)));
+        table([{ label: 'Справочник' }, { label: 'Коллекция' }, { label: 'Активных записей', class: 'num' }], rows)));
     }
     const root = el('div', {},
       el('div', { class: 'toolbar' }, el('label', { for: 'catalogSearch' }, 'Поиск'), search),
       sections,
-      el('p', { class: 'hint' }, 'Справочники salaries и absences видны только ролям reference-hr-reader и reference-hr-admin. В интерфейсе, подключённом к API, перечень коллекций берётся из спецификации OpenAPI.'));
+      el('p', { class: 'hint' }, 'Справочники salaries и absences видны только ролям reference-hr-reader и reference-hr-admin. Число записей считается по первой странице, "100+" означает, что страниц больше.'));
     search.addEventListener('input', () => {
       const needle = search.value.trim().toLowerCase();
       for (const row of root.querySelectorAll('tbody tr')) row.hidden = needle !== '' && !row.dataset.title.includes(needle);
@@ -259,40 +270,31 @@
 
   // ---- S-02: the table of one catalog ----
 
-  function listColumns(collection) {
-    const cat = CATALOGS[collection];
-    if (collection === 'employees') return ['name', 'display_name', 'username', 'hire_date', 'org_unit', 'position', 'employment_state', 'account_state', 'state'];
-    return ['name', ...(cat.displayName ? ['display_name'] : []), 'state', ...cat.fields.map((f) => f.name)];
-  }
-
   function filterPlaceholder(collection) {
     const examples = {
-      employees: 'employment_state = EMPLOYED AND org_unit = "org_units/dev-backend"',
-      org_units: 'kind = TEAM AND parent = "org_units/dev"',
-      assignments: 'employee = "employees/1001" AND NOT end_date:*',
+      employees: 'employment_state = "EMPLOYED" AND org_unit_id = 2',
+      org_units: 'kind = "TEAM" AND parent_id = 1',
+      assignments: 'employee_id = 1 AND NOT end_date:*',
       salaries: 'amount >= 150000',
-      absences: 'kind = VACATION AND start_date >= "2026-07-01"',
-      countries: 'state = ACTIVE AND display_name:"Р"',
+      absences: 'kind = "VACATION" AND start_date >= "2026-07-01"',
+      countries: 'name:"Р" AND currency_id = 1',
     };
-    return examples[collection] || 'state = ACTIVE AND display_name:"евро"';
+    return examples[collection] || 'name:"евро"';
   }
 
   function orderOptions(collection, selected) {
     const options = [];
-    for (const field of queryFields(collection)) {
-      if (field === 'etag') continue;
-      options.push(field, `${field} desc`);
-    }
-    return options.map((o) => el('option', { value: o, selected: o === selected || (o === 'name' && !selected) }, o));
+    for (const field of queryFields(collection)) options.push(field, `${field} desc`);
+    return [el('option', { value: '', selected: !selected }, 'порядок создания'), ...options.map((o) => el('option', { value: o, selected: o === selected }, o))];
   }
 
   function tableParams(query) {
     return {
       filter: query.get('filter') || '',
       orderBy: query.get('order_by') || '',
-      showDeleted: query.get('show_deleted') === 'true',
-      pageSize: Number(query.get('page_size')) || api.config.defaultPageSize,
-      pageToken: query.get('page_token') || '',
+      allowDeleted: query.get('allowDeleted') === 'true',
+      pageSize: Number(query.get('pageSize')) || 20,
+      pageToken: query.get('pageToken') || '',
     };
   }
 
@@ -300,18 +302,25 @@
     return href(`/${collection}`, {
       filter: params.filter,
       order_by: params.orderBy,
-      show_deleted: params.showDeleted,
-      page_size: params.pageSize,
-      page_token: pageToken || '',
+      allowDeleted: params.allowDeleted,
+      pageSize: params.pageSize === 20 ? '' : params.pageSize,
+      pageToken: pageToken || '',
     });
   }
 
   function cellFor(collection, rec, column) {
     const value = rec[column];
-    if (column === 'name') return el('td', {}, el('a', { href: recordHref(rec.name), class: 'mono' }, rec.name));
-    if (column === 'state' || column === 'employment_state' || column === 'account_state') return el('td', {}, value ? badge(value) : fmtValue(value));
+    const field = fieldByName(collection, column);
+    if (column === 'id') return el('td', {}, el('a', { href: recordHref(collection, rec.id), class: 'mono' }, `#${rec.id}`));
+    if (column === 'is_deleted') return el('td', {}, stateBadge(rec));
+    if (field && field.type === 'enum') return el('td', {}, value ? badge(value) : fmtValue(value));
+    if (field && field.type === 'ref') {
+      const cell = el('td', {}, fmtValue(value));
+      refCell(field, value).then((node) => replace(cell, node));
+      return cell;
+    }
     if (typeof value === 'number') return el('td', { class: 'num' }, String(value));
-    if (typeof value === 'string' && refTarget(value) && CATALOGS[refTarget(value).collection]) return el('td', {}, refLink(value));
+    if (column === 'created_at' || column === 'updated_at' || column === 'deleted_at') return el('td', {}, fmtTime(value));
     return el('td', {}, fmtValue(value));
   }
 
@@ -324,7 +333,7 @@
 
     const filterInput = el('input', { type: 'text', id: 'filter', class: 'mono wide', value: params.filter, placeholder: filterPlaceholder(collection), 'aria-describedby': 'filterHint' });
     const orderSelect = el('select', { id: 'orderBy', 'aria-label': 'Сортировка' }, orderOptions(collection, params.orderBy));
-    const showDeleted = el('input', { type: 'checkbox', id: 'showDeleted', checked: params.showDeleted });
+    const allowDeleted = el('input', { type: 'checkbox', id: 'allowDeleted', checked: params.allowDeleted });
     const pageSize = el('select', { id: 'pageSize', 'aria-label': 'Размер страницы' }, PAGE_SIZES.map((n) => el('option', { value: n, selected: n === params.pageSize }, `${n} на странице`)));
     const form = el('form', {
       class: 'toolbar',
@@ -332,50 +341,50 @@
         submit: (event) => {
           event.preventDefault();
           session.pager[collection] = [];
-          go(tableHref(collection, { filter: filterInput.value.trim(), orderBy: orderSelect.value, showDeleted: showDeleted.checked, pageSize: Number(pageSize.value) }, ''));
+          go(tableHref(collection, { filter: filterInput.value.trim(), orderBy: orderSelect.value, allowDeleted: allowDeleted.checked, pageSize: Number(pageSize.value) }, ''));
         },
       },
     },
     el('label', { for: 'filter' }, 'filter'), filterInput,
     el('label', { for: 'orderBy' }, 'order_by'), orderSelect,
-    el('label', {}, showDeleted, ' show_deleted'),
+    el('label', {}, allowDeleted, ' allowDeleted'),
     pageSize,
     el('button', { type: 'submit', class: 'primary' }, 'Применить'));
 
     const resultBox = el('div', { id: 'tableBanner' });
     const actions = el('div', { class: 'toolbar' });
-    if (can(user, collection, 'X')) actions.appendChild(el('button', { type: 'button', on: { click: () => exportCurrent(collection, params, resultBox) } }, 'Выгрузить в Excel'));
-    if (can(user, collection, 'C')) actions.appendChild(el('a', { class: 'button primary', href: href(`/${collection}/new`) }, 'Создать запись'));
+    if (can(user, collection, 'X')) actions.appendChild(el('button', { type: 'button', id: 'export', on: { click: () => exportCatalog(collection, resultBox) } }, 'Выгрузить в Excel'));
+    if (can(user, collection, 'C')) actions.appendChild(el('a', { class: 'button primary', id: 'create', href: href(`/${collection}/new`) }, 'Создать запись'));
     const hint = el('p', { class: 'hint', id: 'filterHint' },
-      'Поля фильтра: ', queryFields(collection).join(', '), '. Операторы: =, !=, : (вхождение), <, <=, >, >=, AND, OR, NOT, скобки, поле:* (есть значение). Сортировка: поле или "поле desc".');
+      'Поля фильтра: ', queryFields(collection).join(', '), '. Синтаксис AIP-160: =, !=, :, <, <=, >, >=, AND, OR, NOT, скобки, поле:* (есть значение), строки в кавычках. Сортировка: поле или "поле desc". Выгрузка содержит все неудалённые записи справочника без истории.');
 
     const root = el('div', {},
-      el('h2', {}, cat.title, ' ', el('span', { class: 'muted mono small' }, `/v1/${collection}`)),
+      el('h2', {}, cat.title, ' ', el('span', { class: 'muted mono small' }, `/v1/${collection}/`)),
       resultBox, form, hint, actions);
 
     let page;
     try {
-      page = await api.list(user, collection, params);
+      page = await api.list(collection, params);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 'INVALID_ARGUMENT') {
-        const violations = error.fieldViolations;
-        if (violations.some((v) => v.field === 'filter')) filterInput.classList.add('invalid');
-        root.appendChild(banner('error', el('b', {}, 'INVALID_ARGUMENT'), ' ', violations.map((v) => `${v.field}: ${v.description}`).join('. ')));
+      if (error instanceof ApiError && error.status === 400) {
+        const errors = error.fieldErrors;
+        if (errors.filter || /filter/i.test(error.message)) filterInput.classList.add('invalid');
+        root.appendChild(errorBanner(error));
         return root;
       }
       throw error;
     }
 
     const columns = listColumns(collection);
-    const rows = page[collection];
+    const rows = page.items;
     const body = rows.length
-      ? rows.map((rec) => el('tr', { class: rec.state === 'DELETED' ? 'deleted' : null }, columns.map((column) => cellFor(collection, rec, rec[column] === undefined ? null : column))))
+      ? rows.map((rec) => el('tr', { class: rec.is_deleted ? 'deleted' : null }, columns.map((column) => cellFor(collection, rec, column))))
       : [el('tr', {}, el('td', { colspan: columns.length, class: 'muted' }, 'Записей нет', can(user, collection, 'C') ? ', создайте первую' : '', '.'))];
-    root.appendChild(el('div', { class: 'table-wrap' }, table(columns.map((c) => ({ label: c, class: c === 'name' ? null : null })), body)));
+    root.appendChild(el('div', { class: 'table-wrap' }, table(columns.map((c) => ({ label: fieldLabel(collection, c) })), body)));
 
     const stack = session.pager[collection] || [];
     const pager = el('div', { class: 'pager' },
-      el('span', { class: 'muted' }, `на странице: ${rows.length}, total_size: ${page.total_size}, page_size: ${params.pageSize}`),
+      el('span', { class: 'muted' }, `на странице: ${rows.length}, pageSize: ${params.pageSize}`),
       el('button', {
         type: 'button',
         disabled: !stack.length,
@@ -383,39 +392,34 @@
       }, 'Назад'),
       el('button', {
         type: 'button',
-        disabled: !page.next_page_token,
-        on: { click: () => { stack.push(params.pageToken); session.pager[collection] = stack; go(tableHref(collection, params, page.next_page_token)); } },
+        disabled: !page.nextPageToken,
+        on: { click: () => { stack.push(params.pageToken); session.pager[collection] = stack; go(tableHref(collection, params, page.nextPageToken)); } },
       }, 'Вперёд'));
     root.appendChild(pager);
     return root;
   }
 
-  function download(file) {
-    const blob = new Blob([file.bytes], { type: file.contentType });
+  function download(blob, filename) {
     const url = URL.createObjectURL(blob);
-    const link = el('a', { href: url, download: file.filename });
+    const link = el('a', { href: url, download: filename });
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function exportCurrent(collection, params, box) {
+  async function exportCatalog(collection, box) {
     replace(box, banner('ok', 'Выгрузка выполняется…'));
     try {
-      const file = await api.exportList(session.user, collection, params);
-      download(file);
-      replace(box, banner('ok', `Выгружено записей: ${file.rows}, файл ${file.filename}. Запрос: GET /v1/${collection} с текущим отбором и Accept: ${file.contentType}.`));
+      const file = await api.exportFile(collection);
+      download(file.blob, file.filename);
+      replace(box, banner('ok', `Файл ${file.filename} получен (${file.blob.size} байт). Запрос: POST /v1/${collection}/export.`));
     } catch (error) {
       replace(box, errorBanner(error));
     }
   }
 
   // ---- S-03: the record form with the details and the history panel ----
-
-  function normalize(value) {
-    return value === null || value === undefined ? '' : String(value);
-  }
 
   function fieldInput(collection, field, value, locked) {
     const inputId = `f-${field.name}`;
@@ -425,23 +429,33 @@
         return el('select', { ...common, disabled: locked },
           el('option', { value: '' }, '-'),
           field.values.map((v) => el('option', { value: v, selected: v === value }, v)));
-      case 'number':
-        return el('input', { ...common, type: 'number', step: field.integer ? '1' : 'any', value: normalize(value), readOnly: locked });
+      case 'integer':
+        return el('input', { ...common, type: 'number', step: '1', min: field.min, max: field.max, value: normalize(value), readOnly: locked });
+      case 'money':
+        return el('input', { ...common, type: 'number', step: '0.01', min: field.min, value: normalize(value), readOnly: locked });
       case 'date':
         return el('input', { ...common, type: 'date', value: normalize(value), readOnly: locked });
       case 'email':
         return el('input', { ...common, type: 'email', value: normalize(value), readOnly: locked, autocomplete: 'off' });
       case 'ref': {
         const listId = `dl-${collection}-${field.name}`;
-        const input = el('input', { ...common, type: 'text', class: 'mono', value: normalize(value), readOnly: locked, list: listId, placeholder: `${field.ref}/{id}`, autocomplete: 'off' });
+        const input = el('input', { ...common, type: 'text', class: 'mono', value: normalize(value), readOnly: locked, list: listId, placeholder: 'идентификатор', autocomplete: 'off', inputmode: 'numeric' });
         const datalist = el('datalist', { id: listId });
-        api.list(session.user, field.ref, { pageSize: 200, orderBy: 'name' })
-          .then((page) => replace(datalist, page[field.ref].map((r) => el('option', { value: r.name }, r.display_name || ''))))
-          .catch(() => {});
-        return el('span', { class: 'ref' }, input, datalist);
+        const chosen = el('span', { class: 'hint ref-label' });
+        const showLabel = async () => {
+          const labels = await labelsOf(field.ref);
+          const label = labels.get(String(input.value.trim()));
+          chosen.textContent = input.value.trim() ? (label ? `${CATALOGS[field.ref].title}: ${label}` : 'записи с таким идентификатором нет') : '';
+        };
+        labelsOf(field.ref).then((labels) => {
+          replace(datalist, [...labels.entries()].map(([id, label]) => el('option', { value: id }, label)));
+          showLabel();
+        });
+        input.addEventListener('input', showLabel);
+        return el('span', { class: 'ref' }, input, datalist, chosen);
       }
       default:
-        return el('input', { ...common, type: 'text', value: normalize(value), readOnly: locked, autocomplete: 'off' });
+        return el('input', { ...common, type: 'text', value: normalize(value), readOnly: locked, autocomplete: 'off', maxlength: field.maxLen || null });
     }
   }
 
@@ -458,8 +472,8 @@
     const cat = CATALOGS[collection];
     const user = session.user;
     const isNew = !rec;
-    const editable = isNew ? can(user, collection, 'C') : can(user, collection, 'U') && rec.state === 'ACTIVE';
-    const draftKey = `rm.draft:${collection}:${isNew ? 'new' : rec.name}`;
+    const editable = isNew ? can(user, collection, 'C') : can(user, collection, 'U') && !rec.is_deleted;
+    const draftKey = `rm.draft:${collection}:${isNew ? 'new' : rec.id}`;
     const draft = editable ? safeJson(storageGet(draftKey)) : null;
     const inputs = {};
     const boxes = {};
@@ -472,19 +486,7 @@
 
     const formBanner = el('div', {});
     const fields = [];
-    if (isNew && !cat.dated) {
-      const input = el('input', { id: 'f-id', name: cat.idParam, type: 'text', class: 'mono', value: initial(cat.idParam), autocomplete: 'off' });
-      inputs[cat.idParam] = input;
-      boxes[cat.idParam] = fieldBox('Идентификатор', cat.idParam, `${cat.idParam}, обязательно: ${cat.idHint}`, input);
-      fields.push(boxes[cat.idParam]);
-    }
-    if (cat.displayName) {
-      const input = el('input', { id: 'f-display_name', name: 'display_name', type: 'text', value: normalize(initial('display_name')), readOnly: !editable, autocomplete: 'off' });
-      inputs.display_name = input;
-      boxes.display_name = fieldBox('Наименование', 'display_name', 'display_name, обязательно', input);
-      fields.push(boxes.display_name);
-    }
-    for (const field of cat.fields) {
+    for (const field of inputFields(collection)) {
       const locked = !editable || (field.immutable && !isNew) || (isNew && field.immutable && query && query.has(field.name));
       const control = fieldInput(collection, field, initial(field.name), locked);
       const input = control.matches('input, select') ? control : control.querySelector('input, select');
@@ -493,20 +495,9 @@
       if (field.required) notes.push('обязательно');
       if (field.immutable && !isNew) notes.push('не меняется');
       if (field.hint) notes.push(field.hint);
-      if (field.type === 'ref') notes.push(`имя записи ${field.ref}/*`);
+      if (field.type === 'ref') notes.push(`идентификатор записи ${field.ref}`);
       boxes[field.name] = fieldBox(field.label, field.name, notes.join(', '), control);
       fields.push(boxes[field.name]);
-    }
-
-    // the employee's display name follows the name parts until it is edited by hand
-    if (collection === 'employees' && editable) {
-      let generated = inputs.display_name.value;
-      const refresh = () => {
-        const parts = ['family_name', 'given_name', 'middle_name'].map((n) => inputs[n].value.trim()).filter(Boolean);
-        const next = parts.join(' ');
-        if (inputs.display_name.value === generated || inputs.display_name.value === '') { inputs.display_name.value = next; generated = next; }
-      };
-      for (const name of ['family_name', 'given_name', 'middle_name']) inputs[name].addEventListener('input', refresh);
     }
 
     const clearErrors = () => {
@@ -515,57 +506,61 @@
     };
 
     const showFieldErrors = (error) => {
-      const violations = error.fieldViolations;
+      const errors = error.fieldErrors;
       let marked = 0;
-      for (const violation of violations) {
-        const box = boxes[violation.field];
+      for (const [field, message] of Object.entries(errors)) {
+        const box = boxes[field];
         if (!box) continue;
         box.classList.add('invalid');
-        box.querySelector('.error').textContent = violation.description;
+        box.querySelector('.error').textContent = message;
         marked += 1;
       }
-      const rest = violations.filter((v) => !boxes[v.field]).map((v) => `${v.field}: ${v.description}`);
-      replace(formBanner, banner('error', el('b', {}, `INVALID_ARGUMENT ${error.code}`), ` неверных полей: ${violations.length}${marked ? ', см. подписи у полей' : ''}.`, rest.length ? ` ${rest.join('. ')}` : ''));
+      const rest = Object.entries(errors).filter(([field]) => !boxes[field]).map(([field, message]) => `${field}: ${message}`);
+      replace(formBanner, banner('error', el('b', {}, `400 ${error.message}`), marked ? ', см. подписи у полей.' : '.', rest.length ? ` ${rest.join('. ')}` : ''));
     };
 
     const actions = el('div', { class: 'toolbar' });
     const busy = (state) => { for (const button of actions.querySelectorAll('button')) button.disabled = state; };
-    if (editable) actions.appendChild(el('button', { type: 'submit', class: 'primary' }, 'Сохранить'));
-    if (!isNew && can(user, collection, 'D') && rec.state === 'ACTIVE') {
+    if (editable) actions.appendChild(el('button', { type: 'submit', class: 'primary', id: 'save' }, 'Сохранить'));
+    if (!isNew && can(user, collection, 'D') && !rec.is_deleted) {
       actions.appendChild(el('button', {
         type: 'button',
         class: 'danger',
+        id: 'delete',
         on: {
           click: async () => {
-            const title = rec.display_name ? `${rec.name} "${rec.display_name}"` : rec.name;
-            if (!await confirmDialog(`Удалить ${title}? Запись перейдёт в состояние DELETED, идентификатор останется занятым, ссылки на запись продолжат работать.`)) return;
+            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id})? Запись перейдёт в состояние DELETED, идентификатор останется занятым, восстановления нет: удалённая по ошибке запись создаётся заново.`)) return;
             busy(true);
             try {
-              await api.remove(user, collection, idOf(rec.name));
-              flash('ok', `Запись ${rec.name} удалена: state = DELETED, новая ревизия DELETED.`);
+              await api.remove(collection, rec.id);
+              forgetLabels(collection);
+              flash('ok', `Запись #${rec.id} удалена: is_deleted = true, новая ревизия.`);
               render();
             } catch (error) { replace(formBanner, errorBanner(error)); busy(false); }
           },
         },
       }, 'Удалить'));
     }
-    if (!isNew && can(user, collection, 'U') && rec.state === 'DELETED') {
+    if (!isNew && can(user, collection, 'D') && rec.is_deleted) {
       actions.appendChild(el('button', {
         type: 'button',
+        class: 'danger',
+        id: 'purge',
         on: {
           click: async () => {
-            if (!await confirmDialog(`Восстановить ${rec.name}?`)) return;
+            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id}) окончательно вместе с историей? Это действие нельзя отменить.`)) return;
             busy(true);
             try {
-              await api.undelete(user, collection, idOf(rec.name));
-              flash('ok', `Запись ${rec.name} восстановлена: state = ACTIVE, новая ревизия UNDELETED.`);
-              render();
+              await api.remove(collection, rec.id, true);
+              forgetLabels(collection);
+              flash('ok', `Запись #${rec.id} удалена окончательно вместе с ревизиями (force=true).`);
+              go(href(`/${collection}`));
             } catch (error) { replace(formBanner, errorBanner(error)); busy(false); }
           },
         },
-      }, 'Восстановить'));
+      }, 'Удалить окончательно'));
     }
-    actions.appendChild(el('a', { class: 'button', href: `#${backTo}` }, 'Назад'));
+    actions.appendChild(el('a', { class: 'button', href: backTo }, 'Назад'));
 
     const form = el('form', { class: 'record-form', autocomplete: 'off' }, fields, actions);
     if (editable) {
@@ -578,103 +573,124 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       clearErrors();
-      const body = {};
-      for (const name of storedFields(collection)) if (inputs[name]) body[name] = inputs[name].value;
+      const values = {};
+      for (const [name, input] of Object.entries(inputs)) values[name] = input.value;
       busy(true);
       try {
         if (isNew) {
-          const id = inputs[cat.idParam] ? inputs[cat.idParam].value.trim() : undefined;
-          const created = await api.create(user, collection, body, id);
+          const created = await api.create(collection, toBody(collection, values));
           storageSet(draftKey, null);
-          const note = collection === 'employees' ? ` Учётная запись создана и включена: account_state = ${created.account_state}.` : '';
-          flash('ok', `Создано ${created.name}, ревизия #1 CREATED.${note}`);
-          go(cat.dated && query && query.get('back') ? `#${query.get('back')}` : recordHref(created.name));
+          forgetLabels(collection);
+          const note = collection === 'employees' ? ` Учётная запись в Keycloak: ${created.account_state}.` : '';
+          flash('ok', `Создана запись #${created.id} (${recordLabel(collection, created)}), ревизия 1.${note}`);
+          go(query && query.get('back') ? query.get('back') : recordHref(collection, created.id));
         } else {
-          const mask = storedFields(collection).filter((name) => inputs[name] && !inputs[name].readOnly && !inputs[name].disabled && normalize(inputs[name].value) !== normalize(rec[name]));
-          if (!mask.length) { replace(formBanner, banner('warn', 'Изменений нет: update_mask пуст, запрос не отправлен.')); busy(false); return; }
-          const updated = await api.update(user, collection, idOf(rec.name), body, mask.join(','));
+          const mask = updateMask(collection, rec, values);
+          if (!mask.length) { replace(formBanner, banner('warn', 'Изменений нет: updateMask пуст, запрос не отправлен.')); busy(false); return; }
+          const updated = await api.update(collection, rec.id, toBody(collection, values), mask.join(','));
           storageSet(draftKey, null);
-          const note = collection === 'employees' && mask.some((n) => CATALOGS.employees.fields.find((f) => f.name === n && f.account)) ? ` Изменение передано в учётную запись: account_state = ${updated.account_state}.` : '';
-          flash('ok', `Сохранено ${updated.name}: update_mask = ${mask.join(', ')}, новая ревизия UPDATED.${note}`);
+          forgetLabels(collection);
+          const note = collection === 'employees' && mask.some((n) => (fieldByName(collection, n) || {}).account) ? ` Изменение передано в учётную запись: ${updated.account_state}.` : '';
+          flash('ok', `Сохранено: updateMask = ${mask.join(', ')}, ревизия ${updated.revision}.${note}`);
           render();
         }
       } catch (error) {
         busy(false);
-        if (error instanceof ApiError && error.status === 'INVALID_ARGUMENT') { showFieldErrors(error); return; }
-        if (error instanceof ApiError && error.status === 'UNAVAILABLE') {
+        if (error instanceof ApiError && error.status === 400 && Object.keys(error.fieldErrors).length) { showFieldErrors(error); return; }
+        if (error instanceof ApiError && error.status === 503 && collection === 'employees') {
           storageSet(draftKey, null);
           flash('warn', explain(error));
-          go(error.metadata.name ? recordHref(error.metadata.name) : location.hash);
+          await openPendingEmployee(values.username, rec ? rec.id : null);
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409 && !isNew) {
+          replace(formBanner, errorBanner(error, el('button', { type: 'button', on: { click: () => { storageSet(draftKey, null); render(); } } }, 'Перечитать запись')));
           return;
         }
         replace(formBanner, errorBanner(error));
       }
     });
 
-    const title = isNew ? `Новая запись: ${cat.title}` : (rec.display_name || rec.name);
+    const title = isNew ? `Новая запись: ${cat.title}` : `${recordLabel(collection, rec)}`;
     const card = el('div', { class: 'card' },
-      el('h2', {}, title, ' ', el('span', { class: 'muted mono small' }, isNew ? `POST /v1/${collection}` : rec.name)),
+      el('h2', {}, title, ' ', el('span', { class: 'muted mono small' }, isNew ? `POST /v1/${collection}/` : `/v1/${collection}/${rec.id}`)),
       formBanner,
       draft ? banner('warn', 'Восстановлен черновик формы из этого окна браузера.') : null,
-      !editable && !isNew ? el('p', { class: 'hint' }, rec.state === 'DELETED' ? 'Запись удалена: поля только для чтения, доступно восстановление.' : 'Только чтение: у роли нет уровня update на эту группу справочников.') : null,
+      !editable && !isNew ? el('p', { class: 'hint' }, rec.is_deleted ? 'Запись удалена: поля только для чтения, восстановления нет.' : 'Только чтение: у роли нет уровня update на эту группу справочников.') : null,
       form);
 
     // a new dated record is checked against the record still in effect for the same employee
-    if (isNew && cat.dated && collection !== 'absences' && inputs.employee && inputs.employee.value) {
-      api.list(user, collection, { filter: `employee = "${inputs.employee.value}" AND NOT end_date:*`, pageSize: 1 })
+    if (isNew && cat.dated && collection !== 'absences' && inputs.employee_id && inputs.employee_id.value) {
+      api.list(collection, { filter: `employee_id = ${Number(inputs.employee_id.value)} AND NOT end_date:*`, pageSize: 1 })
         .then((page) => {
-          const open = page[collection][0];
+          const open = page.items[0];
           if (!open) return;
-          formBanner.appendChild(banner('warn', `Действующая запись ${open.name} с ${open.start_date} не закрыта. Сначала закройте её датой на карточке сотрудника, иначе периоды пересекутся и запрос будет отклонён.`));
+          formBanner.appendChild(banner('warn', `Действующая запись #${open.id} с ${open.start_date} не закрыта. Сначала закройте её датой на карточке сотрудника, иначе периоды пересекутся и запрос будет отклонён.`));
         })
         .catch(() => {});
     }
     return card;
   }
 
-  function metaCard(rec) {
-    return el('div', { class: 'card' },
-      el('h3', {}, 'Сведения'),
-      el('dl', { class: 'meta' },
-        el('dt', {}, 'name'), el('dd', { class: 'mono' }, rec.name),
-        el('dt', {}, 'state'), el('dd', {}, badge(rec.state)),
-        el('dt', {}, 'etag'), el('dd', { class: 'mono' }, rec.etag),
-        el('dt', {}, 'delete_time'), el('dd', {}, fmtTime(rec.delete_time))));
+  // after UNAVAILABLE the profile is stored with PENDING: the card is opened by the login of the employee
+  async function openPendingEmployee(username, knownId) {
+    if (knownId) { go(recordHref('employees', knownId)); return; }
+    try {
+      const page = await api.list('employees', { filter: `username = "${username}"`, pageSize: 1 });
+      if (page.items[0]) { go(recordHref('employees', page.items[0].id)); return; }
+    } catch (e) {
+      // the list is only a convenience, the flash already explains the state
+    }
+    go(href('/employees'));
   }
 
-  async function historyCard(collection, id) {
+  function metaCard(collection, rec) {
+    const rows = [];
+    for (const field of COMMON) {
+      let value;
+      if (field.name === 'is_deleted') value = stateBadge(rec);
+      else if (field.name === 'created_at' || field.name === 'updated_at' || field.name === 'deleted_at') value = fmtTime(rec[field.name]);
+      else if (field.name === 'last_changer') value = el('span', { class: 'mono' }, rec.last_changer);
+      else value = fmtValue(rec[field.name]);
+      rows.push(el('dt', {}, field.label, ' ', el('span', { class: 'mono muted small' }, field.name)), el('dd', {}, value));
+    }
+    return el('div', { class: 'card' }, el('h3', {}, 'Сведения'), el('dl', { class: 'meta' }, rows));
+  }
+
+  function revisionKind(revision) {
+    if (revision.revision_number === 1) return 'CREATED';
+    if ((revision.change || []).some((op) => op.path === '/is_deleted' && op.value === true)) return 'DELETED';
+    return 'UPDATED';
+  }
+
+  async function historyCard(collection, rec) {
     const box = el('div', { class: 'card' },
       el('h3', {}, 'История'),
-      el('p', { class: 'hint mono' }, `GET /v1/${collection}/${id}/revisions`, ' ', el('span', { class: 'sans' }, 'от новой к старой')));
-    let page;
+      el('p', { class: 'hint mono' }, `GET /v1/${collection}/${rec.id}/revisions`, ' ', el('span', { class: 'sans' }, 'от новой к старой, операции JSON Patch')));
+    let revisions;
     try {
-      page = await api.listRevisions(session.user, collection, id);
+      revisions = await api.allRevisions(collection, rec.id, rec.is_deleted);
     } catch (error) {
       box.appendChild(errorBanner(error));
       return box;
     }
+    revisions.sort((a, b) => b.revision_number - a.revision_number);
     const asOf = el('div', {});
-    const showAsOf = async (number) => {
-      try {
-        const state = await api.getAtRevision(session.user, collection, id, number);
-        replace(asOf, el('div', { class: 'banner banner-warn' },
-          el('b', {}, `Состояние на ревизию #${number}`), ' ', el('span', { class: 'hint mono' }, `GET /v1/${collection}/${id}?revision=${number}`),
-          el('dl', { class: 'meta compact' }, Object.entries(state).map(([key, value]) => [el('dt', {}, key), el('dd', {}, fmtValue(value))]))));
-      } catch (error) {
-        replace(asOf, errorBanner(error));
-      }
+    const showAsOf = (number) => {
+      const state = stateAt(revisions, number);
+      replace(asOf, el('div', { class: 'banner banner-warn' },
+        el('b', {}, `Состояние на ревизию ${number}`), ' ', el('span', { class: 'hint' }, 'собрано из операций ревизий 1..', String(number)),
+        el('dl', { class: 'meta compact' }, Object.entries(state).map(([key, value]) => [el('dt', {}, fieldLabel(collection, key), ' ', el('span', { class: 'mono muted small' }, key)), el('dd', {}, fmtValue(value))]))));
     };
-    for (const revision of page.revisions) {
-      const number = Number(revision.name.split('/').pop());
+    for (const revision of revisions) {
       box.appendChild(el('div', { class: 'revision' },
         el('div', { class: 'revision-head' },
-          el('b', {}, `#${number}`), ' ', badge(revision.action), ' ', fmtTime(revision.create_time), ' ',
-          el('span', { class: 'muted' }, revision.author), ' ',
-          el('span', { class: 'muted mono small' }, `request_id ${revision.request_id}`), ' ',
-          el('button', { type: 'button', class: 'link', on: { click: () => showAsOf(number) } }, 'на ревизию')),
-        el('ul', { class: 'changes' }, revision.changes.map((change) => el('li', {}, el('code', {}, change.field), ': ', fmtValue(change.old_value), ' → ', fmtValue(change.new_value))))));
+          el('b', {}, `${revision.revision_number}`), ' ', badge(revisionKind(revision)), ' ', fmtTime(revision.changed_at), ' ',
+          el('span', { class: 'muted mono small' }, revision.changed_by), ' ',
+          el('button', { type: 'button', class: 'link', on: { click: () => showAsOf(revision.revision_number) } }, 'на ревизию')),
+        el('ul', { class: 'changes' }, (revision.change || []).map((op) => el('li', {}, el('code', {}, `${op.op} ${fieldOf(op)}`), ': ', fmtValue(op.value))))));
     }
-    if (!page.revisions.length) box.appendChild(el('p', { class: 'muted' }, 'Ревизий нет.'));
+    if (!revisions.length) box.appendChild(el('p', { class: 'muted' }, 'Ревизий нет.'));
     box.appendChild(asOf);
     return box;
   }
@@ -682,53 +698,49 @@
   async function screenForm(collection, id, query) {
     const cat = CATALOGS[collection];
     const isNew = id === null;
-    const rec = isNew ? null : await api.get(session.user, collection, id);
-    let backTo = query.get('back') || `/${collection}`;
-    if (!query.get('back') && rec && cat.dated && rec.employee) backTo = `/employees/${idOf(rec.employee)}?tab=${collection}`;
-    crumbs([['Справочники', href('/')], [cat.title, href(`/${collection}`)], [isNew ? 'Новая запись' : rec.name, null]]);
+    const rec = isNew ? null : await api.get(collection, id, true);
+    let backTo = query.get('back') || href(`/${collection}`);
+    if (!query.get('back') && rec && cat.dated && rec.employee_id) backTo = recordHref('employees', rec.employee_id, { tab: collection });
+    crumbs([['Справочники', href('/')], [cat.title, href(`/${collection}`)], [isNew ? 'Новая запись' : `#${rec.id}`, null]]);
     const panel = buildFormPanel(collection, rec, query, backTo);
-    if (isNew) return el('div', { class: 'layout' }, panel, el('div', {}, el('div', { class: 'card' }, el('h3', {}, 'Сведения'), el('p', { class: 'muted' }, cat.dated ? 'Идентификатор назначит сервис.' : 'Имя записи появится после сохранения.'))));
-    return el('div', { class: 'layout' }, panel, el('div', {}, metaCard(rec), await historyCard(collection, id)));
+    if (isNew) return el('div', { class: 'layout' }, panel, el('div', {}, el('div', { class: 'card' }, el('h3', {}, 'Сведения'), el('p', { class: 'muted' }, 'Идентификатор назначит сервис, первая ревизия появится после сохранения.'))));
+    return el('div', { class: 'layout' }, panel, el('div', {}, metaCard(collection, rec), await historyCard(collection, rec)));
   }
 
   // ---- S-05: the employee card ----
 
-  function todayIso() {
-    return api.config.now().toISOString().slice(0, 10);
-  }
-
   function statusCard(rec) {
     const user = session.user;
     const manage = can(user, 'employees', 'U');
-    const id = idOf(rec.name);
     const card = el('div', { class: 'card' },
-      el('h2', {}, rec.display_name, ' ', el('span', { class: 'muted mono small' }, rec.name)),
+      el('h2', {}, recordLabel('employees', rec), ' ', el('span', { class: 'muted mono small' }, `/v1/employees/${rec.id}`)),
       el('dl', { class: 'meta columns' },
-        el('dt', {}, 'employment_state'), el('dd', {}, badge(rec.employment_state)),
-        el('dt', {}, 'hire_date'), el('dd', {}, rec.hire_date),
-        el('dt', {}, 'dismissal_date'), el('dd', {}, fmtValue(rec.dismissal_date)),
-        el('dt', {}, 'account_state'), el('dd', {}, badge(rec.account_state)),
-        el('dt', {}, 'account_user_id'), el('dd', { class: 'mono' }, fmtValue(rec.account_user_id)),
-        el('dt', {}, 'state'), el('dd', {}, badge(rec.state))));
+        el('dt', {}, 'Состояние занятости ', el('span', { class: 'mono muted small' }, 'employment_state')), el('dd', {}, badge(rec.employment_state)),
+        el('dt', {}, 'Дата приёма ', el('span', { class: 'mono muted small' }, 'hire_date')), el('dd', {}, rec.hire_date),
+        el('dt', {}, 'Дата увольнения ', el('span', { class: 'mono muted small' }, 'dismissal_date')), el('dd', {}, fmtValue(rec.dismissal_date)),
+        el('dt', {}, 'Учётная запись ', el('span', { class: 'mono muted small' }, 'account_state')), el('dd', {}, badge(rec.account_state)),
+        el('dt', {}, 'Идентификатор учётной записи ', el('span', { class: 'mono muted small' }, 'account_user_id')), el('dd', { class: 'mono' }, fmtValue(rec.account_user_id)),
+        el('dt', {}, 'Запись'), el('dd', {}, stateBadge(rec))));
     if (rec.account_state === 'PENDING') {
       card.appendChild(banner('warn',
-        'Операция с учётной записью не завершена: профиль сохранён, Keycloak её ещё не подтвердил. ',
+        'Операция с учётной записью не завершена: запись сохранена, Keycloak её ещё не подтвердил. ',
         manage ? el('button', {
           type: 'button',
+          id: 'syncAccount',
           on: {
             click: async () => {
               try {
-                const synced = await api.syncAccount(user, id);
-                flash('ok', `Операция с учётной записью завершена: account_state = ${synced.account_state}. Запрос: POST /v1/employees/${id}:syncAccount.`);
+                const synced = await api.syncAccount(rec.id);
+                flash('ok', `Операция с учётной записью завершена: account_state = ${synced.account_state}. Запрос: POST /v1/employees/${rec.id}/syncAccount.`);
               } catch (error) {
-                flash(error instanceof ApiError && error.status === 'UNAVAILABLE' ? 'warn' : 'error', explain(error));
+                flash(error instanceof ApiError && error.status === 503 ? 'warn' : 'error', explain(error));
               }
               render();
             },
           },
         }, 'Повторить операцию с учётной записью') : null));
     }
-    if (manage && rec.employment_state === 'EMPLOYED' && rec.state === 'ACTIVE') {
+    if (manage && rec.employment_state === 'EMPLOYED' && !rec.is_deleted) {
       const date = el('input', { type: 'date', id: 'dismissalDate', value: todayIso() });
       const error = el('div', { class: 'error' });
       card.appendChild(el('form', {
@@ -737,102 +749,91 @@
           submit: async (event) => {
             event.preventDefault();
             error.textContent = '';
-            if (!await confirmDialog(`Уволить ${rec.display_name} с ${date.value}? Вход сотрудника будет закрыт, действующие назначение и оклад будут закрыты этой датой.`)) return;
+            if (!await confirmDialog(`Уволить ${recordLabel('employees', rec)} с ${date.value}? Вход сотрудника будет закрыт, действующие назначение и оклад будут закрыты этой датой.`)) return;
             try {
-              await api.dismiss(user, id, { dismissal_date: date.value });
-              flash('ok', `Сотрудник уволен с ${date.value}: назначение и оклад закрыты этой датой, учётная запись заблокирована. Запрос: POST /v1/employees/${id}:dismiss.`);
+              await api.dismiss(rec.id, date.value);
+              flash('ok', `Сотрудник уволен с ${date.value}: назначение и оклад закрыты этой датой, учётная запись заблокирована. Запрос: POST /v1/employees/${rec.id}/dismiss.`);
             } catch (err) {
-              if (err instanceof ApiError && err.status === 'INVALID_ARGUMENT') { error.textContent = err.fieldViolations.map((v) => `${v.field}: ${v.description}`).join('. '); return; }
-              flash(err instanceof ApiError && err.status === 'UNAVAILABLE' ? 'warn' : 'error', explain(err));
+              if (err instanceof ApiError && err.status === 400 && Object.keys(err.fieldErrors).length) { error.textContent = Object.entries(err.fieldErrors).map(([f, m]) => `${f}: ${m}`).join('. '); return; }
+              flash(err instanceof ApiError && err.status === 503 ? 'warn' : 'error', explain(err));
             }
+            forgetLabels('employees');
             render();
           },
         },
       },
       el('label', { for: 'dismissalDate' }, 'Дата увольнения'), date,
-      el('button', { type: 'submit', class: 'danger' }, 'Уволить'),
+      el('button', { type: 'submit', class: 'danger', id: 'dismiss' }, 'Уволить'),
       error));
     }
     return card;
   }
 
-  async function nameOf(value) {
-    const target = refTarget(value);
-    if (!target) return fmtValue(value);
-    try {
-      const rec = await api.get(session.user, target.collection, target.id);
-      return el('span', {}, rec.display_name || rec.name, ' ', refLink(value));
-    } catch (error) {
-      return refLink(value);
-    }
-  }
-
   async function currentValuesCard(rec) {
     const today = todayIso();
     const rows = [
-      el('dt', {}, 'Подразделение'), el('dd', {}, await nameOf(rec.org_unit)),
-      el('dt', {}, 'Должность'), el('dd', {}, await nameOf(rec.position)),
+      el('dt', {}, 'Подразделение'), el('dd', {}, await refCell(fieldByName('employees', 'org_unit_id'), rec.org_unit_id)),
+      el('dt', {}, 'Должность'), el('dd', {}, await refCell(fieldByName('employees', 'position_id'), rec.position_id)),
     ];
     if (can(session.user, 'salaries', 'R')) {
       let text = el('span', { class: 'muted' }, 'нет действующего оклада');
       try {
-        const page = await api.list(session.user, 'salaries', { filter: `employee = "${rec.name}" AND start_date <= "${today}" AND (end_date >= "${today}" OR NOT end_date:*)`, pageSize: 1 });
-        const salary = page.salaries[0];
-        if (salary) text = el('span', {}, `${salary.amount} `, refLink(salary.currency), ' ', el('span', { class: 'muted' }, `с ${salary.start_date}`));
+        const page = await api.list('salaries', { filter: `employee_id = ${rec.id} AND start_date <= "${today}" AND (end_date >= "${today}" OR NOT end_date:*)`, pageSize: 1 });
+        const salary = page.items[0];
+        if (salary) text = el('span', {}, `${salary.amount} `, await refCell(fieldByName('salaries', 'currency_id'), salary.currency_id), ' ', el('span', { class: 'muted' }, `с ${salary.start_date}`));
       } catch (error) {
         text = errorBanner(error);
       }
       rows.push(el('dt', {}, 'Оклад'), el('dd', {}, text));
     }
-    return el('div', { class: 'card' }, el('h3', {}, 'Действующие значения'), el('p', { class: 'hint' }, `на ${today}, из записей с периодом действия`), el('dl', { class: 'meta' }, rows));
+    return el('div', { class: 'card' }, el('h3', {}, 'Действующие значения'), el('p', { class: 'hint' }, `на ${today}, из назначения и оклада с периодом действия`), el('dl', { class: 'meta' }, rows));
   }
 
   function periodLabel(row) {
     return `${row.start_date} - ${row.end_date || 'сейчас'}`;
   }
 
-  function periodDetails(collection, row) {
-    if (collection === 'assignments') return el('span', {}, refLink(row.org_unit), ', ', refLink(row.position));
-    if (collection === 'salaries') return el('span', {}, `${row.amount} `, refLink(row.currency));
-    return el('span', {}, row.kind);
+  async function periodDetails(collection, row) {
+    if (collection === 'assignments') return el('span', {}, await refCell(fieldByName('assignments', 'org_unit_id'), row.org_unit_id), ', ', await refCell(fieldByName('assignments', 'position_id'), row.position_id));
+    if (collection === 'salaries') return el('span', {}, `${row.amount} `, await refCell(fieldByName('salaries', 'currency_id'), row.currency_id));
+    return badge(row.kind);
   }
 
   async function periodsCard(rec, requested) {
     const user = session.user;
-    const id = idOf(rec.name);
     const tabs = DATED_TABS.filter(([collection]) => can(user, collection, 'R'));
     const active = tabs.some(([collection]) => collection === requested) ? requested : tabs[0][0];
     const nav = el('div', { class: 'tabs', role: 'tablist' }, tabs.map(([collection, label]) => el('a', {
-      role: 'tab', class: 'tab', 'aria-selected': collection === active ? 'true' : 'false', href: href(`/employees/${id}`, { tab: collection }),
+      role: 'tab', class: 'tab', 'aria-selected': collection === active ? 'true' : 'false', href: recordHref('employees', rec.id, { tab: collection }),
     }, label)));
     const card = el('div', { class: 'card' }, el('h3', {}, 'Периоды'), nav);
-    let page;
+    let rows;
     try {
-      page = await api.list(user, active, { filter: `employee = "${rec.name}"`, orderBy: 'start_date desc', pageSize: 200 });
+      rows = await api.listAll(active, { filter: `employee_id = ${rec.id}`, orderBy: 'start_date desc' });
     } catch (error) {
       card.appendChild(errorBanner(error));
       return card;
     }
-    const rows = page[active];
-    const backTo = `/employees/${id}?tab=${active}`;
+    const backTo = recordHref('employees', rec.id, { tab: active });
     const openRow = rows.find((row) => !row.end_date);
-    const body = rows.map((row) => {
+    const body = [];
+    for (const row of rows) {
       const cells = [
-        el('td', {}, el('a', { href: href(`/${active}/${idOf(row.name)}`, { back: backTo }), class: 'mono' }, row.name)),
+        el('td', {}, el('a', { href: recordHref(active, row.id, { back: backTo }), class: 'mono' }, `#${row.id}`)),
         el('td', {}, periodLabel(row)),
-        el('td', {}, periodDetails(active, row)),
+        el('td', {}, await periodDetails(active, row)),
       ];
       const actionCell = el('td', {});
       if (!row.end_date && can(user, active, 'U') && rec.employment_state === 'EMPLOYED') {
-        const date = el('input', { type: 'date', value: todayIso(), 'aria-label': `Дата окончания ${row.name}` });
+        const date = el('input', { type: 'date', value: todayIso(), 'aria-label': `Дата окончания #${row.id}` });
         actionCell.appendChild(el('form', {
           class: 'inline',
           on: {
             submit: async (event) => {
               event.preventDefault();
               try {
-                await api.update(user, active, idOf(row.name), { end_date: date.value }, 'end_date');
-                flash('ok', `Запись ${row.name} закрыта датой ${date.value}: update_mask = end_date.`);
+                await api.update(active, row.id, toBody(active, { ...row, end_date: date.value }), 'end_date');
+                flash('ok', `Запись #${row.id} закрыта датой ${date.value}: updateMask = end_date.`);
               } catch (error) {
                 flash('error', explain(error));
               }
@@ -842,59 +843,69 @@
         }, date, el('button', { type: 'submit' }, 'Закрыть датой')));
       }
       cells.push(actionCell);
-      return el('tr', {}, cells);
-    });
-    card.appendChild(table([{ label: 'name' }, { label: 'Период' }, { label: 'Значение' }, { label: '' }],
+      body.push(el('tr', {}, cells));
+    }
+    card.appendChild(table([{ label: 'Запись' }, { label: 'Период' }, { label: 'Значение' }, { label: '' }],
       body.length ? body : [el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Записей нет.'))]));
     const actions = el('div', { class: 'toolbar' });
     if (can(user, active, 'C') && rec.employment_state === 'EMPLOYED') {
-      actions.appendChild(el('a', { class: 'button primary', href: href(`/${active}/new`, { employee: rec.name, back: backTo }) }, 'Добавить'));
+      actions.appendChild(el('a', { class: 'button primary', href: href(`/${active}/new`, { employee_id: rec.id, back: backTo }) }, 'Добавить'));
     }
-    if (openRow && active !== 'absences') {
-      actions.appendChild(el('span', { class: 'hint' }, `Действующая запись ${openRow.name} не закрыта: перед добавлением новой закройте её датой, иначе периоды пересекутся.`));
+    if (openRow && active !== 'absences' && can(user, active, 'C') && rec.employment_state === 'EMPLOYED') {
+      actions.appendChild(el('span', { class: 'hint' }, `Действующая запись #${openRow.id} не закрыта: перед добавлением новой закройте её датой, иначе периоды пересекутся.`));
     }
     card.appendChild(actions);
     return card;
   }
 
   async function screenCard(current) {
-    const id = current.id;
-    const rec = await api.get(session.user, 'employees', id);
-    crumbs([['Справочники', href('/')], ['Сотрудники', href('/employees')], [rec.display_name, null]]);
-    const left = el('div', {}, statusCard(rec), buildFormPanel('employees', rec, current.query, '/employees'));
-    const right = el('div', {}, await currentValuesCard(rec), await periodsCard(rec, current.query.get('tab') || 'assignments'), await historyCard('employees', id));
+    const rec = await api.get('employees', current.id, true);
+    crumbs([['Справочники', href('/')], ['Сотрудники', href('/employees')], [recordLabel('employees', rec), null]]);
+    const left = el('div', {}, statusCard(rec), buildFormPanel('employees', rec, current.query, href('/employees')));
+    const right = el('div', {}, await currentValuesCard(rec), await periodsCard(rec, current.query.get('tab') || 'assignments'), await historyCard('employees', rec));
     return el('div', { class: 'layout' }, left, right);
   }
 
-  // ---- start ----
+  // ---- start: the login comes first, the screens need a user ----
 
-  function init() {
-    const select = $('#role');
-    replace(select, USERS.map((u) => el('option', { value: u.key }, u.label)));
-    setUser(storageGet('rm.user') || 'admin');
-    select.value = session.user.key;
-    select.addEventListener('change', () => { setUser(select.value); session.pager = {}; render(); });
+  function showHeader() {
+    const user = session.user;
+    replace($('#who'), user ? [el('b', {}, user.username), ' ', el('span', { class: 'muted' }, user.roles.filter((r) => r.startsWith('reference-')).join(', ') || 'без ролей сервиса')] : '');
+    $('#logout').hidden = !user;
+  }
 
-    const keycloak = $('#kc');
-    keycloak.checked = api.config.keycloakAvailable;
-    keycloak.addEventListener('change', () => { api.config.keycloakAvailable = keycloak.checked; });
-
-    const limit = $('#exportLimit');
-    limit.value = api.config.exportLimit;
-    limit.addEventListener('change', () => {
-      const value = Math.floor(Number(limit.value));
-      if (value >= 1) api.config.exportLimit = value;
-      else limit.value = api.config.exportLimit;
+  function interceptLinks() {
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a[href]');
+      if (!link || link.target || link.hasAttribute('download') || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin !== location.origin || !url.pathname.startsWith(PREFIX)) return;
+      event.preventDefault();
+      go(`${url.pathname}${url.search}`);
     });
+  }
 
-    $('#reset').addEventListener('click', () => {
-      api.reset();
-      session.pager = {};
-      flash('ok', 'Данные имитации возвращены к исходным.');
-      render();
-    });
-
-    window.addEventListener('hashchange', render);
+  async function init() {
+    const view = $('#view');
+    $('#logout').addEventListener('click', () => auth.logout());
+    try {
+      const returnTo = await auth.handleRedirect();
+      if (returnTo) history.replaceState(null, '', returnTo);
+    } catch (error) {
+      replace(view, el('div', { class: 'card' }, banner('error', `Вход не выполнен: ${error.message}`),
+        el('button', { type: 'button', on: { click: () => auth.login(href('/')) } }, 'Войти снова')));
+      return;
+    }
+    const token = await auth.token();
+    if (!token) {
+      replace(view, el('div', { class: 'card' }, el('p', {}, 'Перенаправление на вход в Keycloak…')));
+      await auth.login();
+      return;
+    }
+    session.user = auth.user();
+    showHeader();
+    interceptLinks();
+    window.addEventListener('popstate', render);
     render();
   }
 

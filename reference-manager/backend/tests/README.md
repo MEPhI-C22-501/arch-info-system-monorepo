@@ -20,7 +20,7 @@ go test -v -tags integration -count=1 ./tests
 ## Окружение
 
 Окружение описано в `docker-compose.test.yaml`: сервис (собирается из Dockerfile), миграции, Postgres без volume
-Keycloak с realm из `deployments/configs/keycloak/arch-info-system-realm.json` и OpenTelemetry Collector, который только печатает полученную телеметрию (Elasticsearch и Kibana в тестах не поднимаются).
+Keycloak с realm из `deployments/configs/keycloak/arch-info-system-realm.json` и OpenTelemetry Collector, который только печатает полученную телеметрию (как и в локальном стенде).
 Его поднимает и останавливает сам тест через testcontainers (`infra/`), вручную ничего запускать не нужно.
 
 - Состав окружения задаётся только compose-файлом. Тест знает лишь имена сервисов и их внутренние порты.
@@ -84,6 +84,21 @@ JSON-тела сравниваются семантически: порядок 
 
 Издатель токенов зафиксирован через `KC_HOSTNAME` (`http://localhost:8180`), поэтому он совпадает с `issuer_url`
 локальной конфигурации, с какого бы порта хоста тест ни получал токен.
+
+## Учётные записи Keycloak
+
+Сервис в тестах создаёт учётные записи сотрудников в том же Keycloak под клиентом `reference-manager-provisioner`
+(секрет `test-provisioner-secret` задан в `docker-compose.test.yaml` и подставляется в realm при старте). Шаги пакета
+`steps/keycloak` проверяют и готовят учётные записи через Admin REST API под администратором Keycloak,
+чьи имя и пароль тесты читают из окружения контейнера (`KC_BOOTSTRAP_ADMIN_USERNAME`, `KC_BOOTSTRAP_ADMIN_PASSWORD`):
+
+| Шаг | Что делает |
+| --- | --- |
+| `the Keycloak account "<login>" is enabled`, `is disabled`, `is missing` | Проверяет состояние учётной записи |
+| `the Keycloak account "<login>" has email "<email>"` | Проверяет адрес почты |
+| `the Keycloak account "<login>" has the realm role "<role>"` | Проверяет роль realm |
+| `the Keycloak account "<login>" is removed` | Удаляет учётную запись, если она есть; ставится в `Background`, потому что Keycloak между сценариями не очищается |
+| `a Keycloak account "<login>" exists with email "<email>"` | Создаёт отключённую учётную запись для сценариев повтора и конфликта |
 
 ## Ограничение частоты запросов
 

@@ -11,6 +11,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AccountState.
+const (
+	DISABLED AccountState = "DISABLED"
+	ENABLED  AccountState = "ENABLED"
+	PENDING  AccountState = "PENDING"
+)
+
+// Valid indicates whether the value is a known member of the AccountState enum.
+func (e AccountState) Valid() bool {
+	switch e {
+	case DISABLED:
+		return true
+	case ENABLED:
+		return true
+	case PENDING:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EmploymentState.
 const (
 	DISMISSED EmploymentState = "DISMISSED"
@@ -28,6 +49,9 @@ func (e EmploymentState) Valid() bool {
 		return false
 	}
 }
+
+// AccountState State of the Keycloak account: PENDING until the last operation with the account is confirmed, ENABLED while the employee works, DISABLED after the dismissal (FR-RM-55).
+type AccountState string
 
 // Employee The fields of a employee a client sets on creation and update.
 type Employee struct {
@@ -103,6 +127,12 @@ type ErrorDetail struct {
 
 // ExpandedEmployee A employee with its identifier and the lifecycle derived from its revisions.
 type ExpandedEmployee struct {
+	// AccountState State of the Keycloak account: PENDING until the last operation with the account is confirmed, ENABLED while the employee works, DISABLED after the dismissal (FR-RM-55).
+	AccountState AccountState `json:"account_state"`
+
+	// AccountUserId Identifier of the Keycloak account, the sub claim of its tokens. Empty until the account is created, kept after the dismissal. Read-only, set by the service.
+	AccountUserId *string `json:"account_user_id,omitempty"`
+
 	// CreatedAt The date and time when the record was created.
 	CreatedAt time.Time `json:"created_at"`
 

@@ -306,6 +306,7 @@ func listPageToAPI(p *currencydmn.ListPage) *currencyv1.SuccessWithExpandedCurre
 
 func expandedCurrencyToAPI(c *currencydmn.ExpandedCurrency) *currencyv1.ExpandedCurrency {
 	return &currencyv1.ExpandedCurrency{
+		Id:          &c.ID,
 		Code:        c.Code,
 		Number:      c.Number,
 		Name:        c.Name,

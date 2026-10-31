@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS {{.}};
 
 CREATE TABLE {{.Plural}} (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-{{- range .Fields}}{{if .Stored}}
+{{- range .Fields}}{{if and .Stored (not .Later)}}
     {{.Name}} {{.SQLColumn}},
 {{- end}}{{end}}
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE{{range .ConstraintsSQL}},
@@ -49,9 +49,9 @@ CREATE INDEX idx_{{.Singular}}_revisions_changed_at
 CREATE OR REPLACE VIEW v_expanded_{{.Singular}} AS
 SELECT
     t.id,
-{{- range .Fields}}
+{{- range .Fields}}{{if not .Later}}
     {{if .Stored}}t.{{.Name}}{{else}}{{.Computed}} AS {{.Name}}{{end}},
-{{- end}}
+{{- end}}{{end}}
     t.is_deleted,
     agg.revision,
     agg.last_changer,

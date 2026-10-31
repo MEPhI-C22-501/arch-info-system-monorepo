@@ -30,6 +30,7 @@ Feature: Currency update
     And the HTTP response contains a body
       """
       {
+        "id": 1,
         "code": "USD",
         "number": "840",
         "name": "United States Dollar",
@@ -83,6 +84,7 @@ Feature: Currency update
     And the HTTP response contains a body
       """
       {
+        "id": 1,
         "code": "USX",
         "number": "841",
         "name": "United States Dollar",
@@ -124,6 +126,7 @@ Feature: Currency update
     And the HTTP response contains a body
       """
       {
+        "id": 1,
         "code": "USD",
         "number": "840",
         "name": "US Dollar",

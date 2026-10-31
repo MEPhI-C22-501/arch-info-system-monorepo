@@ -1,0 +1,21 @@
+[
+  {
+    "name": "Приёмка стенда",
+    "kind": "MANUAL",
+    "purpose": "ACCEPTANCE",
+    "caseKeys": [
+      "TC-RM-01", "TC-RM-02", "TC-RM-03", "TC-RM-04", "TC-RM-05",
+      "TC-TT-01", "TC-TT-02", "TC-TT-03", "TC-TT-04", "TC-TT-05",
+      "TC-PS-01", "TC-PS-02", "TC-PS-03", "TC-PS-04", "TC-PS-05",
+      "TC-REP-01", "TC-REP-02", "TC-REP-03", "TC-REP-04", "TC-REP-05",
+      "TC-INF-01", "TC-INF-02", "TC-INF-03", "TC-INF-04", "TC-INF-05"
+    ]
+  },
+  {
+    "name": "Smoke",
+    "kind": "FILTER",
+    "purpose": "SMOKE",
+    "filter": {"automated": true},
+    "filterSuite": "Приёмка стенда"
+  }
+]
