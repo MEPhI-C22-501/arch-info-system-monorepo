@@ -9,7 +9,7 @@ from fastapi import Request
 from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.cell.cell import Cell, ILLEGAL_CHARACTERS_RE
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from . import storage as db
 from .auth import actor
@@ -114,11 +114,8 @@ def assignment_rows(c, a, f):
     return sorted(rows, key=lambda r:(r['date'],r['projectCode'],r['workName'],r['employeeId'],r['id']))
 
 
-def workbook_response(title, columns, rows, f, filename):
-    if len(rows)>50000:fail(422, 'Слишком много строк: сузьте фильтры (максимум 50000)')
-    book = Workbook()
-    sheet = book.active
-    sheet.title = title
+def fill_sheet(sheet, columns, rows):
+    if len(rows)>50000:fail(422, 'Слишком много строк: сузьте фильтры (максимум 50000 на лист)')
     sheet.append([label for _,label in columns])
     for row in rows:
         cells=[]
@@ -133,12 +130,28 @@ def workbook_response(title, columns, rows, f, filename):
             if key=='hours':cell.number_format='0.00'
             cells.append(cell)
         sheet.append(cells)
+    sheet.sheet_view.showGridLines=False
+    sheet.row_dimensions[1].height=32
+    sheet.sheet_properties.pageSetUpPr.fitToPage=True
+    sheet.page_setup.orientation='landscape'
+    sheet.page_setup.fitToWidth=1
+    sheet.page_setup.fitToHeight=0
+    sheet.print_title_rows='1:1'
     sheet.freeze_panes='A2'
     sheet.auto_filter.ref=sheet.dimensions
     for cell in sheet[1]:
-        cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='235CCA')
+        cell.alignment=Alignment(wrap_text=True,vertical='center');cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='235CCA')
     for index,(key,_) in enumerate(columns,1):
         sheet.column_dimensions[sheet.cell(1,index).column_letter].width=18 if key in {'date','start','finish','hours','status'} else 32
+
+
+def workbook_response(title, columns, rows, f, filename, extra_sheets=()):
+    book=Workbook()
+    sheet=book.active;sheet.title=title
+    fill_sheet(sheet,columns,rows)
+    for name,fields,data in extra_sheets:
+        fill_sheet(book.create_sheet(name),fields,data)
+    if extra_sheets:book.active=1  # Detailed work/employee rows are visible on opening.
     meta=book.create_sheet('Фильтры')
     meta.append(['Параметр','Значение'])
     for key,value in [('Сформировано UTC',db.now()),('Строк',len(rows)),('Версии','Последняя версия каждого доступного проекта'),*sorted(f.items())]:
@@ -151,6 +164,35 @@ def workbook_response(title, columns, rows, f, filename):
     output=BytesIO();book.save(output)
     return Response(output.getvalue(),media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition':f'attachment; filename="{filename}.xlsx"'})
+
+
+
+def project_export_details(c,a,projects):
+    plans=latest_plans(c);detail=[];assignments=[];people={}
+    for p in projects:
+        v=plans.get(p['id'])
+        names={x['id']:x['name'] for x in employee_options(c,a,p['portfolioId'])}
+        base={'projectCode':p['code'],'projectName':p['name'],'versionNumber':p['versionNumber'],'planStatus':p['planStatus']}
+        if not v or not v['items']:
+            detail.append({**base,'workName':'Работы ещё не добавлены','status':'Нет назначений'})
+            continue
+        for item in v['items']:
+            work={**base,'workName':item['name'],'workType':item['type'],'start':item['start'],'finish':item['finish'],'plannedHours':item['plannedHours']}
+            demands=[d for d in v['demands'] if d['planItemId']==item['id']]
+            if not demands:detail.append({**work,'status':'Потребность не задана'});continue
+            for demand in demands:
+                required={**work,'roleCode':demand['roleCode'],'gradeCode':demand['gradeCode'],'demandHours':demand['hours']}
+                allocations=[x for x in v['allocations'] if x['demandId']==demand['id']]
+                if not allocations:detail.append({**required,'status':'Сотрудник не назначен'});continue
+                for allocation in allocations:
+                    row={**required,**allocation,'employeeName':names.get(allocation['employeeId'],allocation['employeeId'])}
+                    detail.append(row);assignments.append(row)
+                    person=people.setdefault(allocation['employeeId'],{'employeeId':allocation['employeeId'],'employeeName':row['employeeName'],'projects':set(),'works':set(),'hours':0,'cancelledHours':0})
+                    if allocation['status']=='CANCELLED':person['cancelledHours']+=allocation['hours']
+                    else:
+                        person['projects'].add(p['code']);person['works'].add((p['id'],item['id']));person['hours']+=allocation['hours']
+    employees=[{**x,'projects':', '.join(sorted(x['projects'])),'workCount':len(x['works'])} for x in people.values()]
+    return detail,assignments,sorted(employees,key=lambda x:(x['employeeName'],x['employeeId']))
 
 
 def register(app, command_tx):
@@ -281,8 +323,16 @@ def register(app, command_tx):
         f=filters(req)
         with db.engine.begin() as c:
             rows=project_rows(c,a,f)
+            detail,assignments,employees=project_export_details(c,a,rows)
+            common=[('projectCode','Код проекта'),('projectName','Проект'),('versionNumber','Версия'),('planStatus','Статус плана'),
+                    ('workName','Работа'),('workType','Тип работы'),('start','Начало работы'),('finish','Окончание работы'),
+                    ('roleCode','Специализация'),('gradeCode','Грейд'),('employeeName','Сотрудник'),('employeeId','ID сотрудника'),
+                    ('date','Дата назначения'),('hours','Назначено часов'),('status','Статус назначения')]
             return workbook_response('Проекты',[('code','Код'),('name','Проект'),('status','Статус проекта'),('goal','Цель'),
-                ('managerSubject','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание')],rows,f,'projects')
+                ('managerSubject','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание')],rows,f,'projects',[
+                    ('Работы и сотрудники',common,detail),('Назначения',common,assignments),
+                    ('Сотрудники',[('employeeName','Сотрудник'),('employeeId','ID сотрудника'),('projects','Проекты'),('workCount','Количество работ'),
+                                  ('hours','Часы без отменённых'),('cancelledHours','Отменённые часы')],employees)])
 
     @app.get('/api/v1/downloads/assignments.xlsx')
     def export_assignments(req:Request):

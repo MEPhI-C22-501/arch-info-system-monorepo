@@ -61,6 +61,9 @@ try{
  const download=page.waitForEvent('download');await page.locator('#export-assignments').click();await (await download).saveAs(path.join(temp,'assignments.xlsx'));
  await go('portfolio');await page.locator('#cards-search').fill('Первый тестовый проект '+run);await page.locator('#cards-apply').click();await page.waitForFunction(()=>document.querySelectorAll('.project-card').length===1);
  const projects=page.waitForEvent('download');await page.locator('#export-projects').click();await (await projects).saveAs(path.join(temp,'projects.xlsx'));
+ const allResponse=page.waitForResponse(r=>r.url().includes('/downloads/projects.xlsx'));
+ const allDownload=page.waitForEvent('download');await page.locator('#export-all-projects').click();
+ assert.equal(new URL((await allResponse).url()).searchParams.size,0);await (await allDownload).saveAs(path.join(temp,'all-projects.xlsx'));
  await go('gantt');await page.locator('.gantt-bar').first().waitFor();
  await page.locator('#gantt-scale-slider').fill('32');await page.locator('#gantt-scale-slider').dispatchEvent('change');
  await page.waitForFunction(()=>document.querySelector('#gantt-scale-slider')?.value==='32');
@@ -78,6 +81,6 @@ try{
  await go('gantt');await page.locator('.gantt-bar').first().waitFor();
  await page.reload();await page.locator('.gantt-bar').first().waitFor();assert.ok((await page.locator('[data-gantt-work]').first().getAttribute('aria-label')).includes('2026-10-11'));
  await page.screenshot({path:path.join(out,'app-gantt.png'),fullPage:true});
- assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'workflows-report.json'),JSON.stringify({passed:true,checks:['manager-dropdown','two-project-isolation','work-dates','specialty-grade-dropdowns','multiple-demands','gantt-real-dates','gantt-zoom','gantt-dependencies','gantt-save','drag-and-resize','fs-auto-shift','cross-screen-date-sync','reload-persistence','filtered-project-xlsx','filtered-assignment-xlsx'],errors},null,2));
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'workflows-report.json'),JSON.stringify({passed:true,checks:['manager-dropdown','two-project-isolation','work-dates','specialty-grade-dropdowns','multiple-demands','gantt-real-dates','gantt-zoom','gantt-dependencies','gantt-save','drag-and-resize','fs-auto-shift','cross-screen-date-sync','reload-persistence','filtered-project-xlsx','all-projects-xlsx-ignores-screen-filters','filtered-assignment-xlsx'],errors},null,2));
  console.log('All workflow checks passed');
 }finally{await browser.close()}

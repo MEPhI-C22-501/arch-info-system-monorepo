@@ -169,3 +169,41 @@ def test_project_timeline_real_records_and_scope(client,monkeypatch):
     call(client,'GET','project-timeline?projectId='+PID,role='R-05',expected=403)
     monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('other',{'R-03'},set(),{PORT},set(),set()))
     call(client,'GET','project-timeline?projectId='+PID,expected=404)
+
+
+def test_all_project_workbook_has_detailed_rows_people_and_unstaffed_projects(client):
+    call(client,'POST','projects',{'portfolioId':PORT,'programId':None,'code':'EMPTY','name':'Проект без работ',
+         'goal':'Проверка полного отчёта','managerSubject':'someone-else'},expected=201)
+    call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    book=workbook(client,'projects.xlsx')
+    assert book.active.title=='Работы и сотрудники'
+    assert set(book.sheetnames)=={'Проекты','Работы и сотрудники','Назначения','Сотрудники','Фильтры'}
+    assert book['Проекты'].max_row==3
+    detail=list(book['Работы и сотрудники'].values)
+    assert len(detail)>book['Проекты'].max_row
+    headers=list(detail[0]);work=headers.index('Работа');person=headers.index('Сотрудник')
+    task_rows=[r for r in detail[1:] if r[work]=='Интерфейс']
+    assert len(task_rows)==2 and {r[person] for r in task_rows}=={'Демо-сотрудник 1','Демо-сотрудник 2'}
+    assert any(r[work]=='Работы ещё не добавлены' for r in detail[1:])
+    assert book['Назначения'].max_row==3
+    people=list(book['Сотрудники'].values)
+    assert len(people)==3 and sorted(r[4] for r in people[1:])==[2,6]
+    for name in ['Проекты','Работы и сотрудники','Назначения','Сотрудники']:
+        assert book[name].freeze_panes=='A2' and book[name].auto_filter.ref
+    assert workbook(client,'projects.xlsx?q=EMPTY')['Назначения'].max_row==1
+    assert workbook(client,'projects.xlsx',role='R-03')['Проекты'].max_row==2
+    call(client,'GET','downloads/projects.xlsx',role='R-04',expected=403)
+
+
+def test_project_export_employee_formula_and_cancelled_hours(client):
+    created=call(client,'POST',f'versions/{VID}/assignments',assignment_body(),revision=revision(),expected=201)
+    call(client,'PATCH',f'versions/{VID}/assignments/'+created['assignment']['id'],
+         {**assignment_body(),'status':'CANCELLED'},revision=revision())
+    with db.engine.begin() as c:
+        db.put(c,'employee',{'id':'employees/demo-2','displayName':'=HYPERLINK("x")'},PORT)
+    book=workbook(client,'projects.xlsx')
+    rows=list(book['Сотрудники'].values)
+    row=next(r for r in rows[1:] if r[1]=='employees/demo-2')
+    assert row[4]==0 and row[5]==2
+    sheet=book['Сотрудники'];cell=next(c for c in sheet['A'] if c.value=='=HYPERLINK("x")')
+    assert cell.data_type=='s'
