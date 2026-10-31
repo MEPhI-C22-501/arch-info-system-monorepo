@@ -12,7 +12,7 @@ import uuid
 from collections import Counter
 from datetime import UTC, datetime
 
-from sqlalchemy import ColumnElement, Select, delete, exists, func, select
+from sqlalchemy import ColumnElement, Select, delete, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from app.errors import ApiError, conflict, not_found, validation_failed
 from app.keys import next_key
 from app.models import RunResult as RunResultRow
 from app.models import (
+    DefectRunLink,
     Environment,
     StepResult,
     TestCase,
@@ -178,6 +179,18 @@ def insert_run(
     )
     session.flush()
     return run
+
+
+def delete_run(session: Session, run_id: uuid.UUID, principal: Principal) -> None:
+    """Физически удаляется только прогон без записей (120, раздел 8)."""
+    run = _get(session, run_id, principal, lock=True)
+    if session.scalar(select(_has_records(run))):
+        raise conflict(
+            "RUN_HAS_RESULTS", f"В прогоне {run.key} есть результаты: удаление запрещено"
+        )
+    session.execute(delete(RunResultRow).where(RunResultRow.run_id == run.id))
+    session.delete(run)
+    session.commit()
 
 
 def plan_composition(session: Session, plan_id: uuid.UUID) -> Composition:
@@ -338,6 +351,16 @@ def write_result(
 def _has_unfinished_results(run: TestRun) -> ColumnElement[bool]:
     return exists().where(
         RunResultRow.run_id == run.id, RunResultRow.status == ResultStatus.NOT_RUN
+    )
+
+
+def _has_records(run: TestRun) -> ColumnElement[bool]:
+    """Результат, вернувшийся в NOT_RUN, сохраняет шаги и связь с дефектом."""
+    results = select(RunResultRow.id).where(RunResultRow.run_id == run.id)
+    return or_(
+        exists().where(RunResultRow.run_id == run.id, RunResultRow.status != ResultStatus.NOT_RUN),
+        exists().where(StepResult.run_result_id.in_(results)),
+        exists().where(DefectRunLink.run_result_id.in_(results)),
     )
 
 

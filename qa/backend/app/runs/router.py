@@ -57,6 +57,16 @@ def get_run(
     return service.read_run(session, id, principal)
 
 
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_run(
+    id: uuid.UUID,
+    principal: Principal = Depends(leads),
+    session: Session = Depends(get_session),
+):
+    service.delete_run(session, id, principal)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/{id}/start", response_model=Run)
 def start_run(
     id: uuid.UUID,

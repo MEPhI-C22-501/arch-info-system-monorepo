@@ -13,6 +13,7 @@ export type RunAction = 'start' | 'complete' | 'abort';
 export const listRuns = (query: Record<string, QueryValue>) => request<Page<Run>>('GET', withQuery('/runs', query));
 export const getRun = (id: string) => request<Run>('GET', `/runs/${id}`);
 export const createRun = (input: RunInput) => request<Run>('POST', '/runs', input);
+export const deleteRun = (id: string) => request<void>('DELETE', `/runs/${id}`);
 export const changeRunStatus = (id: string, action: RunAction) => request<Run>('POST', `/runs/${id}/${action}`);
 export const listRunResults = (id: string, query: Record<string, QueryValue>) =>
   request<Page<RunResult>>('GET', withQuery(`/runs/${id}/results`, query));

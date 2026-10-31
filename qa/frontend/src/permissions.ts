@@ -1,5 +1,5 @@
 import type { Suite } from './api/suites';
-import type { RunResult, RunStatus, RunAction } from './api/runs';
+import type { Run, RunResult, RunStatus, RunAction } from './api/runs';
 import type { TestCaseStatus } from './api/cases';
 import type { DefectStatus } from './api/defects';
 import type { PlanAction, TestPlanStatus } from './api/plans';
@@ -61,6 +61,11 @@ export function runActions(role: Role, status: RunStatus): RunAction[] {
     if (status === 'CREATED' || status === 'IN_PROGRESS') actions.push('abort');
   }
   return actions;
+}
+
+// Только прогон без записанных результатов (120, раздел 8); остальное отклонит сервер.
+export function canDeleteRun(role: Role, run: Pick<Run, 'summary'>): boolean {
+  return role === 'qa-lead' && run.summary.notRun === run.summary.total;
 }
 
 export function canRecordResult(session: Session, runStatus: RunStatus, result: Pick<RunResult, 'assignee'>): boolean {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { getPlan } from '../api/plans';
-import { RunAction, RunResult, changeRunStatus, getRun, listRunResults } from '../api/runs';
+import { RunAction, RunResult, changeRunStatus, deleteRun, getRun, listRunResults } from '../api/runs';
 import { getSuite } from '../api/suites';
 import { Column, DataTable } from '../components/DataTable';
 import { ErrorMessage } from '../components/ErrorMessage';
@@ -10,7 +10,7 @@ import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { RESULT_STATUSES, formatDateTime, statusLabel } from '../labels';
-import { canRecordResult, runActions } from '../permissions';
+import { canDeleteRun, canRecordResult, runActions } from '../permissions';
 import { useSession } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
@@ -62,6 +62,18 @@ export function RunCard() {
     }
   };
 
+  const remove = async () => {
+    if (!window.confirm(`Удалить прогон ${current.key}? Это действие нельзя отменить.`)) return;
+    setError(null);
+    try {
+      await deleteRun(id);
+      toast(`Прогон ${current.key} удалён`);
+      navigate('/runs');
+    } catch (failure) {
+      setError(failure);
+    }
+  };
+
   const columns: Column<RunResult>[] = [
     { header: 'Кейс', render: (row) => <>{row.testCaseKey}<div className="muted">{row.title}</div></> },
     { header: 'Версия', render: (row) => row.caseVersion },
@@ -103,6 +115,7 @@ export function RunCard() {
         {runActions(session.role, current.status).map((action) => (
           <button key={action} type="button" className={action === 'start' ? 'primary' : undefined} onClick={() => act(action)}>{ACTION_LABELS[action]}</button>
         ))}
+        {canDeleteRun(session.role, current) && <button type="button" onClick={remove}>Удалить</button>}
         {suite.data?.purpose === 'SMOKE' && current.smokeVerdict && <span>Вердикт: <StatusBadge status={current.smokeVerdict} /></span>}
         {current.verdict && <span>Вердикт приёмки: <StatusBadge status={current.verdict} /></span>}
       </div>

@@ -516,7 +516,11 @@ export interface paths {
         get: operations["getRun"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a run that has no recorded results (qa-lead)
+         * @description Allowed in any status. 409 RUN_HAS_RESULTS - the run has results, step results or linked defects.
+         */
+        delete: operations["deleteRun"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2443,6 +2447,29 @@ export interface operations {
             };
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+        };
+    };
+    deleteRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     changeRunStatus: {

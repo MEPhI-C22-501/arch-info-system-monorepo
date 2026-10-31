@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import type { DefectStatus } from './api/defects';
 import type { RunStatus } from './api/runs';
-import { canArchiveSuite, canCommentDefect, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
+import { canArchiveSuite, canCommentDefect, canDeleteRun, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
 import { DefectCard } from './screens/DefectCard';
 import { RunCard } from './screens/RunCard';
 import { CaseCard } from './screens/CaseCard';
@@ -64,6 +64,14 @@ describe('прогон и план', () => {
   ];
   test.each(cases)('%s, прогон %s: %j', (role, status, expected) => {
     expect(runActions(role, status)).toEqual(expected);
+  });
+
+  test('удаление: лид и только прогон без результатов', () => {
+    const empty = { total: 2, passed: 0, failed: 0, blocked: 0, notRun: 2, skipped: 0, unverified: 0 };
+    const recorded = { ...empty, passed: 1, notRun: 1 };
+    expect(canDeleteRun('qa-lead', { summary: empty })).toBe(true);
+    expect(canDeleteRun('qa-lead', { summary: recorded })).toBe(false);
+    expect(canDeleteRun('qa-tester', { summary: empty })).toBe(false);
   });
 
   test('результат: тестировщик — свой и неназначенный, лид — любой, только в выполняющемся', () => {
@@ -158,13 +166,13 @@ function mockRun(status: string) {
   });
 }
 
-const runButtons = () => ['Запустить', 'Завершить', 'Прервать', 'Выполнить'].filter((name) => screen.queryByRole(name === 'Выполнить' ? 'link' : 'button', { name }));
+const runButtons = () => ['Запустить', 'Завершить', 'Прервать', 'Удалить', 'Выполнить'].filter((name) => screen.queryByRole(name === 'Выполнить' ? 'link' : 'button', { name }));
 
 describe('карточка прогона по ролям', () => {
   test.each<[Role, string, string[]]>([
-    ['qa-lead', 'IN_PROGRESS', ['Завершить', 'Прервать', 'Выполнить']],
-    ['qa-lead', 'CREATED', ['Запустить', 'Прервать']],
-    ['qa-lead', 'COMPLETED', []],
+    ['qa-lead', 'IN_PROGRESS', ['Завершить', 'Прервать', 'Удалить', 'Выполнить']],
+    ['qa-lead', 'CREATED', ['Запустить', 'Прервать', 'Удалить']],
+    ['qa-lead', 'COMPLETED', ['Удалить']],
     ['qa-tester', 'IN_PROGRESS', ['Выполнить']],
     ['qa-tester', 'CREATED', ['Запустить']],
     ['qa-automation', 'IN_PROGRESS', []],
