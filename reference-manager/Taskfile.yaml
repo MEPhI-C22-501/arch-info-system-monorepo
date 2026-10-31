@@ -120,9 +120,9 @@ tasks:
       - task: demo:accounts
 
   demo:data:
-    desc: Load deployments/seed/demo.sql into the running local database, skipped when employees exist
+    desc: Load deployments/seed/demo.sql into the running local database (task up does it too), skipped when employees exist
     cmds:
-      - docker compose -f deployments/docker-compose.yaml --profile demo run --rm reference-manager-seed
+      - docker compose -f deployments/docker-compose.yaml run --rm reference-manager-seed
 
   demo:accounts:
     desc: Create or repeat the Keycloak accounts of every employee through the API as hr-admin

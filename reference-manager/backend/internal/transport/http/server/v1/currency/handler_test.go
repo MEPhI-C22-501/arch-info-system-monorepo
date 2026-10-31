@@ -87,6 +87,7 @@ func TestHandlerCreateCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusCreated,
 				responseBody: `{
+					"id": 1,
 					"code": "USD",
 					"number": "840",
 					"name": "US Dollar",
@@ -254,6 +255,7 @@ func TestHandlerGetCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusOK,
 				responseBody: `{
+					"id": 1,
 					"code": "USD",
 					"number": "840",
 					"name": "US Dollar",
@@ -296,6 +298,7 @@ func TestHandlerGetCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusOK,
 				responseBody: `{
+					"id": 1,
 					"code": "USD",
 					"number": "840",
 					"name": "US Dollar",
@@ -448,6 +451,7 @@ func TestHandlerListCurrencies(t *testing.T) {
 			UpdatedAt:   createdAt,
 		}
 		usdBody = `{
+			"id": 1,
 			"code": "USD",
 			"number": "840",
 			"name": "US Dollar",
@@ -664,6 +668,7 @@ func TestHandlerUpdateCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusOK,
 				responseBody: `{
+					"id": 1,
 					"code": "USD",
 					"number": "840",
 					"name": "United States Dollar",
@@ -879,6 +884,7 @@ func TestHandlerDeleteCurrency(t *testing.T) {
 			want: want{
 				responseStatus: http.StatusOK,
 				responseBody: `{
+					"id": 1,
 					"code": "USD",
 					"number": "840",
 					"name": "US Dollar",

@@ -53,6 +53,7 @@ Feature: Currency listing
       {
         "currencies": [
           {
+            "id": "{{any}}",
             "code": "CLF",
             "number": "990",
             "name": "Unidad de Fomento",
