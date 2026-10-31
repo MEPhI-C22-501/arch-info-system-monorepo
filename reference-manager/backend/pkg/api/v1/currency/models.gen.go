@@ -80,6 +80,9 @@ type ExpandedCurrency struct {
 	// DeletedAt The date and time when the currency record was soft-deleted. Zero value (0001-01-01T00:00:00Z) if the record has never been deleted.
 	DeletedAt time.Time `json:"deleted_at"`
 
+	// Id Identifier of the currency, assigned by the service and referenced by other catalogs.
+	Id *int64 `json:"id,omitempty"`
+
 	// IsDeleted Indicates whether the currency record has been soft-deleted.
 	IsDeleted bool `json:"is_deleted"`
 

@@ -1,5 +1,6 @@
-# local collector, it stores the received telemetry in Elasticsearch, it is browsed in Kibana at http://localhost:5601
-# on the shared stand the collector is provided by Infra, the service only changes telemetry.exporter.endpoint
+# local collector, it prints a summary of every received batch to its log (docker logs reference_manager_otel_collector)
+# and stores nothing; on the shared stand the collector and the storage are provided by Infra,
+# the service only changes telemetry.exporter.endpoint
 receivers:
   otlp:
     protocols:
@@ -10,18 +11,8 @@ receivers:
 
 processors:
   batch: {}
-  # Elasticsearch stores histograms of delta temporality only, the SDK sends cumulative ones
-  cumulative_to_delta: {}
 
 exporters:
-  # OTel-native mapping: the data streams logs-generic.otel-default, traces-generic.otel-default
-  # and metrics-<scope>.otel-default keep the OpenTelemetry field names, Kibana understands them as they are
-  elasticsearch:
-    endpoint: http://reference-manager-elasticsearch:9200
-    mapping:
-      mode: otel
-
-  # a short summary of every batch, docker logs reference_manager_otel_collector
   debug:
     verbosity: basic
 
@@ -35,12 +26,12 @@ service:
     traces:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ elasticsearch, debug ]
+      exporters: [ debug ]
     metrics:
       receivers: [ otlp ]
-      processors: [ cumulative_to_delta, batch ]
-      exporters: [ elasticsearch, debug ]
+      processors: [ batch ]
+      exporters: [ debug ]
     logs:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ elasticsearch, debug ]
+      exporters: [ debug ]

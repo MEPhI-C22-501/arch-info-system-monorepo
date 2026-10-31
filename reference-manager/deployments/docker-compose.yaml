@@ -51,11 +51,11 @@ services:
 
     restart: "no"
 
-  # loads the demonstration data set, started by `task demo:data` only (profile demo)
+  # loads the demonstration data set after the migrations on every start, skipped when employees exist;
+  # `task demo:data` runs it by hand
   reference-manager-seed:
     container_name: reference_manager_seed
     image: postgres:18-alpine
-    profiles: [ "demo" ]
 
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
@@ -131,7 +131,7 @@ services:
       retries: 30
       start_period: 10s
 
-  # local collector, it stores the received traces, metrics and logs in Elasticsearch,
+  # local collector, it prints the received traces, metrics and logs to its log and stores nothing,
   # on the shared stand the collector and the storage are provided by Infra
   reference-manager-otel-collector:
     container_name: reference_manager_otel_collector
@@ -146,82 +146,7 @@ services:
     volumes:
       - ./configs/otel-collector/local/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
 
-    depends_on:
-      reference-manager-elasticsearch:
-        condition: service_healthy
-
     restart: unless-stopped
-
-  # single node without security, for local development only
-  reference-manager-elasticsearch:
-    container_name: reference_manager_elasticsearch
-    image: elasticsearch:9.5.5
-
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      xpack.license.self_generated.type: basic
-      ES_JAVA_OPTS: "-Xms${ELASTICSEARCH_HEAP:-1g} -Xmx${ELASTICSEARCH_HEAP:-1g}"
-
-    ports:
-      - "${ELASTICSEARCH_PORT:-9200}:9200"
-
-    volumes:
-      - reference_manager_elasticsearch_data:/usr/share/elasticsearch/data
-
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-
-    restart: unless-stopped
-
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -sf 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null" ]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 20s
-
-  reference-manager-kibana:
-    container_name: reference_manager_kibana
-    image: kibana:9.5.5
-
-    environment:
-      ELASTICSEARCH_HOSTS: '["http://reference-manager-elasticsearch:9200"]'
-      SERVER_PUBLICBASEURL: http://localhost:${KIBANA_PORT:-5601}
-
-    ports:
-      - "${KIBANA_PORT:-5601}:5601"
-
-    depends_on:
-      reference-manager-elasticsearch:
-        condition: service_healthy
-
-    restart: unless-stopped
-
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -sf http://127.0.0.1:5601/api/status | grep -q '\"level\":\"available\"'" ]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 30s
-
-  # creates the data views of the logs, traces and metrics once Kibana is up
-  reference-manager-kibana-setup:
-    container_name: reference_manager_kibana_setup
-    image: kibana:9.5.5
-
-    entrypoint: [ "bash", "/setup/setup-data-views.sh" ]
-
-    volumes:
-      - ./configs/kibana/local/setup-data-views.sh:/setup/setup-data-views.sh:ro
-
-    depends_on:
-      reference-manager-kibana:
-        condition: service_healthy
-
-    restart: "no"
 
   reference-manager-ui:
     container_name: reference_manager_ui
@@ -236,6 +161,11 @@ services:
     volumes:
       - ./configs/reference-manager-ui/local/reference-manager-ui.conf:/etc/nginx/conf.d/default.conf:ro
 
+    # the panel proxies /v1/ to the service
+    depends_on:
+      reference-manager:
+        condition: service_healthy
+
     restart: unless-stopped
 
     healthcheck:
@@ -247,4 +177,3 @@ services:
 
 volumes:
   reference_manager_database_data:
-  reference_manager_elasticsearch_data:

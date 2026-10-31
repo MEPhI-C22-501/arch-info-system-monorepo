@@ -9,7 +9,7 @@ The service is the single source of reference data and HR master data: employees
 | Path | Contents |
 | --- | --- |
 | `backend/` | Go service: `cmd/`, `internal/`, `pkg/`, OpenAPI specs in `api/openapi/`, the catalog generator in `tools/gencatalog/`, integration tests in `tests/`, `go.mod`, lint and Docker ignore files |
-| `frontend/` | Administration interface: `frontend/admin/` is the step 1 admin panel on mock data (see its README), `frontend/prototype/index.html` is the original single-file prototype |
+| `frontend/` | Administration interface: `frontend/admin/` is the admin panel on the service API with the Keycloak login (see its README), `frontend/prototype/index.html` is the original single-file prototype |
 | `deployments/` | Dockerfiles, Docker Compose, configuration examples and database migrations of both parts |
 | `documents/` | Requirements and design documents (in Russian) |
 | `Taskfile.yaml` | Entry point for every command below. Run `task` from this directory, it switches into `backend/` where needed |
@@ -221,23 +221,13 @@ Build the application, create Docker images, and start all required services:
 task up
 ```
 
-The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`. The admin panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`).
+The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`: the database with the one-shot migrations and seed jobs, Keycloak, the collector, the service and the admin panel. The panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`), it logs in through Keycloak (users of the local realm, the password equals the username: `admin`, `hr-admin`, `reader`, `hr-reader`) and talks to the service through the `/v1/` proxy of its own nginx, so the browser uses one origin.
 
 Copy `deployments/.env.example` to `deployments/.env` first: it holds every secret of the environment (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PROVISIONER_SECRET`), the configuration files hold none. The service account of the database is created on the first start of the database, so run `task down` before `task up` on an environment created before this version. When port `5432` is taken on the host, set `POSTGRES_PORT`.
 
 The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` (its secret is substituted from `KEYCLOAK_PROVISIONER_SECRET` by `deployments/configs/keycloak/import-realm.sh` on the start of Keycloak) and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
 
-The environment also includes the telemetry stack:
-
-| Service                 | Address                 | Purpose                                                                                     |
-| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------- |
-| OpenTelemetry Collector | `localhost:4317` (gRPC), `localhost:4318` (HTTP) | Receives OTLP from the service and writes it to Elasticsearch, config `deployments/configs/otel-collector/local/otel-collector.yaml` |
-| Elasticsearch           | `http://localhost:9200` | Stores logs, traces and metrics in the data streams `logs-*.otel-*`, `traces-*.otel-*`, `metrics-*.otel-*` |
-| Kibana                  | `http://localhost:5601` | Browsing the telemetry                                                                      |
-
-Elasticsearch runs as a single node without security and is meant for local development only. Ports and the heap size are set by `ELASTICSEARCH_PORT`, `ELASTICSEARCH_HEAP` and `KIBANA_PORT` in `deployments/.env`. Logstash is not used: the collector writes to Elasticsearch directly.
-
-On startup `reference-manager-kibana-setup` creates the data views `reference-manager logs`, `reference-manager traces` and `reference-manager metrics`, open them in Kibana under **Discover**. A trace of a request is found by the `X-Trace-Id` of the response: filter `trace_id : "<id>"` in the traces or the logs data view. On the shared stand the collector and the storage are provided by Infra and only `telemetry.exporter.endpoint` changes.
+The environment also includes an OpenTelemetry Collector at `localhost:4317` (gRPC) and `localhost:4318` (HTTP), config `deployments/configs/otel-collector/local/otel-collector.yaml`. It prints a summary of every received batch to its log (`docker logs reference_manager_otel_collector`) and stores nothing. The storage and the browsing of telemetry are provided by Infra on the shared stand, where only `telemetry.exporter.endpoint` changes. A trace of a request is found there by the `X-Trace-Id` of the response.
 
 Get a token and call the API:
 

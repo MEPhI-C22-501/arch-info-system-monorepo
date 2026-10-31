@@ -94,6 +94,21 @@ Feature: Employees
       ["1001"]
       """
 
+  Scenario: A record other records refer to is not purged
+    Given the SQL query from file "testdata/employee_in_effect.sql" is executed
+    And a DELETE HTTP request
+    And the HTTP request is authorized as "hr-admin"
+    And the HTTP request contains URL parameters
+      """
+      force=true
+      """
+    When the HTTP request is sent to "/v1/employees/1"
+    Then an HTTP response is received with status 400
+    And the HTTP response contains a body
+      """
+      {"message": "delete employee: employee 1 is referenced by records of other catalogs: failed precondition"}
+      """
+
   Scenario: The dismissal closes the assignment and the salary in effect
     Given the SQL query from file "testdata/employee_in_effect.sql" is executed
     And a POST HTTP request

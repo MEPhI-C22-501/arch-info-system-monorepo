@@ -475,6 +475,7 @@ components:
         Currency information in accordance with the ISO 4217 standard.
         Includes alphabetic and numeric codes, the name, and rounding precision.
       required:
+        - id
         - code
         - number
         - name
@@ -486,6 +487,12 @@ components:
         - is_deleted
         - deleted_at
       properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Identifier of the currency, assigned by the service and referenced by other catalogs.
+          example: 1
         code:
           type: string
           description: >

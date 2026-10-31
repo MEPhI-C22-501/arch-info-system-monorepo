@@ -16,6 +16,7 @@ Feature: Currency deletion
     And the HTTP response contains a body
       """
       {
+        "id": 1,
         "code": "USD",
         "number": "840",
         "name": "US Dollar",
