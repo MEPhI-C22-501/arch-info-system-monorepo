@@ -565,6 +565,9 @@ def test_list_filters(client, auth, create):
         return [item["key"] for item in response.json()["items"]]
 
     assert keys() == [a["key"], c["key"], b["key"]]  # архивные скрыты
+    everything = [a["key"], c["key"], archived["key"], b["key"]]
+    assert keys(includeArchived=True) == everything
+    assert keys(includeArchived=True, status="ACTUAL") == [c["key"]]
     assert keys(module="TT") == [b["key"]]
     assert keys(type="FUNCTIONAL") == [b["key"]]
     assert keys(epicRef="EPIC-1") == [b["key"]]

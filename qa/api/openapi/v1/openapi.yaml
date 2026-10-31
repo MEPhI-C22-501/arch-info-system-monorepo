@@ -28,6 +28,7 @@ paths:
       parameters:
         - { name: module, in: query, schema: { type: string } }
         - { name: status, in: query, description: Without status ARCHIVED cases are not listed, schema: { $ref: '#/components/schemas/TestCaseStatus' } }
+        - { name: includeArchived, in: query, description: List ARCHIVED cases too; status takes precedence, schema: { type: boolean } }
         - { name: type, in: query, schema: { type: string } }
         - { name: epicRef, in: query, schema: { type: string } }
         - { name: automated, in: query, schema: { type: boolean } }

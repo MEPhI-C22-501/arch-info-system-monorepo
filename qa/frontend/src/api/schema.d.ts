@@ -1434,6 +1434,8 @@ export interface operations {
                 module?: string;
                 /** @description Without status ARCHIVED cases are not listed */
                 status?: components["schemas"]["TestCaseStatus"];
+                /** @description List ARCHIVED cases too; status takes precedence */
+                includeArchived?: boolean;
                 type?: string;
                 epicRef?: string;
                 automated?: boolean;

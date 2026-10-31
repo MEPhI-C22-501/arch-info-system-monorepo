@@ -28,6 +28,9 @@ editors = require_roles(Role.TESTER, Role.AUTOMATION, Role.LEAD)
 def list_test_cases(
     module: str | None = None,
     status: CaseStatus | None = Query(None, description="Без статуса архивные не показываются"),
+    include_archived: bool = Query(
+        False, alias="includeArchived", description="Показать и архивные; status важнее"
+    ),
     type: str | None = None,
     epic_ref: str | None = Query(None, alias="epicRef"),
     automated: bool | None = None,
@@ -45,7 +48,7 @@ def list_test_cases(
         q=q,
         suite_id=suite_id,
     )
-    return service.list_cases(session, case_filter, params)
+    return service.list_cases(session, case_filter, params, include_archived)
 
 
 @router.post("", response_model=TestCase, status_code=status.HTTP_201_CREATED)

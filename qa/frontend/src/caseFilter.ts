@@ -1,17 +1,22 @@
 import type { CaseFilter } from './api/cases';
 import type { Classifier } from './api/admin';
+import type { QueryValue } from './api/client';
 import type { FilterField } from './components/FilterBar';
 import { CASE_STATUSES, MODULE_OPTIONS, statusLabel } from './labels';
 import { optionsOf } from './useReferenceData';
 
+const ALL_STATUSES = 'ALL';
+
 // Поля отбора кейсов: одни и те же для списка, набора FILTER и добавления в план (050, CaseFilter).
-export function caseFilterFields(classifiers: Classifier[] | undefined, statusEmptyLabel = 'Все, кроме архивных'): FilterField[] {
+// Вариант «Все» только у списка: в наборы и планы архив не попадает.
+export function caseFilterFields(classifiers: Classifier[] | undefined, withArchived = false): FilterField[] {
+  const statuses = CASE_STATUSES.map((value) => ({ value: value as string, label: statusLabel(value) }));
   return [
     { name: 'q', label: 'Поиск', type: 'text', placeholder: 'Ключ или название' },
     { name: 'module', label: 'Модуль', type: 'select', emptyLabel: 'Все модули', options: MODULE_OPTIONS },
     {
-      name: 'status', label: 'Статус', type: 'select', emptyLabel: statusEmptyLabel,
-      options: CASE_STATUSES.map((value) => ({ value, label: statusLabel(value) })),
+      name: 'status', label: 'Статус', type: 'select', emptyLabel: 'Все, кроме архивных',
+      options: withArchived ? [{ value: ALL_STATUSES, label: 'Все, включая архивные' }, ...statuses] : statuses,
     },
     { name: 'type', label: 'Тип', type: 'select', emptyLabel: 'Все типы', options: optionsOf(classifiers, 'CASE_TYPE') },
     { name: 'epicRef', label: 'Эпик', type: 'text' },
@@ -20,6 +25,11 @@ export function caseFilterFields(classifiers: Classifier[] | undefined, statusEm
       options: [{ value: 'true', label: 'Автотест' }, { value: 'false', label: 'Ручной' }],
     },
   ];
+}
+
+// В адресе «Все» — значение фильтра status, а API ждёт отдельный параметр.
+export function caseListQuery(values: Record<string, string | undefined>): Record<string, QueryValue> {
+  return values.status === ALL_STATUSES ? { ...values, status: undefined, includeArchived: true } : values;
 }
 
 export function toCaseFilter(values: Record<string, string | undefined>): CaseFilter {
