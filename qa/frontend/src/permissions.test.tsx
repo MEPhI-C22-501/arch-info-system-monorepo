@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import type { DefectStatus } from './api/defects';
 import type { RunStatus } from './api/runs';
-import { canArchiveSuite, canCommentDefect, canDeleteRun, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
+import { canArchiveSuite, canCommentDefect, canDeleteCase, canDeleteRun, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
 import { DefectCard } from './screens/DefectCard';
 import { RunCard } from './screens/RunCard';
 import { CaseCard } from './screens/CaseCard';
@@ -209,6 +209,17 @@ function mockCase(status = 'ACTUAL') {
 }
 
 describe('карточка кейса по ролям', () => {
+  test('удаление: черновик, свой или любой для QA-лида', () => {
+    const lead = { role: 'qa-lead', name: 'ivanov' } as const;
+    const tester = { role: 'qa-tester', name: 'petrov' } as const;
+    const viewer = { role: 'qa-viewer', name: 'petrov' } as const;
+    expect(canDeleteCase(lead, { status: 'DRAFT', createdBy: 'petrov' })).toBe(true);
+    expect(canDeleteCase(tester, { status: 'DRAFT', createdBy: 'petrov' })).toBe(true);
+    expect(canDeleteCase(tester, { status: 'DRAFT', createdBy: 'ivanov' })).toBe(false);
+    expect(canDeleteCase(viewer, { status: 'DRAFT', createdBy: 'petrov' })).toBe(false);
+    expect(canDeleteCase(lead, { status: 'ACTUAL', createdBy: 'ivanov' })).toBe(false);
+  });
+
   test('читатель не видит кнопок изменения', async () => {
     mockCase();
     renderScreen(<CaseCard />, { role: 'qa-viewer', path: '/test-cases/c1', pattern: '/test-cases/:id' });

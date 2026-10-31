@@ -14,6 +14,7 @@ export const getCase = (id: string, version?: number) =>
   request<TestCase>('GET', withQuery(`/test-cases/${id}`, { version }));
 export const createCase = (input: TestCaseInput) => request<TestCase>('POST', '/test-cases', input);
 export const updateCase = (id: string, input: TestCaseInput) => request<TestCase>('PUT', `/test-cases/${id}`, input);
+export const deleteCase = (id: string) => request<void>('DELETE', `/test-cases/${id}`);
 export const changeCaseStatus = (id: string, status: TestCaseStatus) =>
   request<TestCase>('POST', `/test-cases/${id}/status`, { status });
 export const listCaseVersions = (id: string) =>

@@ -1,6 +1,6 @@
 import type { Suite } from './api/suites';
 import type { Run, RunResult, RunStatus, RunAction } from './api/runs';
-import type { TestCaseStatus } from './api/cases';
+import type { TestCase, TestCaseStatus } from './api/cases';
 import type { DefectStatus } from './api/defects';
 import type { PlanAction, TestPlanStatus } from './api/plans';
 import type { Role, Session } from './session';
@@ -26,6 +26,12 @@ const CASE_TRANSITIONS: Record<TestCaseStatus, TestCaseStatus[]> = {
 
 export function caseTransitions(role: Role, status: TestCaseStatus): TestCaseStatus[] {
   return canEditCase(role) ? CASE_TRANSITIONS[status] : [];
+}
+
+// Только черновик: свой, QA-лид — любой (070, раздел 2); кейс с прогонами отклонит сервер.
+export function canDeleteCase(session: Session, testCase: Pick<TestCase, 'status' | 'createdBy'>): boolean {
+  if (testCase.status !== 'DRAFT') return false;
+  return session.role === 'qa-lead' || (canEditCase(session.role) && testCase.createdBy === session.name);
 }
 
 export function isCaseReadOnly(role: Role, status: TestCaseStatus): boolean {
