@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { TestCase, copyCases, listCases } from '../api/cases';
-import { caseFilterFields } from '../caseFilter';
+import { caseFilterFields, caseListQuery } from '../caseFilter';
 import { Column, DataTable } from '../components/DataTable';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { FilterBar } from '../components/FilterBar';
@@ -30,7 +30,7 @@ export function CasesList() {
   const toast = useToast();
   const { values, page, setFilter, setPage, reset } = useListParams();
   const classifiers = useClassifiers();
-  const cases = useLoad(() => listCases({ ...values, page }), [values, page]);
+  const cases = useLoad(() => listCases({ ...caseListQuery(values), page }), [values, page]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copyError, setCopyError] = useState<unknown>(null);
   const [copying, setCopying] = useState(false);
@@ -54,7 +54,7 @@ export function CasesList() {
   return (
     <>
       <h2>Тест-кейсы</h2>
-      <FilterBar fields={caseFilterFields(classifiers.data)} values={values} onChange={setFilter} onReset={reset} />
+      <FilterBar fields={caseFilterFields(classifiers.data, true)} values={values} onChange={setFilter} onReset={reset} />
       {editable && (
         <div className="bar">
           <Link className="btn primary" to="/test-cases/new">Создать кейс</Link>

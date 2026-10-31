@@ -1,14 +1,14 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client';
-import { LastResult, TestCase, TestCaseStatus, TestCaseVersionInfo, changeCaseStatus, copyCases, getCase, listCaseVersions, updateCase } from '../api/cases';
+import { LastResult, TestCase, TestCaseStatus, TestCaseVersionInfo, changeCaseStatus, copyCases, deleteCase, getCase, listCaseVersions, updateCase } from '../api/cases';
 import { CaseFormValues, FieldErrors, caseFormOf, fieldErrorsOf, saveOutcome, toUpdateInput, validateCase } from '../caseForm';
 import { Column, DataTable } from '../components/DataTable';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { formatDateTime, statusLabel } from '../labels';
-import { canEditAutotest, canEditCase, caseTransitions, isCaseReadOnly } from '../permissions';
+import { canDeleteCase, canEditAutotest, canEditCase, caseTransitions, isCaseReadOnly } from '../permissions';
 import { useSession } from '../session';
 import { useLoad } from '../useLoad';
 import { useClassifiers } from '../useReferenceData';
@@ -110,7 +110,8 @@ function CaseEditor({ testCase, onSaved, onOpenLatest }: FormProps) {
 
 export function CaseCard() {
   const { id = '' } = useParams();
-  const { role } = useSession();
+  const session = useSession();
+  const { role } = session;
   const navigate = useNavigate();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -147,6 +148,18 @@ export function CaseCard() {
     }
   };
 
+  const remove = async () => {
+    if (!window.confirm(`Удалить черновик ${current.key}? Это действие нельзя отменить.`)) return;
+    setActionError(null);
+    try {
+      await deleteCase(id);
+      toast(`Кейс ${current.key} удалён`);
+      navigate('/test-cases');
+    } catch (error) {
+      setActionError(error);
+    }
+  };
+
   const showVersion = (version: number) => {
     setParams(version === current.currentVersion ? {} : { version: String(version) });
   };
@@ -163,6 +176,7 @@ export function CaseCard() {
             </button>
           ))}
           {canEditCase(role) && <button type="button" onClick={copy}>Копировать</button>}
+          {canDeleteCase(session, current) && <button type="button" onClick={remove}>Удалить</button>}
         </div>
       )}
       <ErrorMessage error={actionError} />

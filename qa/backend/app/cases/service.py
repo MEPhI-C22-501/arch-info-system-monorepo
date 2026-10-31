@@ -61,6 +61,9 @@ CLASSIFIER_FIELDS = {
     "type": ClassifierKind.CASE_TYPE,
 }
 TEMPLATE_FIELDS = ("description", "preconditions", "priority", "severity", "type")
+# Подсистемы стартового набора (vision 7). Проверяются только при создании: модуль входит в
+# неизменяемый ключ, а уже созданный кейс с другим модулем должен оставаться доступным.
+MODULES = ("RM", "TT", "PS", "REP", "INF")
 
 # 050, раздел 2. Удаление черновика — отдельная операция DELETE.
 TRANSITIONS = {
@@ -104,11 +107,13 @@ def read_case(session: Session, case_id: uuid.UUID, version: int | None = None) 
     return _out(session, case, get_version(session, case, version or case.current_version))
 
 
-def list_cases(session: Session, case_filter: CaseFilter, params: PageParams) -> Page[TestCase]:
+def list_cases(
+    session: Session, case_filter: CaseFilter, params: PageParams, include_archived: bool = False
+) -> Page[TestCase]:
     stmt = (
         select(TestCaseRow)
         .join(TestCaseVersion, CURRENT_VERSION)
-        .where(*filter_clauses(session, case_filter))
+        .where(*filter_clauses(session, case_filter, include_archived=include_archived))
         .options(contains_eager(TestCaseRow.current).selectinload(TestCaseVersion.steps))
         .order_by(TestCaseRow.key, TestCaseRow.id)
         .execution_options(populate_existing=True)
@@ -130,13 +135,18 @@ def count_cases(session: Session, case_filter: CaseFilter) -> int:
 
 
 def filter_clauses(
-    session: Session, case_filter: CaseFilter, depth: int = 0
+    session: Session, case_filter: CaseFilter, depth: int = 0, include_archived: bool = False
 ) -> list[ColumnElement[bool]]:
-    """Условия на test_case и его текущую версию; запрос должен соединять их CURRENT_VERSION."""
+    """Условия на test_case и его текущую версию; запрос должен соединять их CURRENT_VERSION.
+
+    include_archived — только для списка кейсов: в наборы и планы архив не попадает.
+    """
     f = case_filter
-    clauses: list[ColumnElement[bool]] = [
-        TestCaseRow.status == f.status if f.status else TestCaseRow.status != CaseStatus.ARCHIVED
-    ]
+    clauses: list[ColumnElement[bool]] = []
+    if f.status:
+        clauses.append(TestCaseRow.status == f.status)
+    elif not include_archived:
+        clauses.append(TestCaseRow.status != CaseStatus.ARCHIVED)
     if f.module:
         clauses.append(TestCaseRow.module == f.module)
     if f.type:
@@ -225,6 +235,8 @@ def create_case(session: Session, data: TestCaseInput, principal: Principal) -> 
         steps = _apply_template(session, data.template_id, content, steps)
     steps = steps or []
     errors = _content_errors(content)
+    if data.module not in MODULES:
+        errors.append({"field": "module", "reason": "unknown"})
     errors += check_codes(
         session,
         {

@@ -7,7 +7,6 @@ import { CaseFormValues, FieldErrors, applyTemplate, emptyCaseForm, fieldErrorsO
 import { ErrorMessage } from '../components/ErrorMessage';
 import { Field } from '../components/Field';
 import { useToast } from '../components/Toast';
-import { MODULES } from '../labels';
 import { canEditAutotest } from '../permissions';
 import { useSession } from '../session';
 import { useLoad } from '../useLoad';
@@ -61,7 +60,6 @@ export function CaseCreate() {
             {templates.data?.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
         </Field>
-        <datalist id="module-hints">{MODULES.map((value) => <option key={value} value={value} />)}</datalist>
         <CaseFields values={values} onChange={setValues} errors={errors} classifiers={classifiers.data} readOnly={false} autotestEditable={canEditAutotest(role)} moduleEditable />
         <div className="bar" style={{ marginTop: 12, marginBottom: 0 }}>
           <button type="submit" className="primary" disabled={saving}>Создать кейс</button>

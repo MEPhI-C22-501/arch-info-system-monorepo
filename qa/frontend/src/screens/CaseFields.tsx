@@ -1,7 +1,8 @@
 import type { Classifier } from '../api/admin';
-import { CaseFormValues, FieldErrors } from '../caseForm';
+import { CaseFormValues, FieldErrors, isKnownModule } from '../caseForm';
 import { Field } from '../components/Field';
 import { StepsEditor } from '../components/StepsEditor';
+import { MODULE_OPTIONS } from '../labels';
 import { optionsOf } from '../useReferenceData';
 
 type Props = {
@@ -38,7 +39,12 @@ export function CaseFields({ values, onChange, errors, classifiers, readOnly, au
       <Field label="Название" error={errors.title}><input {...text('title')} /></Field>
       <div className="fields">
         <Field label="Модуль" error={errors.module}>
-          <input type="text" disabled={!moduleEditable} value={values.module} list="module-hints" onChange={(event) => set('module', event.target.value.toUpperCase())} />
+          <select className="wide" disabled={!moduleEditable} value={values.module} onChange={(event) => set('module', event.target.value)}>
+            <option value="">—</option>
+            {/* Созданный ранее кейс мог получить модуль не из списка: в карточке он остаётся виден. */}
+            {values.module && !isKnownModule(values.module) && <option value={values.module}>{values.module}</option>}
+            {MODULE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
         </Field>
         {select('priority', 'PRIORITY', 'Приоритет')}
         {select('severity', 'SEVERITY', 'Серьёзность')}

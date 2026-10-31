@@ -48,8 +48,14 @@ export const RUN_STATUSES = ['CREATED', 'IN_PROGRESS', 'COMPLETED', 'ABORTED'] a
 export const RESULT_STATUSES = ['NOT_RUN', 'PASSED', 'FAILED', 'BLOCKED', 'SKIPPED'] as const;
 export const DEFECT_STATUSES = ['NEW', 'OPEN', 'IN_PROGRESS', 'FIXED', 'READY_FOR_TEST', 'CLOSED', 'REOPENED'] as const;
 export const SEVERITIES = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'TRIVIAL'] as const;
-// Списка модулей в API нет; подсказки — подсистемы стартового набора (vision 7).
-export const MODULES = ['RM', 'TT', 'PS', 'REP', 'INF'];
+// Списка модулей в API нет: подсистемы стартового набора (vision 7), сервер проверяет те же коды.
+export const MODULE_OPTIONS = [
+  { value: 'RM', label: 'RM — Reference Manager' },
+  { value: 'TT', label: 'TT — Task Tracker' },
+  { value: 'PS', label: 'PS — Planning System' },
+  { value: 'REP', label: 'REP — Reports' },
+  { value: 'INF', label: 'INF — Infra' },
+];
 
 export const PURPOSE_LABELS: Record<string, string> = { GENERAL: 'Общий', SMOKE: 'Smoke', ACCEPTANCE: 'Приёмка стенда' };
 export const KIND_LABELS: Record<string, string> = { MANUAL: 'Ручной', FILTER: 'По фильтру' };

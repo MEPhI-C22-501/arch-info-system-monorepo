@@ -1,10 +1,11 @@
-import { screen, within } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
+import { fireEvent, screen, within } from '@testing-library/react';
+import { describe, expect, test, vi } from 'vitest';
 import type { DefectStatus } from './api/defects';
 import type { RunStatus } from './api/runs';
-import { canArchiveSuite, canCommentDefect, canDeleteRun, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
+import { canArchiveSuite, canCommentDefect, canDeleteCase, canDeleteRun, canRecordResult, caseTransitions, defectTransitions, isCaseReadOnly, planActions, runActions } from './permissions';
 import { DefectCard } from './screens/DefectCard';
 import { RunCard } from './screens/RunCard';
+import { RunsList } from './screens/RunsList';
 import { CaseCard } from './screens/CaseCard';
 import { CasesList } from './screens/CasesList';
 import { SuitesList } from './screens/SuitesList';
@@ -209,6 +210,17 @@ function mockCase(status = 'ACTUAL') {
 }
 
 describe('карточка кейса по ролям', () => {
+  test('удаление: черновик, свой или любой для QA-лида', () => {
+    const lead = { role: 'qa-lead', name: 'ivanov' } as const;
+    const tester = { role: 'qa-tester', name: 'petrov' } as const;
+    const viewer = { role: 'qa-viewer', name: 'petrov' } as const;
+    expect(canDeleteCase(lead, { status: 'DRAFT', createdBy: 'petrov' })).toBe(true);
+    expect(canDeleteCase(tester, { status: 'DRAFT', createdBy: 'petrov' })).toBe(true);
+    expect(canDeleteCase(tester, { status: 'DRAFT', createdBy: 'ivanov' })).toBe(false);
+    expect(canDeleteCase(viewer, { status: 'DRAFT', createdBy: 'petrov' })).toBe(false);
+    expect(canDeleteCase(lead, { status: 'ACTUAL', createdBy: 'ivanov' })).toBe(false);
+  });
+
   test('читатель не видит кнопок изменения', async () => {
     mockCase();
     renderScreen(<CaseCard />, { role: 'qa-viewer', path: '/test-cases/c1', pattern: '/test-cases/:id' });
@@ -238,6 +250,35 @@ describe('карточка кейса по ролям', () => {
 });
 
 describe('списки по ролям', () => {
+  const mockRuns = () => mockFetch(({ method, url }) => {
+    if (method === 'DELETE') return { status: 204 };
+    if (url.includes('/runs')) {
+      return page([{ ...run, status: 'CREATED' }, { ...run, id: 'r2', key: 'RUN-03', status: 'COMPLETED', summary: { ...run.summary, notRun: 0, passed: 1 } }]);
+    }
+    if (url.includes('/suites') || url.includes('/test-plans')) return page([]);
+    return undefined;
+  });
+
+  test('QA-лид отмечает только прогоны без результатов и удаляет их', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const calls = mockRuns();
+    renderScreen(<RunsList />);
+    await screen.findByText('RUN-02');
+    expect(screen.queryByRole('checkbox', { name: 'Выбрать r2' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать r1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить выбранные (1)' }));
+    await vi.waitFor(() => expect(calls.some((call) => call.method === 'DELETE' && call.url === '/api/v1/runs/r1')).toBe(true));
+    confirm.mockRestore();
+  });
+
+  test('тестировщик не видит выбора и удаления прогонов', async () => {
+    mockRuns();
+    renderScreen(<RunsList />, { role: 'qa-tester' });
+    await screen.findByText('RUN-02');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Удалить выбранные/ })).toBeNull();
+  });
+
   test('читатель не видит создания и выбора кейсов', async () => {
     mockFetch(({ url }) => {
       if (url.includes('/admin/classifiers')) return page([]);

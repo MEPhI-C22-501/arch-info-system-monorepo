@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import { describeCaseFilter } from '../caseFilter';
+import { caseFilterFields, caseListQuery, describeCaseFilter } from '../caseFilter';
 import { CasesList } from '../screens/CasesList';
 import { mockFetch, page, renderScreen } from '../test/helpers';
 import { Column, DataTable } from './DataTable';
@@ -49,6 +49,15 @@ describe('DataTable', () => {
   test('«выбрать все» выбирает строки страницы', () => {
     const onChange = vi.fn();
     render(<DataTable columns={COLUMNS} rows={ROWS} rowKey={(row) => row.id} emptyText="Пусто" selection={{ selected: new Set(), onChange }} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать все на странице' }));
+    expect([...onChange.mock.calls[0][0]]).toEqual(['1']);
+  });
+
+  test('строка, которую нельзя выбрать, остаётся без галочки и не входит в «выбрать все»', () => {
+    const onChange = vi.fn();
+    const rows = [...ROWS, { id: '2', title: 'Вторая' }];
+    render(<DataTable columns={COLUMNS} rows={rows} rowKey={(row) => row.id} emptyText="Пусто" selection={{ selected: new Set(), onChange }} isSelectable={(row) => row.id === '1'} />);
+    expect(screen.queryByRole('checkbox', { name: 'Выбрать 2' })).toBeNull();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать все на странице' }));
     expect([...onChange.mock.calls[0][0]]).toEqual(['1']);
   });
@@ -129,6 +138,20 @@ test('StatusBadge дублирует цвет текстом и различае
   expect(screen.getByText('Выполняется').className).toBe('tag IN_PROGRESS');
   rerender(<StatusBadge status="IN_PROGRESS" kind="defect" />);
   expect(screen.getByText('В работе')).toBeTruthy();
+});
+
+test('«Все» по статусу уходит в запрос как includeArchived', () => {
+  expect(caseListQuery({ status: 'ALL', module: 'RM' })).toEqual({ module: 'RM', includeArchived: true });
+  expect(caseListQuery({ status: 'ARCHIVED' })).toEqual({ status: 'ARCHIVED' });
+});
+
+test('«Все, включая архивные» есть только у списка кейсов', () => {
+  const statusOptions = (withArchived: boolean) => {
+    const field = caseFilterFields([], withArchived).find((item) => item.name === 'status');
+    return field?.type === 'select' ? field.options.map((option) => option.value) : [];
+  };
+  expect(statusOptions(true)).toContain('ALL');
+  expect(statusOptions(false)).not.toContain('ALL');
 });
 
 test('условие набора не показывает незаданные поля', () => {
