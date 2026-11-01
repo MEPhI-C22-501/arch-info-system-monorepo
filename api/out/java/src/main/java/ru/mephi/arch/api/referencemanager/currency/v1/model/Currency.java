@@ -39,7 +39,7 @@ import ru.mephi.arch.api.referencemanager.currency.v1.ApiClient;
   Currency.JSON_PROPERTY_DECIMALS,
   Currency.JSON_PROPERTY_IS_DELETED
 })
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-11-01T12:20:03.823061751+03:00[Europe/Moscow]", comments = "Generator version: 7.26.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.26.0")
 public class Currency {
   public static final String JSON_PROPERTY_CODE = "code";
   @jakarta.annotation.Nonnull

@@ -10,12 +10,9 @@
 
 package currency_v1
 
-
 import (
 	"time"
 )
-
-
 
 // CurrencyRevision - Currency revision record reflecting changes made to currency data. This model is read-only.
 type CurrencyRevision struct {

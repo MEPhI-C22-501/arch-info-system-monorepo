@@ -39,7 +39,7 @@ import ru.mephi.arch.api.referencemanager.currency.v1.ApiClient;
   Error.JSON_PROPERTY_MESSAGE,
   Error.JSON_PROPERTY_DETAILS
 })
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-11-01T12:20:03.823061751+03:00[Europe/Moscow]", comments = "Generator version: 7.26.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.26.0")
 public class Error {
   public static final String JSON_PROPERTY_MESSAGE = "message";
   @jakarta.annotation.Nonnull

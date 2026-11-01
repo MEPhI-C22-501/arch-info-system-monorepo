@@ -1,7 +1,0 @@
-packageName: currency_v1
-isGoSubmodule: false
-generateInterfaces: true
-router: chi
-outputAsLibrary: true
-onlyInterfaces: true
-sourceFolder: .

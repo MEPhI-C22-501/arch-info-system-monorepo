@@ -10,9 +10,6 @@
 
 package currency_v1
 
-
-
-
 type InlineObject struct {
 
 	// List of currencies

@@ -14,5 +14,6 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Every generated top-level package (reference_manager, qa, ...) is picked up automatically
 [tool.hatch.build.targets.wheel]
-packages = ["reference_manager"]
+include = ["/*/**/*.py"]

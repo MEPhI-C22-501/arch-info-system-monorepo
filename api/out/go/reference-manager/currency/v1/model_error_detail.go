@@ -10,9 +10,6 @@
 
 package currency_v1
 
-
-
-
 // ErrorDetail - Detailed information about a specific error or validation issue.
 type ErrorDetail struct {
 

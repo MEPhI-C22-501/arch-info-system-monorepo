@@ -10,32 +10,29 @@
 
 package currency_v1
 
-
 import (
-	"time"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"time"
 )
 
-
-
-// ExpandedCurrency - Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision. 
+// ExpandedCurrency - Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
 type ExpandedCurrency struct {
 
 	// Identifier of the currency, assigned by the service and referenced by other catalogs.
 	Id int64 `json:"id"`
 
-	// Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters. 
+	// Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters.
 	Code string `json:"code" validate:"regexp=^[A-Z]{3}$"`
 
-	// Three-digit numeric currency code.  Passed as a string to preserve leading zeros (e.g., '840' for USD). 
+	// Three-digit numeric currency code.  Passed as a string to preserve leading zeros (e.g., '840' for USD).
 	Number string `json:"number" validate:"regexp=^\\d{3}$"`
 
 	// Official name of the currency in Russian or English.
 	Name string `json:"name"`
 
-	// The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD). 
+	// The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
 	Decimals int32 `json:"decimals"`
 
 	// The sequential number of the latest revision applied to this currency.
@@ -53,9 +50,10 @@ type ExpandedCurrency struct {
 	// The date and time when the currency record was last updated.
 	UpdatedAt time.Time `json:"updated_at"`
 
-	// The date and time when the currency record was soft-deleted. Zero value (0001-01-01T00:00:00Z) if the record has never been deleted. 
+	// The date and time when the currency record was soft-deleted. Zero value (0001-01-01T00:00:00Z) if the record has never been deleted.
 	DeletedAt time.Time `json:"deleted_at"`
 }
+
 // UnmarshalJSON validates required property keys then unmarshals into ExpandedCurrency
 func (o *ExpandedCurrency) UnmarshalJSON(data []byte) (err error) {
 	// Presence is checked against required fields that exist on this struct,
@@ -74,30 +72,30 @@ func (o *ExpandedCurrency) UnmarshalJSON(data []byte) (err error) {
 	}
 
 	requiredNullableProperties := map[string]bool{
-		"code": false,
-		"number": false,
-		"name": false,
-		"decimals": false,
-		"revision": false,
+		"code":         false,
+		"number":       false,
+		"name":         false,
+		"decimals":     false,
+		"revision":     false,
 		"last_changer": false,
-		"is_deleted": false,
-		"created_at": false,
-		"updated_at": false,
-		"deleted_at": false,
+		"is_deleted":   false,
+		"created_at":   false,
+		"updated_at":   false,
+		"deleted_at":   false,
 	}
 
 	allowedJsonKeys := map[string]struct{}{
-		"id": {},
-		"code": {},
-		"number": {},
-		"name": {},
-		"decimals": {},
-		"revision": {},
+		"id":           {},
+		"code":         {},
+		"number":       {},
+		"name":         {},
+		"decimals":     {},
+		"revision":     {},
 		"last_changer": {},
-		"is_deleted": {},
-		"created_at": {},
-		"updated_at": {},
-		"deleted_at": {},
+		"is_deleted":   {},
+		"created_at":   {},
+		"updated_at":   {},
+		"deleted_at":   {},
 	}
 
 	allProperties := make(map[string]json.RawMessage)

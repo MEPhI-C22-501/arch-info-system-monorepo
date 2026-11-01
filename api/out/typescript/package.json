@@ -5,6 +5,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./reference-manager/currency/v1": "./src/reference-manager/currency/v1/index.ts"
+    "./*": "./src/*/index.ts"
   }
 }

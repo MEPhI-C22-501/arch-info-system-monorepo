@@ -10,9 +10,6 @@
 
 package currency_v1
 
-
-
-
 type InlineObject1 struct {
 
 	// List of currency revisions

@@ -10,13 +10,10 @@
 
 package currency_v1
 
-
 import (
 	"encoding/json"
 	"fmt"
 )
-
-
 
 // Error - Standardized error response format for all API errors.
 type Error struct {
@@ -24,9 +21,10 @@ type Error struct {
 	// Human-readable error message describing what went wrong.
 	Message string `json:"message"`
 
-	// Optional array of detailed error information. Can include field-specific validation errors or additional context. 
+	// Optional array of detailed error information. Can include field-specific validation errors or additional context.
 	Details []ErrorDetail `json:"details,omitempty"`
 }
+
 // UnmarshalJSON validates required property keys then unmarshals into Error
 func (o *Error) UnmarshalJSON(data []byte) (err error) {
 	// Presence is checked against required fields that exist on this struct,

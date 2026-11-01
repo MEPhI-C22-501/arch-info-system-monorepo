@@ -12,14 +12,15 @@ package currency_v1
 
 import (
 	"net/http"
+
 	"github.com/go-chi/chi/v5"
 )
 
 // A Route defines the parameters for an api endpoint
 type Route struct {
 	Name        string
-	Method	    string
-	Pattern	    string
+	Method      string
+	Pattern     string
 	HandlerFunc http.HandlerFunc
 }
 

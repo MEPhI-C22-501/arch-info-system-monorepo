@@ -1,8 +1,0 @@
-library: native
-invokerPackage: ru.mephi.arch.api.referencemanager.currency.v1
-apiPackage: ru.mephi.arch.api.referencemanager.currency.v1.api
-modelPackage: ru.mephi.arch.api.referencemanager.currency.v1.model
-useJakartaEe: true
-openApiNullable: false
-annotationLibrary: none
-documentationProvider: none

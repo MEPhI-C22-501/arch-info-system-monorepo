@@ -21,7 +21,7 @@ import (
 
 // DefaultAPIController binds http requests to an api service and writes the service results to the http response
 type DefaultAPIController struct {
-	service DefaultAPIServicer
+	service      DefaultAPIServicer
 	errorHandler ErrorHandler
 }
 
@@ -156,8 +156,6 @@ func (c *DefaultAPIController) OrderedRoutes() []Route {
 		},
 	}
 }
-
-
 
 // ListCurrencies - List currencies with pagination
 func (c *DefaultAPIController) ListCurrencies(w http.ResponseWriter, r *http.Request) {

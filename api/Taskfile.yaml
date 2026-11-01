@@ -1,66 +1,113 @@
 version: '3'
 
 vars:
-  SPEC_DIR: '{{.ROOT_DIR}}/openapi/reference-manager/currency/v1'
+  SPECS_DIR: '{{.ROOT_DIR}}/openapi'
+  CONFIGS_DIR: '{{.ROOT_DIR}}/configs'
   OUT_DIR: '{{.ROOT_DIR}}/out'
   NO_TESTS_AND_DOCS: modelTests=false,apiTests=false,modelDocs=false,apiDocs=false
+  ALL_LANGS: [go, python, java, typescript]
+  # Spec paths relative to SPECS_DIR, e.g. reference-manager/currency/v1
+  ALL_SPECS:
+    sh: cd {{.ROOT_DIR}}/openapi && find . -name openapi.yaml -exec dirname {} \; | sed 's|^\./||' | sort
 
 tasks:
   generate:
-    desc: Generate code from specifications for the target language (TARGET=go|python|java|typescript)
+    desc: Generate code from all specs or one for all languages or one ([TARGET=go|python|java|typescript] [SPEC=qa/v1])
+    vars:
+      TARGETS: '{{.TARGET | default (join " " .ALL_LANGS)}}'
+    cmds:
+      - for:
+          var: TARGETS
+        task: generate:lang
+        vars:
+          TARGET: '{{.ITEM}}'
+
+  generate:lang:
+    internal: true
     requires:
       vars:
         - name: TARGET
-          enum: [go, python, java, typescript]
+          enum:
+            ref: .ALL_LANGS
+    vars:
+      SPECS: '{{.SPEC | default .ALL_SPECS}}'
     cmds:
-      - task: generate:{{.TARGET}}
+      - for:
+          var: SPECS
+        task: generate:{{.TARGET}}
+        vars:
+          SPEC: '{{.ITEM}}'
 
   generate:go:
     internal: true
+    requires:
+      vars: [SPEC]
     vars:
       MODULE_DIR: '{{.OUT_DIR}}/go'
-      PACKAGE_DIR: '{{.MODULE_DIR}}/reference-manager/currency/v1'
+      PACKAGE_DIR: '{{.MODULE_DIR}}/{{.SPEC}}'
+      # reference-manager/currency/v1 -> currency_v1
+      PACKAGE_NAME: '{{splitList "/" .SPEC | initial | last | replace "-" "_"}}_{{splitList "/" .SPEC | last}}'
+    preconditions: &spec-exists
+      - sh: test -f {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml
+        msg: 'Spec {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml not found'
     cmds:
       - rm -rf {{.PACKAGE_DIR}}
       - |
         openapi-generator-cli generate \
-          -i {{.SPEC_DIR}}/openapi.yaml \
-          -c {{.SPEC_DIR}}/config.go.yaml \
+          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
+          -c {{.CONFIGS_DIR}}/go.yaml \
           -g go-server \
           -o {{.PACKAGE_DIR}} \
+          --additional-properties=packageName={{.PACKAGE_NAME}} \
           --global-property=models,apis,supportingFiles=api.go:routers.go:helpers.go:error.go:logger.go:impl.go
       - rm -rf {{.PACKAGE_DIR}}/.openapi-generator
+      # The generator creates a directory for the skipped api/openapi.yaml
+      - find {{.PACKAGE_DIR}} -type d -empty -delete
+      # go-server templates import "errors" in some models that never use it
+      - go run golang.org/x/tools/cmd/goimports@v0.52.0 -w {{.PACKAGE_DIR}}
       - cd {{.MODULE_DIR}} && go mod tidy
 
   generate:python:
     internal: true
+    requires:
+      vars: [SPEC]
     vars:
       PROJECT_DIR: '{{.OUT_DIR}}/python'
-      PACKAGE_DIR: '{{.PROJECT_DIR}}/reference_manager/currency/v1'
+      # reference-manager/currency/v1 -> reference_manager.currency.v1
+      PACKAGE_NAME: '{{.SPEC | replace "-" "_" | replace "/" "."}}'
+      PACKAGE_DIR: '{{.PROJECT_DIR}}/{{.PACKAGE_NAME | replace "." "/"}}'
+    preconditions: *spec-exists
     cmds:
       - rm -rf {{.PACKAGE_DIR}}
       - |
         openapi-generator-cli generate \
-          -i {{.SPEC_DIR}}/openapi.yaml \
-          -c {{.SPEC_DIR}}/config.python.yaml \
+          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
+          -c {{.CONFIGS_DIR}}/python.yaml \
           -g python \
           -o {{.PROJECT_DIR}} \
+          --additional-properties=packageName={{.PACKAGE_NAME}} \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=__init__.py:api_client.py:api_response.py:configuration.py:exceptions.py:rest.py
       - rm -rf {{.PROJECT_DIR}}/.openapi-generator
 
   generate:java:
     internal: true
+    requires:
+      vars: [SPEC]
     vars:
       PROJECT_DIR: '{{.OUT_DIR}}/java'
-      PACKAGE_DIR: '{{.PROJECT_DIR}}/src/main/java/ru/mephi/arch/api/referencemanager/currency/v1'
+      # reference-manager/currency/v1 -> ru.mephi.arch.api.referencemanager.currency.v1
+      PACKAGE_NAME: 'ru.mephi.arch.api.{{.SPEC | replace "-" "" | replace "/" "."}}'
+      PACKAGE_DIR: '{{.PROJECT_DIR}}/src/main/java/{{.PACKAGE_NAME | replace "." "/"}}'
+    preconditions: *spec-exists
     cmds:
       - rm -rf {{.PACKAGE_DIR}}
       - |
         openapi-generator-cli generate \
-          -i {{.SPEC_DIR}}/openapi.yaml \
-          -c {{.SPEC_DIR}}/config.java.yaml \
+          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
+          -c {{.CONFIGS_DIR}}/java.yaml \
           -g java \
           -o {{.PROJECT_DIR}} \
+          --additional-properties=invokerPackage={{.PACKAGE_NAME}},apiPackage={{.PACKAGE_NAME}}.api,modelPackage={{.PACKAGE_NAME}}.model \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=ApiClient.java:ApiException.java:ApiResponse.java:Configuration.java:JSON.java:Pair.java:RFC3339DateFormat.java:RFC3339InstantDeserializer.java:RFC3339JavaTimeModule.java:ServerConfiguration.java:ServerVariable.java:AbstractOpenApiSchema.java
       - rm -rf {{.PROJECT_DIR}}/.openapi-generator
       # The generator creates directories for skipped supporting files (gradle/, .github/, api/)
@@ -68,14 +115,17 @@ tasks:
 
   generate:typescript:
     internal: true
+    requires:
+      vars: [SPEC]
     vars:
-      PACKAGE_DIR: '{{.OUT_DIR}}/typescript/src/reference-manager/currency/v1'
+      PACKAGE_DIR: '{{.OUT_DIR}}/typescript/src/{{.SPEC}}'
+    preconditions: *spec-exists
     cmds:
       - rm -rf {{.PACKAGE_DIR}}
       - |
         openapi-generator-cli generate \
-          -i {{.SPEC_DIR}}/openapi.yaml \
-          -c {{.SPEC_DIR}}/config.typescript.yaml \
+          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
+          -c {{.CONFIGS_DIR}}/typescript.yaml \
           -g typescript-fetch \
           -o {{.PACKAGE_DIR}} \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=index.ts:runtime.ts

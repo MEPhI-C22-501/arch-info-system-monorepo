@@ -51,7 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-11-01T12:20:03.823061751+03:00[Europe/Moscow]", comments = "Generator version: 7.26.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.26.0")
 public class DefaultApi {
   /**
    * Utility class for extending HttpRequest.Builder functionality.

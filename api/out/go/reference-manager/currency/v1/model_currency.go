@@ -10,33 +10,31 @@
 
 package currency_v1
 
-
 import (
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
-
-
-// Currency - Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision. 
+// Currency - Currency information in accordance with the ISO 4217 standard. Includes alphabetic and numeric codes, the name, and rounding precision.
 type Currency struct {
 
-	// Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters. 
+	// Three-letter international currency code (alphabetic code). Always consists of three uppercase Latin letters.
 	Code string `json:"code" validate:"regexp=^[A-Z]{3}$"`
 
-	// Three-digit numeric currency code.  Passed as a string to preserve leading zeros (e.g., '840' for USD). 
+	// Three-digit numeric currency code.  Passed as a string to preserve leading zeros (e.g., '840' for USD).
 	Number string `json:"number" validate:"regexp=^\\d{3}$"`
 
 	// Official name of the currency in Russian or English.
 	Name string `json:"name"`
 
-	// The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD). 
+	// The number of decimal places (minor units) for fractional parts (cents, kopecks). Usually 2, but there are exceptions (e.g., 0 for JPY or 3 for BHD).
 	Decimals int32 `json:"decimals"`
 
 	// Indicates whether the currency record has been soft-deleted.
 	IsDeleted bool `json:"is_deleted"`
 }
+
 // UnmarshalJSON validates required property keys then unmarshals into Currency
 func (o *Currency) UnmarshalJSON(data []byte) (err error) {
 	// Presence is checked against required fields that exist on this struct,
@@ -50,18 +48,18 @@ func (o *Currency) UnmarshalJSON(data []byte) (err error) {
 	}
 
 	requiredNullableProperties := map[string]bool{
-		"code": false,
-		"number": false,
-		"name": false,
-		"decimals": false,
+		"code":       false,
+		"number":     false,
+		"name":       false,
+		"decimals":   false,
 		"is_deleted": false,
 	}
 
 	allowedJsonKeys := map[string]struct{}{
-		"code": {},
-		"number": {},
-		"name": {},
-		"decimals": {},
+		"code":       {},
+		"number":     {},
+		"name":       {},
+		"decimals":   {},
 		"is_deleted": {},
 	}
 
