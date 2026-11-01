@@ -1,0 +1,68 @@
+openapi: 3.1.0
+
+info:
+  title: Reference Manager Healthcheck API
+  description: API endpoints for monitoring the liveness and readiness of the Reference Manager service.
+  version: 1.0.0
+
+paths:
+  /v1/health/livez:
+    get:
+      operationId: getLiveness
+      summary: Liveness probe
+      description: Checks if the service is running. If this endpoint returns a non-200 response, the service is considered dead and should be restarted.
+      responses:
+        "200":
+          description: Service is alive and healthy.
+
+  /v1/health/readyz:
+    get:
+      operationId: getReadiness
+      summary: Readiness probe
+      description: Checks if the service is ready to accept and process network traffic. Returns a 503 status code if any critical internal or external dependencies are failing.
+      responses:
+        "200":
+          description: Service is ready to handle traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: Service is unavailable or dependencies have failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+
+components:
+  schemas:
+    Readiness:
+      type: object
+      required:
+        - ready
+        - failedDependencies
+      properties:
+        ready:
+          type: boolean
+          description: Indicates whether the service is fully operational.
+          example: true
+        failedDependencies:
+          type: array
+          description: A list of internal or external systems that are currently unreachable or failing.
+          items:
+            $ref: "#/components/schemas/FailedDependency"
+
+    FailedDependency:
+      type: object
+      required:
+        - name
+        - error
+      properties:
+        name:
+          type: string
+          description: The name of the failed dependency (e.g., Database, Cache, External API).
+          example: "PostgreSQL Database"
+        error:
+          type: string
+          description: The error message or reason for the dependency failure.
+          example: "Connection timeout after 5000ms"
