@@ -1,0 +1,10 @@
+{
+  "name": "arch-api",
+  "version": "0.1.0",
+  "description": "Generated clients for arch-info-system APIs",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./reference-manager/currency/v1": "./src/reference-manager/currency/v1/index.ts"
+  }
+}
