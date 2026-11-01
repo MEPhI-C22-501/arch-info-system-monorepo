@@ -306,7 +306,7 @@ Postgres и Keycloak в пилотах. Система как единое це�
 Разрыв 6 — проверка интеграций на моках и расхождение форматов:
     grep -rn "mock-tracker" reports/pilots/compose.yaml | head -3
     grep -n "INTEGRATION_MODE" planning-system/server/worker.py | head -3
-    grep -n "sinceVersion" task-tracker/backend/src/main/java/ru/mephi/arch/tasktracker/DirectoryService.java
+    grep -n "sinceVersion" task-tracker/backend/src/main/java/**/DirectoryService.java
     grep -rc "sinceVersion" reference-manager/backend/api/openapi/ | head -3          # ожидается 0
     grep -n "directory-url\|dev-directory" task-tracker/backend/src/main/resources/application.yml
 
