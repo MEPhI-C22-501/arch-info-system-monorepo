@@ -11,6 +11,28 @@ vars:
     sh: cd {{.ROOT_DIR}}/openapi && find . -name openapi.yaml -exec dirname {} \; | sed 's|^\./||' | sort
 
 tasks:
+  swagger:
+    desc: Start Swagger UI in Docker for specs of all components (SWAGGER_PORT=8080)
+    vars:
+      SWAGGER_PORT: '{{.SWAGGER_PORT | default "8080"}}'
+    cmds:
+      - |
+        URLS_JSON="["
+        for spec in {{.ALL_SPECS | catLines}}; do
+          URLS_JSON="${URLS_JSON}{\"url\":\"api/${spec}/openapi.yaml\",\"name\":\"${spec}\"},"
+        done
+        URLS_JSON="${URLS_JSON%,}]"
+
+        echo -e "Swagger UI is running at: http://localhost:{{.SWAGGER_PORT}} \n"
+
+        docker run --rm \
+          -p {{.SWAGGER_PORT}}:8080 \
+          -v "{{.SPECS_DIR}}:/usr/share/nginx/html/api:ro" \
+          -e URLS_PRE_FILTER="true" \
+          -e URLS="$URLS_JSON" \
+          --name api_swagger_ui \
+          swaggerapi/swagger-ui
+
   generate:
     desc: Generate code from all specs or one for all languages or one ([TARGET=go|python|java|typescript] [SPEC=qa/v1])
     vars:
