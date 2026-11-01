@@ -1,0 +1,6 @@
+library: native
+useJakartaEe: true
+openApiNullable: false
+annotationLibrary: none
+documentationProvider: none
+hideGenerationTimestamp: true

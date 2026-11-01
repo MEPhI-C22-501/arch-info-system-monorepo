@@ -1,0 +1,7 @@
+isGoSubmodule: false
+generateInterfaces: true
+router: chi
+outputAsLibrary: true
+onlyInterfaces: true
+sourceFolder: .
+enumClassPrefix: true
