@@ -46,6 +46,12 @@ public class AccessService {
         require("item.read");
         if (role().equals("MEMBER") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");
     }
+    /** QA's read-only account (Q-09): single-item + comment reads only, never list/search or
+     * write — those still go through {@link #itemRead}/{@link #require} unmodified. */
+    public void itemReadOrQa(Map<String,Object> item) {
+        if (clientRole("qa-tracker-reader")) return;
+        itemRead(item);
+    }
     public void itemWrite(Map<String,Object> item) {
         require("item.update");
         if (role().equals("MEMBER") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");

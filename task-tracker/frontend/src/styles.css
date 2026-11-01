@@ -4,3 +4,10 @@
 .attachment-preview { margin-top: 16px; padding: 12px; border: 1px solid #dce2eb; border-radius: 12px; }
 .attachment-preview img, .attachment-preview iframe { display: block; width: 100%; max-height: 420px; object-fit: contain; margin-top: 12px; border: 0; }
 .attachment-preview iframe { height: 420px; }
+.picker { position: relative; min-width: 0; }
+.picker-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid #dce2eb; border-radius: 8px; padding: 10px 12px; cursor: pointer; font-size: 12px; color: #263247; }
+.picker-selected button { border: 0; background: none; color: #8792a3; font-size: 15px; line-height: 1; padding: 0 2px; }
+.picker-options { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 6px; list-style: none; background: #fff; border: 1px solid #dce2eb; border-radius: 10px; box-shadow: 0 10px 25px #1c294526; max-height: 220px; overflow: auto; }
+.picker-options li button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 9px; border-radius: 7px; font-size: 12px; color: #263247; }
+.picker-options li button:hover { background: #f1f3fb; }
+.filter-reset { white-space: nowrap; }

@@ -34,4 +34,17 @@ class AccessServiceTest {
         assertEquals(403, assertThrows(ApiException.class, () -> access.itemWrite(other)).status);
         assertDoesNotThrow(() -> access.itemRead(Map.of("assignee_external_id", "member")));
     }
+
+    @Test void qaTrackerReaderBypassesItemReadButNotPlainItemRead() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject("service-account-qa-tracker-reader")
+            .claim("resource_access", Map.of("task-tracker", Map.of("roles", java.util.List.of("qa-tracker-reader"))))
+            .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        AccessService access = new AccessService(db, "");
+        var someonesItem = Map.<String,Object>of("assignee_external_id", "someone-else");
+        assertDoesNotThrow(() -> access.itemReadOrQa(someonesItem));
+        verifyNoInteractions(db);
+        assertEquals(403, assertThrows(ApiException.class, () -> access.itemRead(someonesItem)).status);
+    }
 }

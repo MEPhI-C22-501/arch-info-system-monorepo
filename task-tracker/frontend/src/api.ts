@@ -18,6 +18,7 @@ export type Iteration = {
 export type Status = { id: string; name: string; boardOrder: number; active: boolean; boardVisible: boolean; category: string };
 export type Priority = { id: string; name: string; sortOrder: number; active: boolean; code: string | null };
 export type User = { id: string; name: string; teamId: string | null; departmentId: string | null; active: boolean };
+export type Page<T> = { items: T[]; page: number; pageSize: number; totalPages: number; total: number };
 
 const authority = import.meta.env.VITE_OIDC_AUTHORITY || 'http://localhost:8081/realms/arch-info-system';
 export const auth = new UserManager({
