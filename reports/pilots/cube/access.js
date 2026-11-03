@@ -23,6 +23,8 @@ async function rewrite(query, { securityContext: c }, resolve=lookup) {
   const refs=members(query); const cubes=[...new Set(refs.map(x=>x.split('.')[0]))];
   if(cubes.length!==1 || !allowed[cubes[0]])throw Error('Reports scope requires one supported cube');
   const cube=cubes[0];
+  // *Part measures are rollup leaves (e.g. raw hour sums); only their derived measures are public.
+  if(refs.some(r=>/Part$/.test(r)))throw Error('Reports scope denied');
   if(cube==='PlanFact') {
     const period=(query.timeDimensions||[]).find(t=>t.dimension==='PlanFact.period')?.dateRange;
     if(!Array.isArray(period)||period.length!==2||!period.every(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(d))||Date.parse(period[1])<Date.parse(period[0]))throw Error('PlanFact requires an explicit period scope');

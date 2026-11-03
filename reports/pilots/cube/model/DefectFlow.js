@@ -1,5 +1,7 @@
 cube('DefectFlow', {
   sql: 'SELECT * FROM dwh.cube_defect_flow',
+  // Distinct defect counts are not additive; approximate distinct needs Cubestore (ADR-017, ADR-018).
+  refreshKey: { every: '1 minute' },
   measures: {
     closed: { sql: `COUNT(DISTINCT CASE WHEN to_status='CLOSED' THEN defect_id END)`, type: 'number', description: 'M-12: distinct defects closed during selected period' },
     reopened: { sql: `COUNT(DISTINCT CASE WHEN is_reopen=1 THEN defect_id END)`, type: 'number', description: 'M-17: distinct reopened defects' },

@@ -93,6 +93,35 @@ def main():
                 try:request('load',q,access)
                 except RuntimeError:checks.append('permission-denied')
                 else:raise AssertionError('Unauthorized Cube query succeeded')
+            # Rollup-only Cube answers only from pre-aggregations: additive measures must still
+            # match, while quantiles, distinct counts and period-bound cubes must be refused (ADR-018).
+            cube.terminate();cube.wait(timeout=30)
+            port=free_port();cube=subprocess.Popen([os.getenv('NODE','node'),'-e',script],cwd=Path(__file__).with_name('cube'),env=dict(env,PORT=str(port),CUBEJS_PG_SQL_PORT=str(free_port()),CUBEJS_ROLLUP_ONLY='true'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            for _ in range(90):
+                if cube.poll() is not None:raise RuntimeError('Cube rollup-only server failed')
+                try:request('meta');break
+                except (urllib.error.URLError,TimeoutError):time.sleep(1)
+            else:raise RuntimeError('Cube rollup-only readiness failed')
+            rollups=[('TimeLogs.hours',expected['R-01']['M-01'],{}),('TimeLogs.hours',3.75,{'access':token(MB,MEMBER_1)}),
+                     *[('WorkItems.'+m,v,{}) for m,v in [('plannedHours',10),('remainingHours',-1.25),('actualHours',11.25),('overrun',1.25),('overdue',0),('completionPercent',100),('throughput',1),('estimateErrorPercent',12.5),('tasks',1)]],
+                     ('WorkItems.plannedHours',10,{'access':token(PM)}),('Defects.opened',1,{}),('Defects.remaining',1,{}),
+                     ('TestResults.passPercent',100,{}),('TestRuns.passPercent',100,{}),('TestRuns.executionPercent',100,{}),
+                     ('Quality.candidateDefectDensity',10,{}),('Quality.defectDensity',None,{}),('Resources.utilizationPercent',None,{}),
+                     ('Resources.utilizationPercent',46.875,{'filters':[{'member':'Resources.userId','operator':'equals','values':[MEMBER_1]}]})]
+            for measure,wanted,kwargs in rollups:
+                for _ in range(120):
+                    try:equal(measure,wanted,**kwargs);break
+                    except RuntimeError:time.sleep(1)  # the first rollup build is asynchronous
+                else:raise AssertionError(measure+' is not served by a pre-aggregation')
+                checks.append('rollup:'+measure)
+            facts_only=[('WorkItems.cycleMedian',{}),('Defects.closeMedian',{}),('DefectFlow.closed',{}),('Forecasts.forecastFinish',{}),
+                        ('StatusFlow.averageWip',{'timeDimensions':[{'dimension':'StatusFlow.day','dateRange':['2026-10-01','2026-10-07']}]}),
+                        ('PlanFact.overrun',{'timeDimensions':[{'dimension':'PlanFact.period','dateRange':['2026-10-01','2026-10-31']}]}),
+                        ('Resources.deficitHours',{})]
+            for measure,kwargs in facts_only:
+                try:query([measure],**kwargs)
+                except RuntimeError:checks.append('facts-only:'+measure)
+                else:raise AssertionError(measure+' was unexpectedly served by a pre-aggregation')
             result={'passed':True,'checks':checks,'real_cube':True,'real_postgres':True,'m16_approved':False,'source_integrations_verified':False}
             root=Path(__file__).resolve().parents[2];sources=[Path(__file__),Path(__file__).with_name('star.py'),*(p for p in Path(__file__).with_name('cube').rglob('*.js') if p.is_file() and 'node_modules' not in p.parts)]
             result['source_sha256']={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
