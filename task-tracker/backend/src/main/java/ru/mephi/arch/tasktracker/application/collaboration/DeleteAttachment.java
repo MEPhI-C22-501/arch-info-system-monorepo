@@ -27,7 +27,7 @@ public class DeleteAttachment {
     public void execute(UUID workItemId, UUID attachmentId) {
         permissions.requireItemReadable(workItems.getById(workItemId).assigneeId);
         permissions.require("attachment.delete");
-        Attachment attachment = attachments.getByIdAndWorkItem(attachmentId, workItemId);
+        Attachment attachment = attachments.findMetadataByWorkItem(workItemId).stream().filter(row -> row.id.equals(attachmentId)).findFirst().orElseThrow(() -> ApiException.missing("attachmentId"));
         if ("MEMBER".equals(permissions.currentRole()) && !permissions.currentSubject().equals(attachment.uploadedByExternalId)) {
             throw new ApiException(403, "attachment", "forbidden");
         }

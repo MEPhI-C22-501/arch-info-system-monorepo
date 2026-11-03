@@ -1,0 +1,41 @@
+# Optional standalone integration services; combine with compose.yaml.
+services:
+  broker:
+    image: apache/kafka:4.3.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  object-store:
+    image: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+    build: ../infra/images/minio
+    command: [server, /data, --console-address, ':9001']
+    environment:
+      MINIO_ROOT_USER: tracker-local
+      MINIO_ROOT_PASSWORD: tracker-local-password
+    volumes: [tracker_objects:/data]
+  object-bootstrap:
+    image: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+    build: ../infra/images/minio
+    entrypoint: [/bin/sh, -c]
+    command: ["until mc alias set local http://object-store:9000 tracker-local tracker-local-password; do sleep 2; done; mc mb --ignore-existing local/arch-dev-task-tracker"]
+    depends_on: [object-store]
+  backend:
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: broker:9092
+      S3_ENDPOINT: http://object-store:9000
+      S3_BUCKET: arch-dev-task-tracker
+      S3_ACCESS_KEY: tracker-local
+      S3_SECRET_KEY: tracker-local-password
+    depends_on:
+      object-bootstrap: {condition: service_completed_successfully}
+      broker: {condition: service_started}
+volumes:
+  tracker_objects:

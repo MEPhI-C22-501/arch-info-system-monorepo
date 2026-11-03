@@ -41,6 +41,9 @@ class JdbcWorkItemRepositoryTest {
         db = new JdbcTemplate(dataSource);
         try (Connection connection = dataSource.getConnection()) {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/changelog/001-initial.sql"));
+            try(var statement=connection.createStatement()) {
+                statement.execute(new ClassPathResource("db/changelog/002-review.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+            }
         }
     }
 
@@ -60,6 +63,20 @@ class JdbcWorkItemRepositoryTest {
 
     private UUID statusId() { return db.queryForObject("SELECT id FROM status LIMIT 1", UUID.class); }
     private UUID priorityId() { return db.queryForObject("SELECT id FROM priority LIMIT 1", UUID.class); }
+
+    @Test void blockingLinksRejectCyclesAndSymmetricLinksRejectReverseDuplicates() {
+        var permissions=org.mockito.Mockito.mock(ru.mephi.arch.tasktracker.application.port.PermissionPort.class);
+        org.mockito.Mockito.when(permissions.currentSubject()).thenReturn("lead");
+        var publisher=org.mockito.Mockito.mock(ru.mephi.arch.tasktracker.application.port.EventPublisherPort.class);
+        var controller=new ru.mephi.arch.tasktracker.LinkController(db,repo,permissions,publisher);
+        UUID a=UUID.randomUUID(),b=UUID.randomUUID(),c=UUID.randomUUID();
+        repo.insert(newTask(a,null));repo.insert(newTask(b,null));repo.insert(newTask(c,null));
+        controller.create(a,java.util.Map.of("targetId",b,"type","BLOCKS"));
+        controller.create(b,java.util.Map.of("targetId",c,"type","BLOCKS"));
+        assertThrows(ApiException.class,()->controller.create(c,java.util.Map.of("targetId",a,"type","BLOCKS")));
+        controller.create(a,java.util.Map.of("targetId",c,"type","RELATED"));
+        assertThrows(ApiException.class,()->controller.create(c,java.util.Map.of("targetId",a,"type","RELATED")));
+    }
 
     @Test void insertThenGetByIdRoundTrips() {
         UUID id = UUID.randomUUID();

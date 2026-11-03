@@ -50,6 +50,8 @@ public class CreateWorkItem {
         if (!typeSettings.isEnabled(type)) throw ApiException.invalid("type", "disabled");
         String title = Values.str(input, "title", true);
 
+        if(input.containsKey("title")) Values.checkLength("title", Objects.toString(input.get("title"),""));
+        if(input.containsKey("description")) Values.checkLength("description", Objects.toString(input.get("description"),""));
         UUID statusId = Values.uuid(input.getOrDefault("statusId", statuses.defaultStatusId()), "statusId");
         if (!statuses.isActive(statusId)) throw ApiException.invalid("statusId", "unknown_or_inactive");
         UUID priorityId = Values.uuid(input.getOrDefault("priorityId", priorities.defaultPriorityId()), "priorityId");

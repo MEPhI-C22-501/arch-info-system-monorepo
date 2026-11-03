@@ -39,20 +39,32 @@ public class DirectoryService {
         long start=System.nanoTime();String correlation=ApiAdvice.correlationId();
         try {
             if(url.isBlank())throw new IllegalStateException("directory_url_not_configured");
-            String version=Objects.toString(db.queryForObject("SELECT version FROM directory_meta WHERE singleton=true",String.class),"");
-            String endpoint=url+(url.contains("?")?"&":"?")+"sinceVersion="+URLEncoder.encode(version,StandardCharsets.UTF_8);
-            HttpRequest.Builder builder=HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(6)).header("Accept","application/json").header("X-Correlation-ID",correlation).GET();
-            if(!token.isBlank())builder.header("Authorization","Bearer "+token);
-            HttpResponse<String> response=null;
-            for(int attempt=0;attempt<3;attempt++){
-                try{response=http.send(builder.build(),HttpResponse.BodyHandlers.ofString());if(response.statusCode()<500)break;}
-                catch(Exception e){if(attempt==2)throw e;}
-                if(attempt<2)Thread.sleep(200L*(attempt+1));
+            List<Map<String,Object>> employees=pages("employees"), units=pages("org_units");
+            List<Map<String,Object>> users=new ArrayList<>(), teams=new ArrayList<>(), departments=new ArrayList<>();
+            Set<String> subjects=new HashSet<>();
+            Map<String,Map<String,Object>> org=new HashMap<>();
+            for(var unit:units) {
+                String id=unit.get("id").toString(); org.put(id,unit);
+                Map<String,Object> entry=Map.of("id",id,"name",Objects.toString(unit.get("name"),id),"active",!Boolean.TRUE.equals(unit.get("is_deleted")));
+                if("TEAM".equals(unit.get("kind"))) teams.add(entry); else departments.add(entry);
             }
-            if(response==null||response.statusCode()!=200)throw new IllegalStateException("directory_http_"+(response==null?"unavailable":response.statusCode()));
-            Map<String,Object> snapshot=json.readValue(response.body(),Map.class);
-            String nextVersion=required(snapshot,"version");
-            List<Map<String,Object>> users=entries(snapshot,"users"),teams=entries(snapshot,"teams"),departments=entries(snapshot,"departments");
+            for(var employee:employees) {
+                String sub=Objects.toString(employee.get("account_user_id"),"");
+                if(sub.isBlank()) continue;
+                if(!subjects.add(sub)) throw new IllegalArgumentException("duplicate_account_user_id");
+                Map<String,Object> entry=new HashMap<>(); entry.put("id",sub);
+                entry.put("name",(Objects.toString(employee.get("family_name"),"")+" "+Objects.toString(employee.get("given_name"),"")+" "+Objects.toString(employee.get("middle_name"),"")).trim());
+                entry.put("active","EMPLOYED".equals(employee.get("employment_state")) && "ENABLED".equals(employee.get("account_state")) && !Boolean.TRUE.equals(employee.get("is_deleted")));
+                String cursor=Objects.toString(employee.get("org_unit_id"),""); Set<String> visited=new HashSet<>();
+                while(org.containsKey(cursor)) {
+                    if(!visited.add(cursor)) throw new IllegalArgumentException("org_cycle");
+                    var unit=org.get(cursor);
+                    if("TEAM".equals(unit.get("kind"))) entry.putIfAbsent("teamId",cursor); else entry.putIfAbsent("departmentId",cursor);
+                    cursor=Objects.toString(unit.get("parent_id"),"");
+                }
+                users.add(entry);
+            }
+            String nextVersion=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(List.of(employees,units))));
             tx.executeWithoutResult(s->{
                 db.update("UPDATE user_cache SET active=false");db.update("UPDATE directory_team SET active=false");db.update("UPDATE directory_department SET active=false");
                 for(var e:teams)db.update("INSERT INTO directory_team(external_id,display_name,active) VALUES(?,?,?) ON CONFLICT(external_id) DO UPDATE SET display_name=EXCLUDED.display_name,active=EXCLUDED.active",e.get("id"),e.get("name"),e.get("active"));
@@ -63,6 +75,33 @@ public class DirectoryService {
             log(true,"synced version "+nextVersion,start,correlation);
             return Map.of("version",nextVersion,"users",users.size(),"teams",teams.size(),"departments",departments.size());
         }catch(Exception e){log(false,e.getMessage()==null?"directory_error":e.getMessage(),start,correlation);throw new ApiException(503,"directory","sync_failed");}
+    }
+    @SuppressWarnings("unchecked")
+    private List<Map<String,Object>> pages(String resource) throws Exception {
+        List<Map<String,Object>> all=new ArrayList<>(); Set<String> seen=new HashSet<>(); String page="";
+        do {
+            if(!seen.add(page)) throw new IllegalArgumentException("page_token_cycle");
+            String endpoint=url.replaceAll("/+$", "")+"/v1/"+resource+"/?allowDeleted=true&pageSize=100"+(page.isEmpty()?"":"&pageToken="+URLEncoder.encode(page,StandardCharsets.UTF_8));
+            HttpResponse<String> response=null;
+            for(int attempt=0;attempt<3;attempt++) {
+                var builder=HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(6)).header("Accept","application/json").header("X-Correlation-ID",ApiAdvice.correlationId()).GET();
+                if(!token.isBlank()) builder.header("Authorization","Bearer "+token);
+                try { response=http.send(builder.build(),HttpResponse.BodyHandlers.ofString());
+                    if(response.statusCode()<500 && response.statusCode()!=429) break;
+                } catch(java.io.IOException ex) { if(attempt==2) throw ex; }
+                if(attempt<2) Thread.sleep(200L*(attempt+1));
+            }
+            if(response==null || response.statusCode()!=200) throw new IllegalStateException("directory_http_"+(response==null?"unavailable":response.statusCode()));
+            Map<String,Object> body=json.readValue(response.body(),Map.class);
+            Object collection=body.get(resource);
+            if(!(collection instanceof List<?>)) throw new IllegalArgumentException("missing_"+resource);
+            for(Object row:(List<?>)collection) {
+                if(!(row instanceof Map<?,?>)) throw new IllegalArgumentException("invalid_"+resource);
+                all.add((Map<String,Object>)row);
+            }
+            page=Objects.toString(body.get("nextPageToken"),"");
+        } while(!page.isEmpty());
+        return all;
     }
     private String required(Map<String,Object> entry,String key){Object v=entry.get(key);if(v==null||v.toString().isBlank())throw new IllegalArgumentException("missing_"+key);return v.toString();}
     @SuppressWarnings("unchecked") private List<Map<String,Object>> entries(Map<String,Object> snapshot,String key){

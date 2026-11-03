@@ -12,7 +12,12 @@ public final class Values {
         if (value == null) { if (required) throw ApiException.invalid(field,"required"); return null; }
         String result = value.toString().trim();
         if (required && result.isEmpty()) throw ApiException.invalid(field,"required");
+        checkLength(field,result);
         return result;
+    }
+    public static void checkLength(String field,String value) {
+        int max=switch(field) { case "title", "name" -> 255; case "description" -> 50000; case "body" -> 10000; default -> Integer.MAX_VALUE; };
+        if(value!=null && value.length()>max) throw ApiException.invalid(field,"too_long");
     }
     public static UUID uuid(Object value, String field) {
         if (value == null || value.toString().isBlank()) return null;
@@ -27,7 +32,7 @@ public final class Values {
         if (value == null || value.toString().isBlank()) return null;
         try {
             BigDecimal result = new BigDecimal(value.toString());
-            if (result.scale() > 2 || (positive ? result.signum() <= 0 : result.signum() < 0)) throw new NumberFormatException();
+            if (result.compareTo(new BigDecimal("9999999999.99"))>0 || result.scale() > 2 || (positive ? result.signum() <= 0 : result.signum() < 0)) throw new NumberFormatException();
             return result;
         } catch (NumberFormatException e) { throw ApiException.invalid(field,"invalid_hours"); }
     }

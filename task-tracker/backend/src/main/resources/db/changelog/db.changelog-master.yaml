@@ -6,3 +6,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/changelog/001-initial.sql
             splitStatements: true
+  - changeSet:
+      id: 002-review
+      author: task-tracker
+      changes:
+        - sqlFile:
+            path: db/changelog/002-review.sql
+            splitStatements: false

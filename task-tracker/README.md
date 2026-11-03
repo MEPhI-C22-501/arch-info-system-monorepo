@@ -29,3 +29,14 @@ Keycloak принят как единый IdP проекта. Владение �
 ## Исправления по проверке 12.10.2026
 
 Добавлены [CI и демо-данные](docs/block-i-integration-and-deployment/165.deployment-diagram.md), [отчёт безопасности](docs/security-check.md); временный REST-опрос и контрольные даты согласований уточнены в [162](docs/block-i-integration-and-deployment/162.integration-spec.md). Линтеры: `cd backend && mvn checkstyle:check`; `cd frontend && npm run lint`.
+
+## Правки по разбору 01.11.2026
+
+Перечень изменений, API и параметры интеграций: [отчёт](docs/review-2026-11-01.md).
+Проверки: `bash scripts/check.sh`. Для браузерных сценариев поднимите отдельный стенд,
+затем выполните `cd frontend && npm run test:e2e`. Переменная `TRACKER_E2E_URL` задаёт
+адрес стенда; `TRACKER_CHROME_PATH` позволяет использовать установленный Chromium/Chrome.
+
+## Для команды инфраструктуры
+
+[166 — Настройка S3 и Kafka для Task Tracker](docs/block-i-integration-and-deployment/166.infrastructure-s3-kafka.md): ресурсы, ACL, секреты, TLS, передача конфигурации в backend и совместная приёмка. В инструкции отдельно отмечено несовпадение PLAIN в общем Kafka и SCRAM-SHA-512 в текущем клиенте трекера.

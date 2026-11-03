@@ -1,3 +1,6 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
+import { validateItem } from '../../validation';
+import { Links } from '../../components/Links';
 import { useEffect, useState } from 'react';
 import { auth, date, dateTime, hours, json, request, typeName } from '../../api';
 import type { Item, Json } from '../../api';
@@ -14,6 +17,7 @@ const getError = (e: unknown): string => (e instanceof Error ? e.message : 'Не
 
 export function ItemDialog({ id, context, close, open, refresh }:
   { id: string; context: Context; close: () => void; open: (id: string) => void; refresh: () => void }) {
+  const dialogRef=useDialogFocus(close);
   const [item, setItem] = useState<Item | null>(null);
   const [form, setForm] = useState<Json>({});
   const [comments, setComments] = useState<Array<Json>>([]);
@@ -60,6 +64,8 @@ export function ItemDialog({ id, context, close, open, refresh }:
     if (key === 'description') localStorage.setItem(`description:${id}`, String(value));
   };
   const save = async () => {
+    const invalid = validateItem(form);
+    if (Object.keys(invalid).length) { setError(Object.values(invalid).join('; ')); return; }
     if (!item) return;
     try {
       await request(`/work-items/${id}`, json('PATCH', { ...form, assigneeId: form.assigneeId || null, parentId: form.parentId || null,
@@ -124,7 +130,7 @@ export function ItemDialog({ id, context, close, open, refresh }:
   const allowedChild = item?.type === 'PROJECT' ? 'EPIC' : item?.type === 'EPIC' ? 'TASK' : ['TASK', 'BUG'].includes(item?.type || '') ? 'SUBTASK' : null;
 
   return <div className="overlay" onMouseDown={close}>
-    <div className="item-dialog" role="dialog" aria-modal="true" aria-label="Карточка рабочего элемента" onMouseDown={e => e.stopPropagation()}>
+    <div className="item-dialog" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Карточка рабочего элемента" onMouseDown={e => e.stopPropagation()}>
       <div className="dialog-title">
         <div><span className="eyebrow">{item ? `${typeName(item.type)} · ${id.slice(0, 8)}` : 'ЗАГРУЗКА'}</span><h2>{item?.title || 'Рабочий элемент'}</h2></div>
         <button onClick={close} aria-label="Закрыть">×</button>
@@ -165,7 +171,8 @@ export function ItemDialog({ id, context, close, open, refresh }:
           {item.parentId && <button className="link-row" onClick={() => open(item.parentId!)}>↑ Родительский элемент · {item.parentId.slice(0, 8)}</button>}
           {item.children.length ? item.children.map(child => <button className="link-row" key={child.id} onClick={() => open(child.id)}>↳ {typeName(child.type)} · {child.title}</button>) : <p className="muted">Дочерних элементов нет</p>}
         </div>
-        <div className="tabs" role="tablist">
+        {['TASK','BUG','SUBTASK'].includes(item.type) && <Links id={id} context={context} open={open} />}
+      <div className="tabs" role="tablist">
           {([['discussion', 'Комментарии'], ['time', 'Трудозатраты'], ['files', 'Вложения'], ['history', 'История']] as const).map(([key, label]) =>
             <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}
         </div>

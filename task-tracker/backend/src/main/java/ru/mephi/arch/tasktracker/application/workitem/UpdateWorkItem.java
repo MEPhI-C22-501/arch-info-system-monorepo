@@ -53,6 +53,8 @@ public class UpdateWorkItem {
             throw ApiException.invalid("type", "immutable");
         }
 
+        if(input.containsKey("title")) Values.checkLength("title", Objects.toString(input.get("title"),""));
+        if(input.containsKey("description")) Values.checkLength("description", Objects.toString(input.get("description"),""));
         UUID statusId = before.statusId;
         if (input.containsKey("statusId")) {
             UUID requested = Values.uuid(input.get("statusId"), "statusId");
