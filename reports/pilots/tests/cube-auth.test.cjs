@@ -33,6 +33,10 @@ test('BI SQL identity cannot reach new models; mixed cubes are rejected',async()
  await assert.rejects(run({measures:['Forecasts.budgetAdjustment']},claims(['reports-bi-service'])),/scope/);
  await assert.rejects(run({measures:['TimeLogs.hours','WorkItems.plannedHours']},claims(['reports-analyst'])),/scope/);
 });
+test('rollup leaf measures are never queryable directly',async()=>{
+ for(const roles of [['reports-analyst'],['reports-qa-lead'],['reports-bi-service']])await assert.rejects(run({measures:['WorkItems.actualSumPart']},claims(roles)),/scope/);
+ await assert.rejects(run({measures:['WorkItems.plannedHours'],filters:[{member:'WorkItems.plannedSumPart',operator:'gt',values:['0']}]},claims(['reports-analyst'])),/scope/);
+});
 test('unknown SQL identities are denied and production uses the tested rewrite',async()=>{
  assert.equal(config.queryRewrite,rewrite);await assert.rejects(config.checkSqlAuth({},'any-user'),/denied/);
 });

@@ -11,6 +11,9 @@ cube('PlanFact', {
     SELECT 'time:'||l.id,l.project_id,l.user_id,NULL,NULL,l.hours_cents/100.0,
       ${FILTER_PARAMS.PlanFact.period.filter((from, to) => from)}::date AS period
     FROM dwh.report_time_log l WHERE ${FILTER_PARAMS.PlanFact.period.filter('l.logged_date::date')}`,
+  // Exact R-06 semantics depend on the requested period, so this cube reads the facts.
+  // The pre-aggregated plan-fact uses TimeLogs.hours and WorkItems.plannedHours (ADR-018).
+  refreshKey: { every: '1 minute' },
   measures: {
     hours: {sql: 'COALESCE(SUM(logged_hours),0)',type:'number',description:'M-01: period actual hours'},
     plannedHours: {sql:'SUM(planned_hours)',type:'number',description:'M-02: leaf task population at period end'},

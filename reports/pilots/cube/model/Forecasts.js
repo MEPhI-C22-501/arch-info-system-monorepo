@@ -1,5 +1,7 @@
 cube('Forecasts', {
   sql: 'SELECT * FROM dwh.cube_forecasts',
+  // One latest forecast row per project: nothing to pre-aggregate (ADR-018).
+  refreshKey: { every: '1 minute' },
   measures: {
     budgetAdjustment: { sql: `SUM(budget_adjustment)`, type: 'number', description: 'M-09: Planning source value; cost.read and currency dimension mandatory' },
     estimatedTotalCost: { sql: `SUM(estimated_total_cost)`, type: 'number', description: 'Planning cost; no inferred rates' },

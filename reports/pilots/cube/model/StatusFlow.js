@@ -1,5 +1,7 @@
 cube('StatusFlow', {
   sql: 'SELECT * FROM dwh.cube_daily_wip',
+  // Average WIP divides by the number of distinct days: not additive, no rollup (ADR-018).
+  refreshKey: { every: '1 minute' },
   measures: {
     averageWip: { sql: `CASE WHEN MIN(history_known)=1 THEN 1.0*SUM(is_working)/NULLIF(COUNT(DISTINCT day),0) END`, type: 'number', description: 'M-19: average daily WIP; filter day including zero WIP days' },
   },

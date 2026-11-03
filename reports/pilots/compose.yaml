@@ -179,6 +179,12 @@ services:
       CUBESQL_SQL_PUSH_DOWN: "false"
       CUBEJS_PRE_AGGREGATIONS_SCHEMA: reports_preaggregations
       CUBEJS_PRE_AGGREGATIONS_BUILDER: "true"
+      # Without it Cube builds and refreshes rollups only when a query arrives; the
+      # single local process also runs the scheduled refresh (ADR-017, ADR-018).
+      CUBEJS_REFRESH_WORKER: "true"
+      # A minute refresh creates a new table version each time; drop versions untouched
+      # for 10 minutes instead of the default 24 hours, or the schema grows by thousands a day.
+      CUBEJS_TOUCH_PRE_AGG_TIMEOUT: "600"
       # Single-process local pilot: rollups persist in PostgreSQL. The official
       # Cubestore image has no ARM64 manifest and hangs under QEMU on this Mac.
       # Shared production queues/cache require a separately verified Cubestore.
