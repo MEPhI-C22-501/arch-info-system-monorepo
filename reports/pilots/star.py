@@ -69,6 +69,14 @@ def migrate(db):
                 if target in DIMS or target=='date': refs.append(f'FOREIGN KEY({column}) REFERENCES dwh.dim_{target}({target}_key)')
             else: defs.append(column+' '+kind)
         db.execute(f'CREATE TABLE IF NOT EXISTS dwh.fact_{name}(id TEXT PRIMARY KEY,{",".join(defs)},data_as_of TEXT NOT NULL,payload TEXT NOT NULL{","+",".join(refs) if refs else ""})')
+    # The current_* views pick the latest snapshot per entity and cube_daily_wip and
+    # cube_resources look up transitions and availability per row: without these
+    # indexes each lookup scans the whole fact table (measured in check_cube_matrix.py).
+    for name,table,columns in [('work_item_latest','fact_work_item_daily','work_item_id,snapshot_date'),
+                               ('defect_latest','fact_defect_daily','defect_id,snapshot_date'),
+                               ('status_transition_item','fact_status_transition','work_item_id,changed_at'),
+                               ('availability_user','fact_availability','user_id,status')]:
+        db.execute(f'CREATE INDEX IF NOT EXISTS star_{name} ON dwh.{table}({columns})')
     db.execute('''CREATE TABLE IF NOT EXISTS dwh.plan_version(id TEXT PRIMARY KEY,project_key BIGINT NOT NULL DEFAULT -1 REFERENCES dwh.dim_project(project_key),
       project_id TEXT,version_number INTEGER,revision INTEGER,status TEXT,data_as_of TEXT NOT NULL,payload TEXT NOT NULL)''')
     db.execute('''CREATE TABLE IF NOT EXISTS etl.star_issue(source TEXT NOT NULL,entity TEXT NOT NULL,entity_id TEXT NOT NULL,code TEXT NOT NULL,
