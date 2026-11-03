@@ -24,7 +24,8 @@ public class JdbcAttachmentRepository implements AttachmentRepository {
         rs.getString("uploaded_by_external_id"), rs.getObject("uploaded_at", OffsetDateTime.class));
 
     private final JdbcTemplate db;
-    public JdbcAttachmentRepository(JdbcTemplate db) { this.db = db; }
+    private final ru.mephi.arch.tasktracker.ObjectStorage storage;
+    public JdbcAttachmentRepository(JdbcTemplate db, ru.mephi.arch.tasktracker.ObjectStorage storage) { this.db = db; this.storage=storage; }
 
     @Override public List<Attachment> findMetadataByWorkItem(UUID workItemId) {
         return db.query("SELECT id,work_item_id,file_name,size_bytes,content_type,uploaded_by_external_id,uploaded_at " +
@@ -36,11 +37,24 @@ public class JdbcAttachmentRepository implements AttachmentRepository {
     }
 
     @Override public Optional<Attachment> findByIdAndWorkItem(UUID id, UUID workItemId) {
-        var rows = db.query("SELECT * FROM attachment WHERE id=? AND work_item_id=?", FULL_MAPPER, id, workItemId);
+        var rows = db.query("SELECT * FROM attachment WHERE id=? AND work_item_id=?", (rs,i)-> {
+            byte[] bytes=rs.getBytes("content");
+            if(bytes==null) {
+                if(!storage.enabled()) throw new ru.mephi.arch.tasktracker.ApiException(503,"file","storage_unavailable");
+                bytes=storage.get(rs.getString("object_key"),rs.getString("sha256"));
+            }
+            return new Attachment((UUID)rs.getObject("id"),(UUID)rs.getObject("work_item_id"),rs.getString("file_name"),rs.getLong("size_bytes"),rs.getString("content_type"),bytes,rs.getString("uploaded_by_external_id"),rs.getObject("uploaded_at",OffsetDateTime.class));
+        }, id, workItemId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
     @Override public void insert(Attachment attachment) {
+        if(storage.enabled()) {
+            String key="attachments/"+attachment.id+"/"+UUID.randomUUID();
+            storage.put(key,attachment.content,attachment.contentType);
+            db.update("INSERT INTO attachment(id,work_item_id,file_name,size_bytes,content_type,object_key,sha256,uploaded_by_external_id,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?)",attachment.id,attachment.workItemId,attachment.fileName,attachment.sizeBytes,attachment.contentType,key,ru.mephi.arch.tasktracker.ObjectStorage.hash(attachment.content),attachment.uploadedByExternalId,attachment.uploadedAt);
+            return;
+        }
         db.update("INSERT INTO attachment(id,work_item_id,file_name,size_bytes,content_type,content,uploaded_by_external_id,uploaded_at) VALUES(?,?,?,?,?,?,?,?)",
             attachment.id, attachment.workItemId, attachment.fileName, attachment.sizeBytes, attachment.contentType,
             attachment.content, attachment.uploadedByExternalId, attachment.uploadedAt);

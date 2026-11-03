@@ -5,6 +5,7 @@ package ru.mephi.arch.tasktracker.domain.event;
  * gone by the time this is published, matching today's behavior exactly. Only a notification with a
  * denormalized snapshot survives, which is why this doesn't implement {@link RecordableChange}.
  */
-public record WorkItemHardDeleted(String recipientId, String workItemPublicId, String title, String actorId)
+public record WorkItemHardDeleted(String recipientId, String workItemPublicId, String title, String actorId, String type)
     implements DomainEvent {
+    public WorkItemHardDeleted(String recipientId,String workItemPublicId,String title,String actorId) { this(recipientId,workItemPublicId,title,actorId,"TASK"); }
 }

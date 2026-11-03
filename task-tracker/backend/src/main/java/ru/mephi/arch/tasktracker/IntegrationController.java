@@ -76,6 +76,22 @@ public class IntegrationController {
         return slice(output,page,size);
     }
     @GetMapping("/reports/statuses") public Object reportStatuses(){access.reports();return db.queryForList("SELECT id,name,board_order AS \"boardOrder\",category,active FROM status ORDER BY board_order");}
+    @GetMapping("/reports/history") public Object reportHistory(@RequestParam Map<String,String> filters) {
+        access.reports(); int number=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
+        LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
+        if(from!=null && to!=null && to.isBefore(from)) throw ApiException.invalid("periodTo","before_periodFrom");
+        String where=" WHERE true"; List<Object> args=new ArrayList<>();
+        if(from!=null) { where+=" AND occurred_at>=?"; args.add(java.sql.Date.valueOf(from)); }
+        if(to!=null) { where+=" AND occurred_at<?"; args.add(java.sql.Date.valueOf(to.plusDays(1))); }
+        long total=db.queryForObject("SELECT count(*) FROM audit_entry"+where,Long.class,args.toArray());
+        args.add(size); args.add(((long)number-1)*size);
+        var history=db.queryForList("SELECT id,work_item_id AS \"workItemId\",actor_external_id AS \"actorId\",occurred_at AS \"occurredAt\",changed_fields AS \"changedFields\",old_values AS \"oldValues\",new_values AS \"newValues\" FROM audit_entry"+where+" ORDER BY occurred_at,id LIMIT ? OFFSET ?",args.toArray());
+        for(var entry:history) for(String key:List.of("changedFields","oldValues","newValues")) {
+            try { entry.put(key,new com.fasterxml.jackson.databind.ObjectMapper().readValue(entry.get(key).toString(),Object.class)); }
+            catch(com.fasterxml.jackson.core.JsonProcessingException ex) { throw new IllegalStateException("invalid_history_json",ex); }
+        }
+        return Map.of("items",history,"page",number,"pageSize",size,"totalPages",(total+size-1)/size);
+    }
     private int page(String input,int fallback){try{int v=input==null?fallback:Integer.parseInt(input);if(v<1)throw new NumberFormatException();return v;}catch(NumberFormatException e){throw ApiException.invalid("page","invalid_integer");}}
     private Map<String,Object> slice(List<?> rows,int page,int size){int from=Math.min(rows.size(),(page-1)*size),to=Math.min(rows.size(),from+size);return Map.of("items",rows.subList(from,to),"page",page,"pageSize",size,"totalPages",(rows.size()+size-1)/size);}
 }

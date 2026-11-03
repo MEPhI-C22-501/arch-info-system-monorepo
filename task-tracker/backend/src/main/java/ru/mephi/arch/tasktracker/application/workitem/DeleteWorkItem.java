@@ -35,6 +35,6 @@ public class DeleteWorkItem {
             events.publish(new HierarchyChanged(item.parentId, actor, null,
                 Map.of("childRemoved", false), Map.of("childRemoved", id.toString())));
         }
-        events.publish(new WorkItemHardDeleted(item.assigneeId, id.toString(), item.title, actor));
+        events.publish(new WorkItemHardDeleted(item.assigneeId, id.toString(), item.title, actor, item.type.name()));
     }
 }
