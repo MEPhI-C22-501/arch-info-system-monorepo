@@ -36,3 +36,7 @@ Keycloak принят как единый IdP проекта. Владение �
 Проверки: `bash scripts/check.sh`. Для браузерных сценариев поднимите отдельный стенд,
 затем выполните `cd frontend && npm run test:e2e`. Переменная `TRACKER_E2E_URL` задаёт
 адрес стенда; `TRACKER_CHROME_PATH` позволяет использовать установленный Chromium/Chrome.
+
+## Для команды инфраструктуры
+
+[166 — Настройка S3 и Kafka для Task Tracker](docs/block-i-integration-and-deployment/166.infrastructure-s3-kafka.md): ресурсы, ACL, секреты, TLS, передача конфигурации в backend и совместная приёмка. В инструкции отдельно отмечено несовпадение PLAIN в общем Kafka и SCRAM-SHA-512 в текущем клиенте трекера.
