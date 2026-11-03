@@ -221,6 +221,16 @@ class Product(unittest.TestCase):
         with self.db.transaction(): key2=self.service.create_export('R-01',QUERY,'csv')
         tick(self.db);self.assertEqual(self.service.export(key2)['status'],'COMPLETED')
 
+    def test_employee_account_user_id_is_the_subject_without_a_manual_link(self):
+        # Reference Manager answer in #115: account_user_id = Keycloak sub, empty until the account exists.
+        employees=[{'id':7,'family_name':'Petrova','given_name':'Anna','org_unit_id':5,'account_user_id':MEMBER_2,'is_deleted':False},
+                   {'id':8,'name':'No account','org_unit_id':6,'account_user_id':'','is_deleted':False}]
+        value=now();load(self.db,'reference',lambda:(dict(self.data['reference'],employees=employees),value,value,None))
+        rows=dict(self.db.execute("SELECT employee_id,account_user_id FROM dwh.dim_employee WHERE is_current=1 AND employee_key<>-1").fetchall())
+        self.assertEqual(rows['7'],MEMBER_2);self.assertIsNone(rows['8'])
+        units={r['unit']['id'] for r in self.query('R-01',dict(QUERY,slice=['unit']))['rows']}
+        self.assertIn('5',units);self.assertNotIn('6',units)
+
 
 @unittest.skipUnless(os.getenv('REPORTS_TEST_DATABASE_URL'),'Native PostgreSQL runner required')
 class PostgreSQLProduct(Product):

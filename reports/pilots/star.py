@@ -198,7 +198,7 @@ def records(db,source,entity):
 
 
 def refresh(db,at,batch_id=None,*,observed_at=None):
-    from report_engine import Engine
+    from report_engine import Engine,employee_subject
     # at is the source watermark, not evidence that historical dimensions
     # were observed then. SCD2 and daily observations use our observation time.
     from product_store import stamp
@@ -211,11 +211,13 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
     engine=Engine(db);engine.records=lambda source,entity:records(db,source,entity)
     def k(name,source,value,when=at):return key_at(db,name,source,value,when)
     project_inverse={target:source for (kind,source),target in links.items() if kind=='planning-project'}
+    employees=records(db,'reference','employees')
     employee_inverse={target:source for (kind,source),target in links.items() if kind=='hr-employee'}
+    employee_inverse.update({subject:str(r['id']) for r in employees for subject in [employee_subject(r,links)] if subject})
     def emp(subject,when=at):return k('employee','reference',employee_inverse.get(subject),when)
     def project(tracker,when=at):return k('project','planning',project_inverse.get(tracker),when)
-    for r in records(db,'reference','employees'):
-        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=links.get(('hr-employee',str(r['id']))),full_name=' '.join(str(r.get(f,'')) for f in ['family_name','given_name','middle_name']).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=r.get('grade'),is_active=int(not r.get('is_deleted',False))),r,at)
+    for r in employees:
+        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=employee_subject(r,links),full_name=' '.join(str(r.get(f,'')) for f in ['family_name','given_name','middle_name']).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=r.get('grade'),is_active=int(not r.get('is_deleted',False))),r,at)
     for entity,name,idcol in [('org_units','org_unit','org_unit_id'),('positions','position','position_id'),('project_roles','project_role','role_code'),('grades','grade','grade_id')]:
         for r in records(db,'reference',entity):dimension(db,name,'reference',r['id'],{idcol:str(r['id']),'name':r.get('name'),'parent_id':str(r['parent_id']) if r.get('parent_id') is not None else None},r,at)
     plans=records(db,'planning','plan')
