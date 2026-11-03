@@ -38,7 +38,7 @@
 | --- | --- | --- |
 | Q-REP-01 | Письменно принять read-replica собственной витрины как выполнение постановки | Преподаватель, Infra |
 | Q-REP-11/15 | Выдать primary/replica, роли, адреса, лимиты и общий Keycloak; подтвердить стек и размещение | Infra |
-| Q-REP-16 | Часть Reference Manager согласована ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228): `account_user_id` = `sub`, поле до 02.11.2026); остаются Tracker `TimeLog.userId` и срок отзыва доступа; совпадение ID само по себе прав не даёт | Reference Manager, Infra, Task Tracker |
+| Q-REP-16 | Часть Reference Manager согласована ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228): `account_user_id` = `sub`, поле с [PR #162](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/162) используется ETL); остаются Tracker `TimeLog.userId` и срок отзыва доступа; совпадение ID само по себе прав не даёт | Reference Manager, Infra, Task Tracker |
 | Q-REP-02/03 | Подтвердить отчётный REST, удаления/инкремент и согласованный переход к событиям | Task Tracker, Infra |
 | Q-REP-04/07 | Контракт QA закрыт (Q-05 у QA); выдача данных у QA не реализована — на 03.11.2026 в [OpenAPI QA](../../qa/api/openapi/v1/openapi.yaml) «Planned, not implemented yet», контрольная дата 10.11.2026; остаются событие `BugCreatedFromTesting` трекера и тестовые доступы | QA System, Task Tracker, Infra |
 | Q-REP-05/10 | Ответ Reports в #147 дан; уточнения Planning от 29.10 совпадают с реализацией, остаются T-INT-08 и клиент S-06. Формулировки мастера проекта и эпика сошлись, нужен подписанный ID mapping (#145) | Planning System, Task Tracker, Infra |
@@ -77,7 +77,7 @@ read-replica, предоставление ресурсов, реальные с
 | --- | --- | --- |
 | 1. Свой сценарий проверок в общем репозитории | Workflow зарегистрирован: тесты на временном PostgreSQL, ссылки и контракты, меры и области Cube, диаграммы, секреты и сборка двух образов; полный BI-прогон — вручную | [`.github/workflows/reports-checks.yaml`](../../.github/workflows/reports-checks.yaml); первый запуск в GitHub ещё не выполнен |
 | 2. Письменные ответы, начиная с дешёвых | Q-REP-04 и Q-REP-08 закрыты по решениям QA; Q-REP-09 закрыт решением Reports (вопрос 4 у Reference Manager адресован Reports, сообщено в [#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6505754551)); Q-REP-05 частично согласован, уточнения Planning подтверждены в [#147](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147#issuecomment-6505753939); запрос трекеру по Q-REP-02/03/07 — [#159](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/159); Q-REP-10: формулировки DEC-TT-01 и D-01 сошлись, ждём подписанный mapping | [020, раздел 6](020.system-context.md#6-открытые-договорённости) |
-| 3. Три вопроса заказчику списком с датой | Q-REP-01, Q-REP-12, Q-REP-14 и владелец уведомлений (Q-REP-13) — список подготовлен 29.10.2026 | [020, раздел 6](020.system-context.md#6-открытые-договорённости) |
+| 3. Три вопроса заказчику списком с датой | Список Q-REP-01, Q-REP-12, Q-REP-14 был подготовлен 29.10.2026, но не отправлялся: 03.11.2026 команда сочла вынос неактуальным | [020, раздел 6](020.system-context.md#6-открытые-договорённости) |
 | 4. Предложение Infra №128 | Влито в main. Выданы БД с репликой, бакет, группы Kafka, клиенты; не выданы роли клиента `reports`, redirect URI, роли чтения соседей и CronJob — заявка Infra [#158](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/158) | Q-REP-11 в [020](020.system-context.md#6-открытые-договорённости) |
 | 5. Сквозной сценарий на демонстрации | Локально: четыре источника по контрактам владельцев → staging → DWH → Cube → Superset и Reports UI; планировщик повторяет загрузку каждые 60 с без двойного учёта. Источники синтетические, совместные T-INT не проводились | [Пилоты](../pilots/README.md), [проверка чистого запуска](../pilots/artifacts/clean-stack-verification.json) |
 | 6. Версия партии Planning | Совпадает: `schemaVersion` 1.0.0 в OpenAPI владельца и в адаптере Reports; уточнения Planning от 29.10.2026 (полный срез, ARCHIVED, Idempotency-Key, только ACTIVE) совпадают с реализацией | [OpenAPI Planning](../../planning-system/docs/contracts/openapi.json), `pilots/adapters.py`, [реестр Planning](../../planning-system/docs/integration-agreements.md) |
@@ -86,7 +86,7 @@ read-replica, предоставление ресурсов, реальные с
 
 | Разрыв | Состояние Reports |
 | --- | --- |
-| 2. Сотрудник не связан с учётной записью | Q-REP-16 частично: Reference Manager подтвердил `account_user_id` = `sub` ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228)), поле — до 02.11.2026; ответ трекера ждём в [#159](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/159) |
+| 2. Сотрудник не связан с учётной записью | Q-REP-16 частично: Reference Manager подтвердил `account_user_id` = `sub` ([#115](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/115#issuecomment-6506044228)), поле с [PR #162](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/162) используется ETL; ответ трекера ждём в [#159](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/159) |
 | 5. Свежесть «5 минут» без публикации событий | Требования разведены: 5 минут — только после Kafka (NFR-04.1), сейчас опрос REST с порогом 15 минут (NFR-04.2) — [075](075.nfr.md) |
 | 6а. Конвейер сверяется с собственной заглушкой трекера | Признаётся: совместимость с живыми сервисами не подтверждена; прогон ETL против сервера Task Tracker — задача И-M2 |
 | 9. Мастер проекта и эпика | Q-REP-10 переформулирован: противоречия в текстах больше нет, не хватает подписанного mapping |
@@ -110,7 +110,7 @@ read-replica, предоставление ресурсов, реальные с
 | 6. Общий стенд | Не выполнено: у клиента `reports` в реалме Infra нет ролей, redirect указывает на `:3002`, ответа на #158 нет. Блок 4 | Q-REP-11 в [020](020.system-context.md#6-открытые-договорённости) |
 | 7. Выгрузка отчёта файлом | **Уже есть** — замечание основано на `api.py`, а прикладной API находится в `product_service.py`: `POST /api/v1/exports` (CSV, XLSX), `GET /api/v1/exports/{id}/file`, `POST /api/v1/reports/{id}/print`; кнопки «Выгрузить CSV», «Выгрузить XLSX», «Версия для печати» в Reports UI; проверка — `check_product.py` | [реализация](product-implementation.md), [протокол](../pilots/artifacts/product-verification.json) |
 | 8. Общий кэш и очередь | Решение ADR-017: на стенде — память одного процесса и предагрегации в PostgreSQL, в общей среде — Cubestore; перечислено, что проверить при переходе | [145](145.architecture-decisions.md) |
-| 9. Реестр вопросов | «Релиз» (Q-REP-08) и контракт QA (Q-REP-04) закрыты ещё 29.10 в PR #160. Q-REP-11 и Q-REP-15 переведены в «частично» по фактическому состоянию Infra, а не закрыты: ролей клиента и подтверждения Superset/Cube нет. Вопросы заказчику — Q-REP-01, Q-REP-12, Q-REP-14 | [020, раздел 6](020.system-context.md#6-открытые-договорённости) |
+| 9. Реестр вопросов | «Релиз» (Q-REP-08) и контракт QA (Q-REP-04) закрыты ещё 29.10 в PR #160. Q-REP-11 и Q-REP-15 переведены в «частично» по фактическому состоянию Infra, а не закрыты: ролей клиента и подтверждения Superset/Cube нет. Вопросы заказчику Q-REP-01, Q-REP-12, Q-REP-14 не выносились: решение команды 03.11.2026 | [020, раздел 6](020.system-context.md#6-открытые-договорённости) |
 | 10. Простое описание | Раздел «как это работает» на одну страницу; глоссарий ссылается на него, он — на глоссарий. Подробности конвейера и контейнеров вынесены отдельно | [как это работает](how-it-works.md), [конвейер ETL](etl-pipeline.md) |
 
 Ответы на вопросы проверяющей к Reports (MY-01…MY-05):
@@ -124,6 +124,9 @@ read-replica, предоставление ресурсов, реальные с
 | MY-05. Замер по остальным кубам и холодному старту | Блок 2: таблица «куб → холодный, тёплый, с предагрегацией и без» и прогон в контейнерах |
 
 Замечания общих отчётов проверки, относящиеся к Reports: адрес интерфейса
-Reports — `http://localhost:8081/ui/`, а не `:8085`; вопрос В-4 «что считается
-интерфейсом отчётности — дашборды или собственное приложение» ждёт решения
-команды.
+Reports — `http://localhost:8081/ui/`, а не `:8085`. Вопрос В-4 «что считается
+интерфейсом отчётности — дашборды или собственное приложение» решён командой
+03.11.2026: интерфейс отчётности — Reports UI; дашборды Superset — дополнительный
+аналитический канал. Поэтому замечания к интерфейсу (адаптивность, доступность,
+экраны [110](110.ui-ux.md), которые ещё не реализованы) относятся к Reports UI и
+планируются отдельным блоком.

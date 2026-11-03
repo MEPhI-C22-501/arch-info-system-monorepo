@@ -104,6 +104,13 @@ def quantile(values,p):
     return round(values[low]+(values[high]-values[low])*(pos-low),4)
 
 
+def employee_subject(employee,links):
+    # Reference Manager confirmed account_user_id = Keycloak sub (#115); it is
+    # empty until the account exists. An explicit hr-employee link is the fallback.
+    value=employee.get('account_user_id')
+    return value if isinstance(value,str) and value else links.get(('hr-employee',str(employee['id'])))
+
+
 class Scope:
     def __init__(self,db,claims,rid):
         self.db,self.claims,self.rid=db,claims,rid
@@ -201,7 +208,7 @@ class Engine:
         statuses={s['id']:s for s in self.records('tracker','statuses')}
         items=self.records('tracker','work-items'); parents={i.get('parentId') for i in items if i.get('parentId')}
         by_id={i['id']:i for i in items}
-        units={self.links.get(('hr-employee',str(e['id']))):str(e['org_unit_id']) for e in self.records('reference','employees') if e.get('org_unit_id') is not None}
+        units={employee_subject(e,self.links):str(e['org_unit_id']) for e in self.records('reference','employees') if e.get('org_unit_id') is not None}
         result=[]
         for item in items:
             if item.get('type') not in {'TASK','SUBTASK','BUG'} or item['id'] in parents: continue
@@ -222,7 +229,7 @@ class Engine:
 
     def logs(self,first,last):
         items={t['id']:t for t in self.task_rows()}
-        units={self.links.get(('hr-employee',str(e['id']))):str(e['org_unit_id']) for e in self.records('reference','employees') if e.get('org_unit_id') is not None}
+        units={employee_subject(e,self.links):str(e['org_unit_id']) for e in self.records('reference','employees') if e.get('org_unit_id') is not None}
         rows=self.db.execute('''SELECT id,user_id,project_id,work_item_id,logged_date,hours_cents
             FROM dwh.report_time_log WHERE logged_date>=? AND logged_date<=? ORDER BY id LIMIT 100001''',
             (first.isoformat(),last.isoformat())).fetchall()
