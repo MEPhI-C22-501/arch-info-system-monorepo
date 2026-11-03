@@ -1,3 +1,6 @@
+import { useSearchParams } from 'react-router-dom';
+import { BulkActions } from '../BulkActions';
+import { SavedViews } from '../SavedViews';
 import { useState } from 'react';
 import { date, hours, json, request, typeName } from '../api';
 import type { Item, Iteration, Json, Page } from '../api';
@@ -14,15 +17,20 @@ const emptyFilters = { search: '', type: '', statusId: '', priorityId: '', assig
 
 export function Backlog({ context, revision, open, refresh }:
   { context: Context; revision: number; open: (id: string) => void; refresh: () => void }) {
-  const [filters, setFilters] = useState({ ...emptyFilters, sort: 'dueDate' });
+  const [params,setParams]=useSearchParams();
+  const filters={...emptyFilters,sort:'dueDate',...Object.fromEntries(params)};
+  const setFilters=(next: typeof filters | ((current: typeof filters)=>typeof filters))=>{const value=typeof next==='function'?next(filters):next;setParams(Object.fromEntries(Object.entries({...value,page:'1'}).filter(([,v])=>v)));};
+  const pageNumber=Math.max(1,parseInt(params.get('page') || '1',10)||1);
+  const setPageNumber=(next:number|((page:number)=>number))=>{const number=typeof next==='function'?next(pageNumber):next;setParams({...Object.fromEntries(params),page:String(number)});};
+  const [selected,setSelected] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
-  const { data: page, loading, error } = useApiResource<Page<Item>>(`/work-items?${query}`, revision);
+  const { data: page, loading, error } = useApiResource<Page<Item>>(`/work-items?page=${pageNumber}&${query}`, revision);
   const { data: iterations } = useApiResource<Iteration[]>('/iterations', revision);
 
-  const change = (key: keyof typeof filters, value: string) => setFilters(current => ({ ...current, [key]: value }));
+  const change = (key: keyof typeof filters, value: string) => { setPageNumber(1); setSelected([]); setFilters(current => ({ ...current, [key]: value })); };
   const activeFilterCount = Object.entries(emptyFilters).filter(([key]) => filters[key as keyof typeof emptyFilters]).length;
 
   const exportFile = async () => {
@@ -76,12 +84,14 @@ export function Backlog({ context, revision, open, refresh }:
         Сбросить фильтры ({activeFilterCount})
       </button>}
     </div>
+    <SavedViews userId={context.userId} filters={filters} apply={value => { setFilters({...emptyFilters,sort:'dueDate',...value}); setPageNumber(1); }} />
+    {can(context,'item.update') && <BulkActions items={(page?.items || []).filter(i=>selected.includes(i.id))} context={context} iterations={iterations || []} refresh={refresh} completed={ids=>setSelected(current=>current.filter(id=>!ids.includes(id)))} />}
     <div className="panel table-panel">
       {loading ? <p className="loading">Загрузка элементов…</p> : page?.items.length
         ? <div className="table-scroll"><table>
-            <thead><tr><th>Элемент</th><th>Тип</th><th>Статус</th><th>Приоритет</th><th>Исполнитель</th><th>Срок</th><th>План / Факт / Остаток</th></tr></thead>
+            <thead><tr><th>Выбор</th><th>Элемент</th><th>Тип</th><th>Статус</th><th>Приоритет</th><th>Исполнитель</th><th>Срок</th><th>План / Факт / Остаток</th></tr></thead>
             <tbody>{page.items.map(item => <tr key={item.id} onClick={() => open(item.id)} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') open(item.id); }}>
-              <td><strong>{item.title}</strong><small>{item.id.slice(0, 8)}</small></td>
+              <td onClick={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Выбрать ${item.title}`} checked={selected.includes(item.id)} onChange={e=>setSelected(current=>e.target.checked?[...current,item.id]:current.filter(id=>id!==item.id))} /></td><td><strong>{item.title}</strong><small>{item.id.slice(0, 8)}</small></td>
               <td>{typeName(item.type)}</td>
               <td><Badge tone={context.statuses.find(row => row.id === item.statusId)?.category === 'COMPLETED' ? 'green' : ''}>{selectName(context.statuses, item.statusId)}</Badge></td>
               <td>{selectName(context.priorities, item.priorityId)}</td>
@@ -94,5 +104,6 @@ export function Backlog({ context, revision, open, refresh }:
     </div>
     {page && <p className="list-foot">Всего элементов: {page.total}</p>}
     {creating && <CreateItem context={context} close={() => setCreating(false)} created={id => { setCreating(false); refresh(); open(id); }} />}
+    <div className="actions"><button disabled={pageNumber===1} onClick={()=>{setPageNumber(p=>p-1);setSelected([]);}}>Назад</button><span>Страница {pageNumber} из {page?.totalPages || 1}</span><button disabled={!page || pageNumber>=page.totalPages} onClick={()=>{setPageNumber(p=>p+1);setSelected([]);}}>Далее</button></div>
   </section>;
 }

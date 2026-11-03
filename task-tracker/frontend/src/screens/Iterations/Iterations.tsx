@@ -1,3 +1,4 @@
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type React from 'react';
 import { date, hours, json, request, typeName } from '../../api';
@@ -15,7 +16,9 @@ const getError = (e: unknown): string => (e instanceof Error ? e.message : 'Не
 
 export function Iterations({ context, revision, open, refresh }:
   { context: Context; revision: number; open: (id: string) => void; refresh: () => void }) {
-  const [selected, setSelected] = useState('');
+  const route=useLocation(); const navigate=useNavigate();
+  const selected=route.pathname.split('/')[2] || '';
+  const setSelected=(id:string)=>{void navigate(`/iterations/${id}`);};
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState(''); const [start, setStart] = useState(''); const [end, setEnd] = useState('');
   const [newItemId, setNewItemId] = useState('');
@@ -57,7 +60,7 @@ export function Iterations({ context, revision, open, refresh }:
       <div className="iteration-detail">{iteration ? <>
         <div className="panel iteration-hero">
           <div className="section-heading">
-            <div><span className="eyebrow">{iteration.state}</span><h2>{iteration.name}</h2><p>{date(iteration.startDate)} — {date(iteration.endDate)}</p></div>
+            <div><span className="eyebrow">{iteration.state}</span><h2>{iteration.name}</h2>{iteration.state==='COMPLETED' && <button onClick={()=>void navigate(`/iterations/${iteration.id}/plan-fact`)}>План-факт</button>}<p>{date(iteration.startDate)} — {date(iteration.endDate)}</p></div>
             {can(context, 'iteration.write') && <div className="actions">
               {iteration.state === 'PLANNED' && <button className="button primary" onClick={() => void action(`/iterations/${iteration.id}/activate`, { method: 'POST' })}>Запустить</button>}
               {iteration.state === 'ACTIVE' && <button className="button primary" onClick={() => void action(`/iterations/${iteration.id}/complete`, { method: 'POST' })}>Завершить</button>}

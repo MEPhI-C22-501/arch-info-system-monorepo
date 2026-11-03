@@ -30,6 +30,9 @@ export const auth = new UserManager({
   scope: 'openid profile',
 });
 
+export class ApiError extends Error {
+  constructor(message:string,public status:number,public errors:Array<{field:string;reason:string}>,public correlationId?:string) {super(message);}
+}
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const user = await auth.getUser();
   const headers = new Headers(init.headers);
@@ -40,14 +43,16 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const details = body?.errors?.map((error: { row?: number; field: string; reason: string }) => `${error.row ? `Строка ${error.row}, ` : ''}${error.field}: ${error.reason}`).join('; ');
-    throw new Error(details || `Ошибка запроса ${response.status}`);
+    throw new ApiError(details || `Ошибка запроса ${response.status}`,response.status,body?.errors || [],body?.correlationId);
   }
   if (response.status === 204) return undefined as T;
   if (response.headers.get('content-type')?.includes('application/vnd.openxmlformats')) return (await response.blob()) as T;
   return response.json() as Promise<T>;
 }
 export const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
-export const date = (value: unknown): string => value ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' }).format(new Date(String(value))) : '—';
+export const date = (value: unknown): string => value ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' }).format(new Date(String(value).length===10?`${value}T12:00:00+03:00`:String(value))) : '—';
 export const dateTime = (value: unknown): string => value ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(new Date(String(value))) : '—';
 export const hours = (value: unknown): string => `${Number(value ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ч`;
 export const typeName = (type: string): string => ({ PROJECT: 'Проект', EPIC: 'Эпик', TASK: 'Задача', BUG: 'Ошибка', SUBTASK: 'Подзадача' }[type] || type);
+
+export const overdue = (item: Item, statuses: Status[]): boolean => Boolean(item.dueDate && item.dueDate < new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()) && statuses.find(s => s.id === item.statusId)?.category === 'OPEN');

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { date, hours, json, request, typeName } from '../api';
+import { CardLinks } from '../components/Links';
+import { useState, useEffect } from 'react';
+import { overdue, date, hours, json, request, typeName } from '../api';
 import type { Item, Iteration, Page } from '../api';
 import { can, selectName } from '../context';
 import type { Context } from '../context';
@@ -16,7 +17,17 @@ export function Board({ context, revision, open, refresh }:
   const [moveError, setMoveError] = useState('');
 
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
-  const { data: page, error } = useApiResource<Page<Item>>(`/work-items?pageSize=500&${query}`, revision);
+  const [page,setPage]=useState<Page<Item>|null>(null); const [error,setError]=useState('');
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      try {
+        const first=await request<Page<Item>>(`/work-items?pageSize=500&${query}`); const items=[...first.items];
+        for(let n=2;n<=first.totalPages;n++) { const next=await request<Page<Item>>(`/work-items?pageSize=500&page=${n}&${query}`);items.push(...next.items); }
+        if(!cancelled) {setPage({...first,items});setError('');}
+      } catch(e) {if(!cancelled)setError(String(e));}
+    })(); return ()=>{cancelled=true;};
+  },[query,revision]);
   const { data: iterations } = useApiResource<Iteration[]>('/iterations', revision);
   const items = (page?.items ?? []).filter(item => ['TASK', 'BUG', 'SUBTASK'].includes(item.type));
 
@@ -46,14 +57,14 @@ export function Board({ context, revision, open, refresh }:
         onDragOver={e => e.preventDefault()}
         onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) void move(id, status.id); }}>
         <div className="column-head"><strong>{status.name}</strong><span>{items.filter(item => item.statusId === status.id).length}</span></div>
-        {items.filter(item => item.statusId === status.id).map(item => <div key={item.id} className="board-card"
+        {items.filter(item => item.statusId === status.id).map(item => <div key={item.id} className={`board-card ${overdue(item,context.statuses)?'overdue':''}`}
           draggable={can(context, 'item.status') && can(context, 'item.update')}
           onDragStart={e => e.dataTransfer.setData('text/plain', item.id)}
           tabIndex={0}
           onKeyDown={e => { if (e.key === 'Enter') open(item.id); if (e.key === 'ArrowRight' && columns[index + 1]) void move(item.id, columns[index + 1].id); if (e.key === 'ArrowLeft' && columns[index - 1]) void move(item.id, columns[index - 1].id); }}
           onClick={() => open(item.id)}>
           <div className="card-top"><small>{typeName(item.type)} · {item.id.slice(0, 8)}</small><span>⋮</span></div>
-          <strong>{item.title}</strong>
+          <strong>{item.title}</strong><CardLinks id={item.id} open={open} />{item.parentId && <small>Родитель: {item.parentId.slice(0,8)}</small>}
           <div className="card-bottom"><span>{selectName(context.users, item.assigneeId)}</span><Badge>{selectName(context.priorities, item.priorityId)}</Badge></div>
           <div className="card-bottom"><small>{item.dueDate ? date(item.dueDate) : 'Без срока'}</small><small className={item.remainingHours < 0 ? 'negative' : ''}>{hours(item.remainingHours)}</small></div>
         </div>)}
