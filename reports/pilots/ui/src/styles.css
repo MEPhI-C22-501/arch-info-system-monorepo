@@ -130,7 +130,8 @@ tfoot th, tfoot td { font-weight: 700; }
 .tone-remaining { fill: var(--accent); }
 .legend { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
-.swatch { width: 12px; height: 12px; flex: none; }
+/* Legend squares sit inside .chart, whose svg rule would stretch them to the full width. */
+.chart svg.swatch { width: 12px; height: 12px; max-width: none; flex: none; }
 .chart-compact svg { max-width: 760px; }
 .chart-note { margin: 0 0 8px; font-size: 0.9rem; }
 .progress { margin: 12px 0; }
