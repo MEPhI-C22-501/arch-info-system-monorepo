@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-11-04T09:09:33.462936+00:00",
+  "checked_at_utc": "2026-11-04T09:20:10.651092+00:00",
   "checks": [
     {
       "account": "anonymous",
@@ -155,7 +155,7 @@
     "reports\\pilots\\worker.py": "8e10fa9499a4438736f7846aea066c6c444a0128fdaacff50a08d8e70e86a0dc",
     "reports\\pilots\\demo.py": "2da48af4e9f459483ab95c7d17e57222ba649592593775f8199781a2b2c2e776",
     "reports\\pilots\\api.py": "b2016b73cc79da62bdd3b26829297d7639a123ae2f3cd622cbf32f97484bda58",
-    "reports\\pilots\\superset\\setup_bi.py": "3d5a868fa4f277cca5c24db24601d1760bbbdaa9035ee2129eb79d9e510b4a78",
+    "reports\\pilots\\superset\\setup_bi.py": "a67085e0b3319276739dd69260492f3b2ff0dd15dc297c7b3fc4d28365846038",
     "reports\\pilots\\superset\\superset_config.py": "5ce8a42bd98683a51f0eb3c3c855ca3a808303c6c458881709a546b180eeec76",
     "reports\\pilots\\superset\\session_policy.py": "fd3aa8261d6e3057a40d46b3d55f4619aad02621d1c1e6e0b293da43c13fbe3e",
     "reports\\pilots\\superset\\check_session.py": "f0c089f2ab0f8f092e9362e12c94483574195ee41273eb092540e5a5b5992a76",

@@ -90,6 +90,8 @@ with app.app_context():
         table.sql = Path(__file__).with_name(sql_file).read_text()
         table.fetch_metadata()
         table.main_dttm_col = time_column
+        for column in table.columns:
+            column.verbose_name = {'project_id': 'Проект', 'logged_date': 'Дата'}.get(column.column_name, column.verbose_name)
         for metric_name, verbose_name, expression in metrics:
             if not any(m.metric_name == metric_name for m in table.metrics):
                 table.metrics.append(SqlMetric(metric_name=metric_name, verbose_name=verbose_name, expression=expression))
@@ -134,12 +136,12 @@ with app.app_context():
         'GRID_ID': {'id': 'GRID_ID', 'type': 'GRID', 'children': ['ROW-1', 'ROW-2'], 'parents': ['ROOT_ID']},
         'ROW-1': {'id': 'ROW-1', 'type': 'ROW', 'children': ['MARKDOWN-1'], 'parents': ['ROOT_ID', 'GRID_ID'], 'meta': {'background': 'BACKGROUND_TRANSPARENT'}},
         'MARKDOWN-1': {'id': 'MARKDOWN-1', 'type': 'MARKDOWN', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-1'],
-                       'meta': {'code': note, 'height': 15, 'width': 12}},
+                       'meta': {'code': note, 'height': 8, 'width': 12}},
         'ROW-2': {'id': 'ROW-2', 'type': 'ROW', 'children': ['CHART-1', 'CHART-2'], 'parents': ['ROOT_ID', 'GRID_ID'], 'meta': {'background': 'BACKGROUND_TRANSPARENT'}},
         'CHART-1': {'id': 'CHART-1', 'type': 'CHART', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-2'],
-                    'meta': {'chartId': plan_chart.id, 'height': 50, 'width': 6, 'sliceName': plan_chart.slice_name}},
+                    'meta': {'chartId': plan_chart.id, 'height': 32, 'width': 6, 'sliceName': plan_chart.slice_name}},
         'CHART-2': {'id': 'CHART-2', 'type': 'CHART', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-2'],
-                    'meta': {'chartId': fact_chart.id, 'height': 50, 'width': 6, 'sliceName': fact_chart.slice_name}},
+                    'meta': {'chartId': fact_chart.id, 'height': 32, 'width': 6, 'sliceName': fact_chart.slice_name}},
     })
     plan_fact.json_metadata = json.dumps({
         'native_filter_configuration': [{
