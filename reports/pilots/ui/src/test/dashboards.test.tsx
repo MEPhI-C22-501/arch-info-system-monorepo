@@ -72,9 +72,13 @@ describe('SCR-05 plan-fact', () => {
     });
     renderAt(<PlanFactDashboard />, ['reports-project-manager'], '/' + period + '&project=x-1');
     expect(await screen.findByText('неполные входы: Ставка')).toBeInTheDocument();
-    expect(screen.getByText('Темп 0: сверочный прогноз не рассчитывается')).toBeInTheDocument();
-    expect(within(tile('Перерасход, ч')).getByText(/бюджет в часах/)).toBeInTheDocument();
+    expect(screen.getByText('темп 0 — не рассчитывается')).toBeInTheDocument();
+    expect(within(tile('Перерасход, ч')).getByText('без права на деньги — в часах')).toBeInTheDocument();
+    const progress = screen.getByRole('img', { name: /Факт за период от плана: 11,25 ч из 10 ч — 112,5 %/ });
+    expect(progress).toBeInTheDocument();
+    expect(screen.getByText(/сверх плана на 1,25 ч/)).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: 'Факт, ч по ISO-неделям' })).toBeInTheDocument();
+    expect(screen.getByText('Полоса — доля плана проекта (10 ч), выработанная за неделю.')).toBeInTheDocument();
   });
 });
 

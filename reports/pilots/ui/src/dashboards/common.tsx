@@ -43,19 +43,26 @@ export function Tile({ title, value, note, delta }: { title: string; value: Reac
   );
 }
 
-/** Bars with the same numbers as a table under them (110: a chart is always duplicated by a table). */
-export function Bars({ title, points, unit = '' }: { title: string; points: { label: string; value: number | null }[]; unit?: string }) {
+/**
+ * Bars with the same numbers as a table under them (110: a chart is always duplicated by a table).
+ * Without scale the longest bar takes the full width; with scale (e.g. the plan) a bar is a share of it.
+ */
+export function Bars({ title, points, unit = '', scale, note }: {
+  title: string; points: { label: string; value: number | null }[]; unit?: string; scale?: number | null; note?: string;
+}) {
   const id = useId();
   if (!points.length) return <p className="muted">{title}: данных нет.</p>;
-  const max = Math.max(1, ...points.map((p) => Math.abs(p.value ?? 0)));
+  const max = Math.max(1, scale ?? 0, ...points.map((p) => Math.abs(p.value ?? 0)));
   const row = 32;
   return (
-    <figure className="chart">
+    <figure className="chart chart-compact">
+      {note && <p className="muted chart-note">{note}</p>}
       <svg viewBox={`0 0 640 ${points.length * row + 8}`} role="img" aria-labelledby={id}>
         <title id={id}>{title}</title>
         {points.map((p, i) => (
           <g key={i}>
             <text x="0" y={i * row + 22} className="chart-label">{p.label.length > 28 ? p.label.slice(0, 27) + '…' : p.label}</text>
+            {scale ? <rect x="220" y={i * row + 10} width="340" height="14" className="bar-track" /> : null}
             <rect x="220" y={i * row + 10} width={(Math.abs(p.value ?? 0) / max) * 340} height="14" className="bar" />
             <text x="630" y={i * row + 22} textAnchor="end" className="chart-value">{p.value === null ? '—' : formatCell(p.value) + unit}</text>
           </g>
@@ -69,6 +76,26 @@ export function Bars({ title, points, unit = '' }: { title: string; points: { la
           </table>
         </details>
       </figcaption>
+    </figure>
+  );
+}
+
+/** "2,5 ч из 10 ч — 25 %": a filled share of a track; above 100 % the excess is marked. */
+export function Progress({ title, value, max, unit }: { title: string; value: number | null; max: number | null; unit: string }) {
+  const id = useId();
+  if (value === null || !max || max <= 0) return <p className="muted">{title}: нет плана для сравнения.</p>;
+  const share = value / max;
+  const width = 600;
+  return (
+    <figure className="chart chart-compact progress">
+      <figcaption id={id} className="progress-text">
+        {title}: <strong>{formatCell(value)}{unit} из {formatCell(max)}{unit}</strong> — {formatCell(Math.round(share * 1000) / 10)} %
+        {share > 1 && <span className="overrun"> (сверх плана на {formatCell(Math.round((value - max) * 100) / 100)}{unit})</span>}
+      </figcaption>
+      <svg viewBox={`0 0 ${width} 20`} role="img" aria-labelledby={id}>
+        <rect x="0" y="2" width={width} height="16" rx="4" className="bar-track" />
+        <rect x="0" y="2" width={Math.min(share, 1) * width} height="16" rx="4" className={share > 1 ? 'bar bar-negative' : 'bar'} />
+      </svg>
     </figure>
   );
 }

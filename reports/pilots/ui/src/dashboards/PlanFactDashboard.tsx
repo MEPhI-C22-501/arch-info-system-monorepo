@@ -3,7 +3,7 @@ import { ResultTable } from '../components/ResultTable';
 import { Notice } from '../components/State';
 import { formatCell } from '../format';
 import type { DimensionValue, ReportQuery } from '../types';
-import { Bars, Block, Choice, FreshnessLine, PeriodFields, Tile, num, useDashboardParams, useReport } from './common';
+import { Bars, Block, Choice, FreshnessLine, PeriodFields, Progress, Tile, num, useDashboardParams, useReport } from './common';
 
 // SCR-05 (US-PM-01, US-AN-03): R-06 plan-fact and forecast, R-03 completion, R-01 hours by week and by employee, for one project.
 export function PlanFactDashboard() {
@@ -32,26 +32,33 @@ export function PlanFactDashboard() {
             const partial = t.quality === 'PARTIAL';
             const missing = Array.isArray(t.missingInputs) ? (t.missingInputs as string[]).map((v) => formatCell(v)).join(', ') : '';
             return (
-              <dl className="totals">
-                <Tile title="План, ч" value={formatCell(t['M-02'])} />
-                <Tile title="Факт, ч" value={formatCell(t['M-01'])} />
-                <Tile title="Остаток, ч" value={formatCell(t['M-03'])} />
-                <Block report={completion}>{(c) => <Tile title="Выполнено, %" value={formatCell(c.totals['M-06'])} />}</Block>
-                <Tile title="Прогноз Planning System" value={t['M-08'] === null ? 'нет прогноза' : formatCell(t['M-08'])}
-                  note={partial ? `неполные входы: ${missing || 'не указаны'}` : t.quality ? 'полные входы' : undefined} />
-                <Tile title="Сверочный прогноз" value={num(t['M-07']) ? formatCell(t.crossCheckFinish) : '—'}
-                  note={num(t['M-07']) ? `темп ${formatCell(t['M-07'])} ч в неделю` : 'Темп 0: сверочный прогноз не рассчитывается'} />
-                {money
-                  ? <Tile title="Отклонение бюджета" value={formatCell(t['M-09'])} />
-                  : <Tile title="Перерасход, ч" value={formatCell(t['M-04'])} note="Денежные поля недоступны для вашей роли — бюджет в часах" />}
-              </dl>
+              <>
+                <dl className="totals">
+                  <Tile title="План, ч" value={formatCell(t['M-02'])} note="листовые задачи проекта" />
+                  <Tile title="Факт, ч" value={formatCell(t['M-01'])} note="списано за период" />
+                  <Tile title="Остаток, ч" value={formatCell(t['M-03'])} note="по трекеру на сегодня" />
+                  <Block report={completion}>{(c) => <Tile title="Выполнено, %" value={formatCell(c.totals['M-06'])} note="доля завершённых задач" />}</Block>
+                  <Tile title="Прогноз Planning" value={t['M-08'] === null ? 'нет' : formatCell(t['M-08'])}
+                    note={partial ? `неполные входы: ${missing || 'не указаны'}` : t.quality ? 'полные входы' : undefined} />
+                  <Tile title="Сверочный прогноз" value={num(t['M-07']) ? formatCell(t.crossCheckFinish) : '—'}
+                    note={num(t['M-07']) ? `темп ${formatCell(t['M-07'])} ч в неделю` : 'темп 0 — не рассчитывается'} />
+                  {money
+                    ? <Tile title="Отклонение бюджета" value={formatCell(t['M-09'])} />
+                    : <Tile title="Перерасход, ч" value={formatCell(t['M-04'])} note="без права на деньги — в часах" />}
+                </dl>
+                <Progress title="Факт за период от плана" value={num(t['M-01'])} max={num(t['M-02'])} unit=" ч" />
+              </>
             );
           }}</Block>
           <h2>Факт по неделям</h2>
-          <Block report={weeks}>{(data) => (
-            <Bars title="Факт, ч по ISO-неделям" unit=" ч"
-              points={data.rows.map((r) => ({ label: (r.week as DimensionValue).label, value: num(r['M-01']) }))} />
-          )}</Block>
+          <Block report={weeks}>{(data) => {
+            const plan = num(planFact.data?.totals['M-02']);
+            return (
+              <Bars title="Факт, ч по ISO-неделям" unit=" ч" scale={plan}
+                note={plan ? `Полоса — доля плана проекта (${formatCell(plan)} ч), выработанная за неделю.` : 'Полосы — относительно самой большой недели.'}
+                points={data.rows.map((r) => ({ label: (r.week as DimensionValue).label, value: num(r['M-01']) }))} />
+            );
+          }}</Block>
           <h2>По сотрудникам</h2>
           <Block report={people}>{(data) => !data.rows.length ? <p className="muted">Списаний за период нет.</p>
             : <ResultTable result={data} caption="Факт по сотрудникам" />}</Block>
