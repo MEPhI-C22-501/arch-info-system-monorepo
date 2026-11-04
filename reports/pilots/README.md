@@ -8,7 +8,7 @@
 | Пилот | Артефакты | Что проверяется | Граница |
 | --- | --- | --- | --- |
 | P-01 ETL | `adapters.py`, `etl.py`, `db.py`, `demo.py` | Пять ресурсов Tracker → staging → PostgreSQL; повтор, пропавшая страница, rollback, checkpoint; версии справочников и суточный снимок | Реальные источники и расписание ожидают приёмки |
-| P-02 Дашборд | `superset/`, `provision.py` | Superset R-01 → Cube SQL API; Keycloak; Gamma RLS по `sub` | Вход трёх пользователей, RLS, чужой фильтр и запрет SQL Lab подтверждены локально |
+| P-02 Дашборд | `superset/`, `provision.py` | Superset R-01 и R-06 → Cube SQL API; Keycloak; Gamma RLS по `sub`, план-факт для аналитиков (ADR-019) | Вход трёх пользователей, RLS, чужой фильтр и запрет SQL Lab подтверждены локально |
 | P-03 Куб | `cube/cube.js`, `cube/model/TimeLogs.js` | M-01…M-20 с отдельным неутверждённым M-16, области доступа, drill-down и предагрегация | Нативный прогретый замер и контейнерный BI выполнены; холодный режим и общий стенд требуют проверки |
 
 ## 1. Проверки без Docker
@@ -108,8 +108,11 @@ reports/pilots/.venv/bin/python reports/pilots/launch.py ps
 только несекретные UUID пользователей для соответствия демоданных Keycloak.
 
 В браузере открыть [Superset](http://localhost:8088), войти через Keycloak:
-`member1`, `member2` или `admin`; пароль — соответствующее значение из
-`~/secrets.env`. Дашборд — [R-01](http://localhost:8088/superset/dashboard/reports-r01/).
+`member1`, `member2`, `analyst` или `admin`; пароль — соответствующее значение из
+`~/secrets.env` (у `analyst` — пароль участников). Дашборды —
+[R-01](http://localhost:8088/superset/dashboard/reports-r01/) и
+[R-06 План-факт](http://localhost:8088/superset/dashboard/reports-r06/) — для `analyst` и `admin`:
+план 10 ч, факт 11,25 ч, за 01–03.10.2026 — 5,0 ч.
 Значения эталона: `member1` — 3,75 часа, `member2` — 7,50, `admin` — 11,25.
 Автоматическая проверка полного authorization-code flow:
 

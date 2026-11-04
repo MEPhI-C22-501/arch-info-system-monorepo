@@ -108,6 +108,15 @@ class Session:
             'result_format': 'json', 'result_type': 'full',
         })
 
+    def query(self, dataset_id, columns, metrics, time_column=None, time_range='No filter'):
+        filters = [{'col': time_column, 'op': 'TEMPORAL_RANGE', 'val': time_range}] if time_column else []
+        return self.request('/api/v1/chart/data', {
+            'datasource': {'id': dataset_id, 'type': 'table'}, 'force': True,
+            'queries': [{'columns': columns, 'metrics': metrics, 'filters': filters, 'row_limit': 1000,
+                         'time_range': time_range, 'granularity': time_column}],
+            'result_format': 'json', 'result_type': 'full',
+        })
+
 
 def rows(status, payload):
     if status != 200: raise CheckFailure('Chart data HTTP '+str(status))
@@ -181,11 +190,51 @@ def main():
             if status != 403 or denied.get('message') != 'Origin is not allowed':
                 raise CheckFailure('Foreign-origin write with a valid CSRF token was accepted')
             checks.append({'account': name, 'check': 'foreign_origin_denied', 'http_status': status, 'passed': True})
+    # R-06 plan-fact dashboard: analysts see all projects for a chosen period; members get no data.
+    analyst = Session(args.base_url)
+    analyst.login('analyst', values['REPORTS_DEMO_MEMBER_PASSWORD'])
+    checks.append({'account': 'analyst', 'check': 'keycloak_login', 'passed': True})
+    r06 = {c['slice_name']: c for c in charts['result'] if c['slice_name'].startswith('R-06')}
+    datasets = {}
+    for name in ['R-06 План и остаток по проектам', 'R-06 Факт за период по проектам']:
+        status, details = sessions['admin'].request('/api/v1/chart/'+str(r06[name]['id']))
+        if status != 200: raise CheckFailure('R-06 chart metadata unavailable')
+        datasets[name] = int(json.loads(details['result']['params'])['datasource'].split('__')[0])
+    plan_id, fact_id = datasets['R-06 План и остаток по проектам'], datasets['R-06 Факт за период по проектам']
+    plan = rows(*analyst.query(plan_id, ['project_id'], ['planned_hours', 'remaining_hours']))
+    if [(Decimal(str(r['planned_hours'])), Decimal(str(r['remaining_hours']))) for r in plan] != [(Decimal('10'), Decimal('-1.25'))]:
+        raise CheckFailure('Incorrect R-06 plan for analyst')
+    for period, wanted in [('No filter', Decimal('11.25')), ('2026-10-01 : 2026-10-04', Decimal('5.0'))]:
+        fact = rows(*analyst.query(fact_id, ['project_id'], ['fact_hours'], time_column='logged_date', time_range=period))
+        if sum((Decimal(str(r['fact_hours'])) for r in fact), Decimal(0)) != wanted:
+            raise CheckFailure('Incorrect R-06 fact for period '+period)
+    checks.append({'account': 'analyst', 'check': 'plan_fact_data', 'planned_hours': '10', 'fact_hours': '11.25',
+                   'fact_hours_2026_10_01_03': '5.0', 'passed': True})
+    total = sum((Decimal(str(r['actual_hours'])) for r in rows(*analyst.chart(dataset_id))), Decimal(0))
+    if total != Decimal('11.25'): raise CheckFailure('Analyst must see all R-01 hours')
+    checks.append({'account': 'analyst', 'check': 'global_hours_without_member_rls', 'hours': str(total), 'passed': True})
+    status, _ = analyst.request('/api/v1/sqllab/execute/', {'database_id': database_id, 'sql': 'SELECT 1', 'runAsync': False})
+    if status != 403: raise CheckFailure('SQL Lab must return 403 for analyst')
+    checks.append({'account': 'analyst', 'check': 'sql_lab_denied', 'http_status': status, 'passed': True})
+    status, board = analyst.request('/api/v1/dashboard/reports-r06')
+    filters = json.loads(board.get('result', {}).get('json_metadata') or '{}').get('native_filter_configuration', [])
+    if status != 200 or [f['name'] for f in filters] != ['Период']:
+        raise CheckFailure('R-06 dashboard with a period filter is not available to analyst')
+    checks.append({'account': 'analyst', 'check': 'plan_fact_dashboard', 'period_filter': True, 'passed': True})
+    for name in ['member1', 'member2']:
+        status, payload = sessions[name].query(plan_id, ['project_id'], ['planned_hours'])
+        if status == 200 and payload.get('result') and not payload['result'][0].get('error'):
+            raise CheckFailure('Member read the R-06 plan dataset')
+        status, boards = sessions[name].request('/api/v1/dashboard/?q=(page_size:100)')
+        if status != 200 or any(b.get('slug') == 'reports-r06' for b in boards.get('result', [])):
+            raise CheckFailure('R-06 dashboard is listed for '+name)
+        checks.append({'account': name, 'check': 'plan_fact_denied', 'http_status': status, 'passed': True})
     result = {'checked_at_utc': datetime.now(timezone.utc).isoformat(), 'checks': checks,
               'authorization_code_flow': True, 'real_keycloak': True, 'real_superset': True, 'passed': True}
     root = Path(__file__).resolve().parents[2]
     source_names = ['compose.yaml', 'check_bi.py', 'provision.py', 'db.py', 'contracts.py', 'etl.py',
-                    'cube/cube.js', 'cube/dataset.sql', 'cube/model/TimeLogs.js',
+                    'cube/cube.js', 'cube/access.js', 'cube/dataset.sql', 'cube/plan_by_project.sql', 'cube/fact_by_project.sql',
+                    'cube/model/TimeLogs.js', 'cube/model/WorkItems.js',
                     'worker.py', 'demo.py', 'api.py', 'superset/setup_bi.py', 'superset/superset_config.py',
                     'superset/session_policy.py', 'superset/check_session.py', 'superset/Dockerfile']
     source_names += ['superset/cube_driver/pyproject.toml', 'superset/cube_driver/reports_cube/dialect.py',

@@ -14,7 +14,7 @@ AUTH_TYPE = AUTH_OAUTH
 AUTH_USER_REGISTRATION = True
 AUTH_USER_REGISTRATION_ROLE = 'ReportsNoAccess'
 AUTH_ROLES_SYNC_AT_LOGIN = True
-AUTH_ROLES_MAPPING = {'reports-member': ['Gamma'], 'reports-admin': ['Admin']}
+AUTH_ROLES_MAPPING = {'reports-member': ['Gamma'], 'reports-analyst': ['ReportsAnalyst'], 'reports-admin': ['Admin']}
 WTF_CSRF_ENABLED = True
 REPORTS_ALLOWED_ORIGINS = ('http://localhost:8088',)
 ENABLE_CORS = False
@@ -54,6 +54,8 @@ class ReportsSecurityManager(SupersetSecurityManager):
             raise PermissionError('Invalid Reports roles')
         if {'reports-admin','reports-analyst'} <= set(roles):
             roles = ['reports-admin']
+        elif 'reports-analyst' in roles:
+            roles = ['reports-analyst']
         elif 'reports-member' in roles:
             roles = ['reports-member']
         else:

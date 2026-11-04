@@ -159,7 +159,7 @@ new Server(config).listen().catch(()=>process.exit(1));"""
                 if sum(float(row[2]) for row in sorted_rows) != 1250000.0:
                     raise RuntimeError('Sorted Superset SQL result differs')
                 try:
-                    connection.execute('SELECT SUM("plannedHours") FROM "WorkItems"').fetchall()
+                    connection.execute('SELECT SUM("budgetAdjustment") FROM "Forecasts"').fetchall()
                 except psycopg.Error as error:
                     if 'scope' not in str(error).lower():raise RuntimeError('SQL model denial was not an authorization check') from None
                 else:raise RuntimeError('Shared BI SQL identity read a protected model')

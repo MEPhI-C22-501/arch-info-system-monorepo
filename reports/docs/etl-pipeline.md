@@ -60,7 +60,7 @@ PostgreSQL. Код — `etl.load`.
 | `api` | API и Reports UI; `/readyz` требует свежую успешную загрузку | `api.py` | постоянно | 8081 |
 | `product-jobs` | Очередь выгрузок CSV/XLSX и подписок; такт 10 с; права получателей сверяет с Keycloak | `product_jobs.py` | постоянно | — |
 | `cube` | Семантический слой: 11 кубов; у семи есть предагрегации (ADR-018), предагрегации и кэш результатов обновляются раз в минуту | `cubejs/cube:v1.6.75` | постоянно | 4000 |
-| `superset` | Дашборд R-01 через Cube SQL API, RLS по `sub` | `superset/Dockerfile` | постоянно | 8088 |
+| `superset` | Дашборды через Cube SQL API: R-01 (участник — RLS по `sub`) и R-06 план-факт для аналитиков (ADR-019) | `superset/Dockerfile` | постоянно | 8088 |
 
 ```mermaid
 flowchart LR
