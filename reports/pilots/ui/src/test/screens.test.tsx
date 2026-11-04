@@ -70,7 +70,7 @@ describe('ReportPage', () => {
     open({ 'reports/R-01/query': [200, result()] });
     const table = await screen.findByRole('table', { name: /R-01/ });
     expect(within(table).getByText('Проект А')).toBeInTheDocument();
-    expect(within(table).getByText('не задано')).toHaveClass('not-set');
+    expect(within(table).getByText('не задано').closest('td')).toHaveClass('not-set');
     expect(within(table).getByRole('note', { name: 'Формула: SUM(hours) за период' })).toBeInTheDocument();
     expect(screen.getAllByText('13,25').length).toBeGreaterThan(0);
   });
@@ -130,7 +130,7 @@ describe('Subscriptions', () => {
     });
     renderAt(<Subscriptions />, ['reports-analyst']);
     await userEvent.selectOptions(await screen.findByLabelText('Параметры'), 'Представление «Команда А»');
-    expect(screen.getByText(/Период 2026-09-01 — 2026-09-30, разрез «employee»/)).toBeInTheDocument();
+    expect(screen.getByText(/Период 2026-09-01 — 2026-09-30, разрез «Сотрудник»/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Создать подписку' }));
     const [, init] = fetch.mock.calls.find(([url, request]) => String(url).endsWith('/subscriptions') && request?.method === 'POST')!;
     expect(JSON.parse(String(init?.body))).toMatchObject({ reportId: 'R-01', query: view.query, schedule: '0 9 * * 1', format: 'xlsx' });

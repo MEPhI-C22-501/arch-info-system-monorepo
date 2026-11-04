@@ -34,7 +34,10 @@ def fixture(subjects=None, size=6):
     history = {'id': str(uuid.UUID(int=8)), 'workItemId': TASK, 'occurredAt': stamp,
                'actorId': subjects['member1'], 'changedFields': ['statusId'],
                'oldValues': {}, 'newValues': {'statusId': status['id']}}
-    return {'work-items': [work], 'time-logs': logs, 'iterations': [iteration],
+    # The project itself is a work item of type PROJECT: its title is the project name in reports.
+    project = dict(work, id=PROJECT, type="PROJECT", title="Демо-проект «Отчётность»", plannedHours=0,
+                   actualHours=0, remainingHours=0, children=[], iterationId=None)
+    return {'work-items': [work, project], 'time-logs': logs, 'iterations': [iteration],
             'history': [history], 'statuses': [status]}
 
 

@@ -1,6 +1,19 @@
-import type { Cell, Freshness } from './types';
+import type { Cell, Freshness, ReportQuery } from './types';
 
 export const NOT_SET = 'не задано';
+
+export const SLICE_TITLES: Record<string, string> = {
+  project: 'Проект', unit: 'Подразделение', role: 'Проектная роль', employee: 'Сотрудник', iteration: 'Итерация',
+  epic: 'Эпик', week: 'Неделя', month: 'Месяц', record: 'Запись', grade: 'Грейд', status: 'Статус', type: 'Вид задачи', severity: 'Серьёзность',
+};
+
+/** Query parameters in words: the empty result (SCR-02) and the export list (SCR-08). */
+export function describeQuery(query: ReportQuery): string {
+  const params = query.params;
+  const filters = [['проекты', params.projectIds], ['итерации', params.iterationIds], ['сотрудники', params.employeeIds]] as const;
+  return [`период ${params.periodFrom} — ${params.periodTo}`, `разрез «${query.slice.map((s) => SLICE_TITLES[s] ?? s).join(' › ')}»`,
+    ...filters.filter(([, ids]) => ids?.length).map(([name, ids]) => `${name}: выбрано ${ids!.length}`)].join(', ');
+}
 
 const LABELS: Record<string, string> = {
   opened: 'Создано', closed: 'Закрыто', remaining: 'Остаток', cycleMedian: 'Цикл, медиана', cycleP85: 'Цикл, p85',

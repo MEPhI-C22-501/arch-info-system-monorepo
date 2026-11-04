@@ -173,9 +173,12 @@ def validate_query(rid,query):
     return params,slices,first,last
 
 
+TYPE_NAMES = {'TASK':'Задача','SUBTASK':'Подзадача','BUG':'Ошибка'}
+
+
 class Engine:
     def __init__(self,db):
-        self.db=db; self.notes=set(); self.cache={}; self.transition_cache={}
+        self.db=db; self.notes=set(); self.cache={}; self.transition_cache={}; self.name_cache={}; self.record_labels={}
         self.links={(k,s):t for k,s,t in db.execute('SELECT kind,source_id,target_id FROM app.entity_link')}
         self.bindings={u:s for s,u in db.execute('SELECT subject,tracker_user_id FROM app.subject_binding')}
 
@@ -191,6 +194,34 @@ class Engine:
         result=self.links.get((kind,str(value)))
         if result is None: self.notes.add('MISSING_MAPPING:'+kind)
         return result
+
+    def names(self,slice):
+        """Readable names of a slice's ids from the loaded sources; an id without a name stays as is."""
+        if slice in self.name_cache: return self.name_cache[slice]
+        items=self.records('tracker','work-items')
+        def named(rows,field='name'): return {str(r['id']):r.get(field) for r in rows if r.get('id') is not None}
+        if slice=='project':
+            result={i['id']:i.get('title') for i in items if i.get('type')=='PROJECT'}
+            for plan in self.records('planning','plan'):
+                data=plan.get('data',{});tracker=self.links.get(('planning-project',str(data.get('projectId'))))
+                if tracker and not result.get(tracker): result[tracker]=data.get('projectName')
+        elif slice=='epic': result={i['id']:i.get('title') for i in items if i.get('type')=='EPIC'}
+        elif slice=='iteration': result=named(self.records('tracker','iterations'))
+        elif slice=='status': result=named(self.records('tracker','statuses'))
+        elif slice=='employee':
+            result={employee_subject(e,self.links):' '.join(str(e.get(f) or '') for f in ['family_name','given_name','middle_name']).strip() or e.get('name')
+                    for e in self.records('reference','employees')}
+        elif slice in {'unit','role','grade'}:
+            result=named(self.records('reference',{'unit':'org_units','role':'project_roles','grade':'grades'}[slice]))
+        elif slice=='type': result=dict(TYPE_NAMES)
+        else: result={}
+        self.name_cache[slice]={str(k):str(v) for k,v in result.items() if k is not None and v}
+        return self.name_cache[slice]
+
+    def label(self,slice,value):
+        if value is None: return 'не задано'
+        if slice=='record': return self.record_labels.get(value) or str(value)
+        return self.names(slice).get(str(value)) or str(value)
 
     def freshness(self,n):
         result=[]
@@ -222,6 +253,7 @@ class Engine:
                 if parent.get('type')=='PROJECT' and not project: project=parent['id']
                 parent=by_id.get(parent.get('parentId'))
             employee=self.bindings.get(item.get('assigneeId'))
+            if item.get('title'): self.record_labels[item['id']]=item['title']
             result.append(dict(item,project=project,unit=units.get(employee),role=self.links.get(('employee-role',employee)),iteration=item.get('iterationId'),epic=epic,
                                employee=self.bindings.get(item.get('assigneeId')),status=item.get('statusId'),
                                priority=item.get('priorityId'),type=item.get('type'),record=item['id'],_category=category))
@@ -237,6 +269,7 @@ class Engine:
         result=[]
         for key,employee,project,task,logged,cents in rows:
             t=items.get(task,{})
+            self.record_labels[key]=f"{t.get('title') or 'Без задачи'}, {logged}"
             result.append(dict(t,record=key,employee=employee,project=None if project=='UNASSIGNED' else project,
                                unit=units.get(employee),role=self.links.get(('employee-role',employee)),_task_id=task,_hours=cents/100,week=day(logged).strftime('%G-W%V'),month=logged[:7]))
         return result
@@ -254,6 +287,7 @@ class Engine:
             project=item.get('trackerProjectId') or plan.get('trackerProjectId')
             if planning_id: project=self.link('planning-project',planning_id)
             owner=item.get('authorId') or item.get('assigneeId')
+            if item.get('title') or item.get('name'): self.record_labels[item['id']]=item.get('title') or item.get('name')
             rows.append(dict(item,project=project,iteration=item.get('trackerIterationId') or plan.get('trackerIterationId'),
                              employee=self.bindings.get(owner),record=item['id'],severity=item.get('severity'),
                              status=item.get('status'),week=(day(item.get('createdAt')).strftime('%G-W%V') if day(item.get('createdAt')) else None)))
@@ -494,13 +528,13 @@ class Engine:
             raise Problem(422,'INVALID_PARAMETER')
         rows=[]
         for key in sorted(groups,key=lambda k:packed(k)):
-            dimensions={s:{'id':v,'label':str(v) if v is not None else 'не задано'} for s,v in zip(slices,key)}
+            dimensions={s:{'id':v,'label':self.label(s,v)} for s,v in zip(slices,key)}
             rows.append(dict(dimensions,**metrics(key)))
         totals=metrics(None)
         subtotals=[]
         for depth in range(1,len(slices)):
             prefixes=sorted({key[:depth] for key in groups},key=packed)
-            subtotals.append({'slice':slices[:depth],'rows':[dict({s:{'id':v,'label':str(v) if v is not None else 'не задано'} for s,v in zip(slices,key)},**metrics(key)) for key in prefixes]})
+            subtotals.append({'slice':slices[:depth],'rows':[dict({s:{'id':v,'label':self.label(s,v)} for s,v in zip(slices,key)},**metrics(key)) for key in prefixes]})
         columns=[{'key':s,'title':DIMENSION_TITLES[s],'type':'dimension'} for s in slices]
         columns += [{'key':m,'title':TITLES[m],'type':'measure','formula':FORMULAS[m]} for m in MEASURES[n] if m!='M-09' or scope.cost]
         result={'reportId':rid,'reportVersion':1,'generatedAt':stamp(),'freshness':fresh,'columns':columns,

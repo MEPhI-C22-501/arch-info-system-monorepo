@@ -4,10 +4,15 @@ import type { Cell, Column, ReportResult } from '../types';
 // M-04 is an overrun: shown in red with an explicit "+" (110, SCR-02), never by colour alone.
 const OVERRUN = new Set(['M-04']);
 
-function CellView({ column, value }: { column: Column; value: Cell | undefined }) {
+function CellView({ column, value, onDrill, drillLabel }: { column: Column; value: Cell | undefined; onDrill?: () => void; drillLabel?: string }) {
   if (column.type === 'dimension') {
     const missing = !value || (typeof value === 'object' && 'id' in value && value.id === null);
-    return <td className={missing ? 'not-set' : undefined}>{formatCell(value)}</td>;
+    const text = formatCell(value);
+    return (
+      <td className={missing ? 'not-set' : undefined}>
+        {onDrill ? <button type="button" className="link-button" onClick={onDrill} aria-label={`${drillLabel}: ${text}`}>{text}</button> : text}
+      </td>
+    );
   }
   const number = numericValue(value);
   if (OVERRUN.has(column.key) && typeof value === 'number' && value > 0) {
@@ -16,7 +21,10 @@ function CellView({ column, value }: { column: Column; value: Cell | undefined }
   return <td className={number === null || typeof value === 'object' ? undefined : 'num'}>{formatCell(value)}</td>;
 }
 
-export function ResultTable({ result, caption }: { result: ReportResult; caption: string }) {
+/** onDrill makes the first dimension of each row a button that opens the next level (SCR-03). */
+export function ResultTable({ result, caption, onDrill, drillLabel = 'Детализировать' }: {
+  result: ReportResult; caption: string; onDrill?: (row: Record<string, Cell>) => void; drillLabel?: string;
+}) {
   const measures = result.columns.filter((c) => c.type === 'measure');
   const dimensions = result.columns.filter((c) => c.type === 'dimension');
   return (
@@ -38,7 +46,10 @@ export function ResultTable({ result, caption }: { result: ReportResult; caption
         <tbody>
           {result.rows.map((row, index) => (
             <tr key={index}>
-              {result.columns.map((column) => <CellView key={column.key} column={column} value={row[column.key]} />)}
+              {result.columns.map((column) => (
+                <CellView key={column.key} column={column} value={row[column.key]} drillLabel={drillLabel}
+                  onDrill={onDrill && column.key === dimensions[0]?.key ? () => onDrill(row) : undefined} />
+              ))}
             </tr>
           ))}
         </tbody>

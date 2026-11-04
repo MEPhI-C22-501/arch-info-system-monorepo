@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { decodeSession } from '../auth';
 import { duration, formatCell, noteText, numericValue, staleSources, weekStart } from '../format';
-import { describeQuery } from '../pages/ReportPage';
+import { describeQuery } from '../format';
 import { describeSchedule } from '../pages/Subscriptions';
 
 const token = (claims: object) => 'h.' + btoa(unescape(encodeURIComponent(JSON.stringify(claims)))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_') + '.s';
@@ -41,7 +41,7 @@ describe('default period', () => {
   });
   it('names the parameters of an empty result', () => {
     expect(describeQuery({ params: { periodFrom: '2026-11-02', periodTo: '2026-11-04', projectIds: ['p-1'] }, slice: ['employee'] }))
-      .toBe('период 2026-11-02 — 2026-11-04, разрез «Сотрудник», проекты: p-1');
+      .toBe('период 2026-11-02 — 2026-11-04, разрез «Сотрудник», проекты: выбрано 1');
   });
 });
 

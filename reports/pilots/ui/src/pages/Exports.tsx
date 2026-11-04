@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, downloadBlob, errorMessage } from '../api';
 import { Empty, Failure, Loading } from '../components/State';
-import { dateTime } from '../format';
+import { dateTime, describeQuery } from '../format';
 import { useSession } from '../session';
 import type { ExportJob, ExportStatus, Page } from '../types';
 import { useLoad } from '../useLoad';
@@ -22,6 +22,16 @@ export function Exports() {
     return () => clearTimeout(timer);
   }, [pending, jobs]);
 
+  // FAILED: the same report, parameters and format go to the queue again.
+  const retry = async (job: ExportJob) => {
+    try {
+      await api(token, 'exports', 'POST', { reportId: job.reportId, query: job.query, format: job.format });
+      jobs.reload();
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
   const download = async (job: ExportJob) => {
     try {
       downloadBlob(await api<Blob>(token, `exports/${job.exportId}/file`), `${job.reportId}-${job.exportId}.${job.format}`);
@@ -40,16 +50,20 @@ export function Exports() {
           <div className="table-scroll" tabIndex={0}>
             <table>
               <caption>Задания выгрузки</caption>
-              <thead><tr><th scope="col">Отчёт</th><th scope="col">Формат</th><th scope="col">Статус</th><th scope="col">Создано</th><th scope="col">Хранится до</th><th scope="col">Действие</th></tr></thead>
+              <thead><tr><th scope="col">Отчёт</th><th scope="col">Параметры</th><th scope="col">Формат</th><th scope="col">Статус</th><th scope="col">Создано</th><th scope="col">Хранится до</th><th scope="col">Действие</th></tr></thead>
               <tbody>
                 {jobs.data.items.map((job) => (
                   <tr key={job.exportId}>
                     <td>{job.reportId}</td>
+                    <td>{job.query ? describeQuery(job.query) : '—'}</td>
                     <td>{job.format.toUpperCase()}</td>
                     <td className={'status status-' + job.status.toLowerCase()}>{STATUS[job.status] ?? job.status}{job.error ? ': ' + job.error : ''}</td>
                     <td>{dateTime(job.createdAt)}</td>
                     <td>{dateTime(job.expiresAt)}</td>
-                    <td>{(job.status === 'COMPLETED' || job.status === 'DELIVERED') && <button type="button" onClick={() => download(job)}>Скачать</button>}</td>
+                    <td>
+                      {(job.status === 'COMPLETED' || job.status === 'DELIVERED') && <button type="button" onClick={() => download(job)}>Скачать</button>}
+                      {job.status === 'FAILED' && job.query && <button type="button" className="secondary" onClick={() => retry(job)}>Повторить</button>}
+                    </td>
                   </tr>
                 ))}
               </tbody>

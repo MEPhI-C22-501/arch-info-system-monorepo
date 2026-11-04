@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-10-24T23:41:02.361443+00:00",
+  "checked_at_utc": "2026-11-04T14:49:05.530616+00:00",
   "passed": true,
   "scope": "Isolated synthetic Reports database; no shared stand or Keycloak backup",
   "checks": [
@@ -13,9 +13,9 @@
     "invalid_archive_rejected"
   ],
   "source_sha256": {
-    "reports/pilots/tests/test_restore.py": "12b959895e6cb66b22d9ddd535293adc2458d5b50178061fec84418a56c99057",
-    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77",
-    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
-    "reports/pilots/demo.py": "27302d23e8f792349a015c468a72b479ab0e485e867820066f03ac367d952a4d"
+    "reports/pilots/tests/test_restore.py": "c20fe8f93e134c934dad266140875bb96b048f0e65c911e60efce4d1514f9e39",
+    "reports/pilots/db.py": "f101b6516d233d26da708224b5bf7edb2d9db7c46c9cd6c69dbe98ba6f0b8b0e",
+    "reports/pilots/etl.py": "4efc71119d326472a29140b96a981db6f10a1b036919dd3026410d1a07cb1d70",
+    "reports/pilots/demo.py": "48c84537b60c8e2740439013dfc770013362f87d42ca992ba97bfc84fd0a067f"
   }
 }

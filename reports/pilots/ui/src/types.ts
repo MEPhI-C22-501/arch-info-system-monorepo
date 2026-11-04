@@ -42,8 +42,11 @@ export interface QueryParams {
   periodFrom: string;
   periodTo: string;
   projectIds?: string[];
+  iterationIds?: string[];
   employeeIds?: string[];
 }
+
+export interface DimensionOption { id: string; label: string }
 
 export interface ReportQuery { params: QueryParams; slice: string[]; compareWithPrevious?: boolean }
 
@@ -60,6 +63,7 @@ export interface ExportJob {
   expiresAt: string | null;
   rowCount: number | null;
   error: string | null;
+  query?: ReportQuery;
 }
 
 export interface Subscription {

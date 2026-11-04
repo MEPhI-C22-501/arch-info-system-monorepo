@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api, errorMessage } from '../api';
 import { Empty, Failure, Loading, Notice } from '../components/State';
-import { dateTime, today, weekStart } from '../format';
+import { SLICE_TITLES, dateTime, today, weekStart } from '../format';
 import { useSession } from '../session';
 import type { Delivery, Page, ReportDefinition, ReportQuery, SavedView, Subscription } from '../types';
 import { useLoad } from '../useLoad';
@@ -142,7 +142,7 @@ function SubscriptionForm({ reports, views, prefill, onCreated }: { reports: Rep
         </select>
       </label>
       <p className="muted">
-        Период {query.params.periodFrom} — {query.params.periodTo}, разрез «{query.slice[0]}».
+        Период {query.params.periodFrom} — {query.params.periodTo}, разрез «{SLICE_TITLES[query.slice[0]] ?? query.slice[0]}».
         {' '}Другие параметры задаются на странице отчёта кнопкой «Подписаться» или сохранённым представлением.
       </p>
       <fieldset>
