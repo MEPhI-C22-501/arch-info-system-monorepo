@@ -7,6 +7,10 @@ import { Failure } from './components/State';
 import { Audit } from './pages/Audit';
 import { Catalog } from './pages/Catalog';
 import { Exports } from './pages/Exports';
+import { Dashboards } from './dashboards/Dashboards';
+import { IterationDashboard } from './dashboards/IterationDashboard';
+import { PlanFactDashboard } from './dashboards/PlanFactDashboard';
+import { QualityDashboard } from './dashboards/QualityDashboard';
 import { Freshness } from './pages/Freshness';
 import { Notifications } from './pages/Notifications';
 import { ReportPage } from './pages/ReportPage';
@@ -72,6 +76,10 @@ function Shell() {
           {/* RL-06 has no catalog (110, section 4); its start screen is data freshness. */}
           <Route path="/" element={can.reports ? <Catalog /> : <Freshness />} />
           <Route path="/reports/:reportId" element={<ReportPage />} />
+          <Route path="/dashboards" element={<Dashboards />} />
+          <Route path="/dashboards/iteration" element={<IterationDashboard />} />
+          <Route path="/dashboards/plan-fact" element={<PlanFactDashboard />} />
+          <Route path="/dashboards/quality" element={<QualityDashboard />} />
           <Route path="/exports" element={<Exports />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
           <Route path="/notifications" element={<Notifications notifications={notifications} />} />

@@ -35,7 +35,7 @@ export interface ReportResult {
   totals: Record<string, Cell>;
   notes: string[];
   freshness: Freshness[];
-  comparison: { periodFrom: string; periodTo: string; delta: Record<string, number> | null } | null;
+  comparison: { periodFrom: string; periodTo: string; totals?: Record<string, Cell>; delta: Record<string, number> | null } | null;
 }
 
 export interface QueryParams {
