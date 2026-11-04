@@ -259,6 +259,13 @@ p95 3,9656 с при 20 клиентах, до включения кэша гр�
 
 ## 5. Реальные источники
 
+Обмен с живыми сервисами соседей, поднятыми локально их `compose`, — `check_live_sources.py`:
+`--source tracker` (секрет `reports-client` из dev-реалма трекера в `~/secrets.env` как
+`REPORTS_TRACKER_CLIENT_SECRET`) или `--source planning --planning-activate-demo-plan`
+(Planning с `DEMO_SEED=true`; демо-план проводится до ACTIVE через их API). Сервисы
+занимают порт 8080, поэтому проверяются по очереди; `--record` дописывает результат
+в [протокол](artifacts/live-sources-verification.json). Результаты — [конвейер ETL](../docs/etl-pipeline.md), раздел 1.
+
 После выдачи отдельной тестовой БД и минимального токена потребителя добавить
 их в `~/secrets.env` как `REPORTS_DATABASE_URL` и `REPORTS_SOURCE_TOKEN`.
 Не использовать собственную БД соседней команды. Например, только чтение

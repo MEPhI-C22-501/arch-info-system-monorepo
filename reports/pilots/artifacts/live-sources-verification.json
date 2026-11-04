@@ -1,0 +1,119 @@
+{
+  "checked_at_utc": "2026-11-04T09:55:24.447242+00:00",
+  "sources": [
+    "planning",
+    "tracker"
+  ],
+  "passed": false,
+  "checks": [
+    {
+      "source": "tracker",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "tracker",
+      "check": "live_api_matches_owner_contract",
+      "passed": false,
+      "rejected": "tracker load 1 rejected: INVALID_PAGE_METADATA",
+      "findings": [
+        {
+          "resource": "work-items",
+          "page_fields_missing": [
+            "total"
+          ]
+        },
+        {
+          "resource": "work-items",
+          "schema": "ReportWorkItem",
+          "item_errors": [
+            "item: 'children' is a required property",
+            "item: 'description' is a required property",
+            "item: 'statusId' is a required property",
+            "item: 'title' is a required property",
+            "item: 'version' is a required property"
+          ]
+        },
+        {
+          "resource": "time-logs",
+          "page_fields_missing": [
+            "total"
+          ]
+        },
+        {
+          "resource": "time-logs",
+          "schema": "TimeLog",
+          "item_errors": [
+            "loggedDate: '2026-11-04T00:00:00.000Z' is not a 'date'"
+          ]
+        },
+        {
+          "resource": "iterations",
+          "page_fields_missing": [
+            "total"
+          ]
+        },
+        {
+          "resource": "history",
+          "page_fields_missing": [
+            "total"
+          ]
+        }
+      ]
+    },
+    {
+      "source": "planning",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "planning",
+      "check": "demo_plan_activated_through_planning_api",
+      "statuses": [
+        "DRAFT",
+        "ON_REVIEW",
+        "APPROVED",
+        "ACTIVE"
+      ],
+      "passed": true
+    },
+    {
+      "source": "planning",
+      "check": "live_export_batch_twice_without_double_count",
+      "records": {
+        "allocation": 2,
+        "availability": 10,
+        "demand": 1,
+        "plan": 1
+      },
+      "rows_per_load": [
+        14,
+        14
+      ],
+      "same_batch_replayed": true,
+      "passed": true
+    }
+  ],
+  "services": {
+    "planning": "planning-system/compose.yaml, AUTH_MODE=demo, DEMO_SEED=true",
+    "tracker": "task-tracker/compose.yaml, its own Keycloak realm arch-info-system"
+  },
+  "contracts": {
+    "planning": "planning-system/docs/contracts/openapi.json",
+    "tracker": "task-tracker/docs/block-g-api-and-events/openapi.yaml"
+  },
+  "not_checked": {
+    "qa": "QA has no reporting export yet (listReportData is planned)",
+    "reference": "not started locally in this run"
+  },
+  "cross_system_consistency": false,
+  "source_sha256": {
+    "reports/pilots/check_live_sources.py": "4ca7861a9e52c7ccadca2207c9a89e0a6b6600187f62d1190eae9b08060ecfae",
+    "reports/pilots/adapters.py": "3133b6b4ad59dd5e6e41672ab37e914f8ae48636834135ce7f365ae5bdd61cdb",
+    "reports/pilots/etl.py": "4efc71119d326472a29140b96a981db6f10a1b036919dd3026410d1a07cb1d70",
+    "reports/pilots/contracts.py": "c7471614cc2e1d43b14569ca736044a8e88f0a795928fa967c8c624fef7a34df",
+    "reports/pilots/star.py": "f3a3c30e3cfe734db80843d75dbf1f6d50a4df74802aa1c95b38f016ac82c4ec"
+  }
+}
