@@ -98,6 +98,29 @@ class Product(unittest.TestCase):
         with self.db.transaction(): _,job,_=self.service.route('POST','exports',{'reportId':'R-01','query':QUERY,'format':'csv'})
         self.assertEqual(self.service.route('GET','exports/'+job['exportId'])[1]['query'],QUERY)
 
+    def test_etl_journal_for_analyst_and_admin_manual_load_for_admin_only(self):
+        analyst=Service(self.db,claims(ADMIN,[AN]))
+        status,batches,_=analyst.route('GET','etl/batches',params={'source':'task-tracker'})
+        self.assertEqual(status,200);self.assertEqual(batches['total'],1)
+        # Task and project, six time logs, iteration, two history entries, two statuses.
+        self.assertEqual({k:batches['items'][0][k] for k in ['source','status','rows','error']},{'source':'task-tracker','status':'LOADED','rows':13,'error':None})
+        self.assertEqual(analyst.route('GET','etl/batches',params={'status':'REJECTED'})[1]['items'],[])
+        checks=analyst.route('GET','etl/reconciliations',params={'source':'task-tracker'})[1]['items']
+        self.assertTrue(checks);self.assertTrue(all(c['mode']=='SOURCE' and c['result']=='MATCH' for c in checks))
+        for c,call in [(self.member,('GET','etl/batches')),(claims(ADMIN,[AN]),('POST','etl/loads',{'source':'qa-system'}))]:
+            with self.assertRaises(Problem) as denied: Service(self.db,c).route(*call)
+            self.assertEqual(denied.exception.status,403)
+        for bad in [{'source':'nowhere'},{'source':'qa-system','kind':'FULL'},[]]:
+            with self.assertRaises(Problem): self.service.route('POST','etl/loads',bad)
+        with self.db.transaction(): status,request,_=self.service.route('POST','etl/loads',{'source':'qa-system'})
+        self.assertEqual((status,request['status'],request['reason']),(202,'PENDING','MANUAL_LOAD'))
+        with self.assertRaises(Problem) as twice: self.service.route('POST','etl/loads',{'source':'qa-system'})
+        self.assertEqual(twice.exception.status,409)
+        self.assertEqual(analyst.route('GET','etl/loads')[1]['items'][0]['status'],'PENDING')
+        from etl import complete_reload_requests
+        complete_reload_requests(self.db,'qa',now())
+        self.assertEqual(analyst.route('GET','etl/loads',params={'source':'qa-system'})[1]['items'][0]['status'],'COMPLETED')
+
     def test_project_scope_mapping_and_drilldown_never_expand_access(self):
         project=self.data['tracker']['work-items'][0]['projectId']
         c=claims(ADMIN,[PM])

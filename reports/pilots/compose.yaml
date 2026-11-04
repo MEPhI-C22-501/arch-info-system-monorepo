@@ -194,7 +194,8 @@ services:
       REPORTS_OIDC_ISSUER: http://localhost:8180/realms/reports-pilot
       REPORTS_OIDC_JWKS_URL: http://keycloak:8080/realms/reports-pilot/protocol/openid-connect/certs
     volumes: [./cube:/cube/conf:ro]
-    ports: ["127.0.0.1:4000:4000"]
+    # 4000 — REST API; 15432 — SQL API (user reports_bi), as Superset reads it; localhost only.
+    ports: ["127.0.0.1:4000:4000", "127.0.0.1:15432:15432"]
     depends_on:
       etl: {condition: service_completed_successfully}
   superset:

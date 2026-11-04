@@ -27,6 +27,10 @@ def migrate(db):
       PRIMARY KEY(topic,partition_id,offset_id))''')
     db.execute('''CREATE TABLE IF NOT EXISTS etl.reload_request(source TEXT NOT NULL,aggregate_id TEXT NOT NULL,
       requested_at TEXT NOT NULL,reason TEXT NOT NULL,status TEXT NOT NULL,PRIMARY KEY(source,aggregate_id))''')
+    # Rows of a loaded batch: staging is deleted after the merge, so the journal keeps the count.
+    existing={row[1] for row in db.execute('PRAGMA table_info(etl_batch)')} if db.sqlite else {r[0] for r in db.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema='etl' AND table_name='batch'")}
+    if 'row_count' not in existing: db.execute('ALTER TABLE etl.batch ADD COLUMN row_count INTEGER')
     db.execute('''CREATE TABLE IF NOT EXISTS etl.reconciliation(id TEXT PRIMARY KEY,source TEXT NOT NULL,entity TEXT NOT NULL,
       source_count INTEGER NOT NULL,stored_count INTEGER NOT NULL,missing_count INTEGER NOT NULL,extra_count INTEGER NOT NULL,
       created_at TEXT NOT NULL,status TEXT NOT NULL)''')

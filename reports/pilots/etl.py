@@ -180,7 +180,8 @@ def load(db, source, extract, scope=None):
                 db.execute("""INSERT INTO etl.checkpoint VALUES (?,?,?)
                     ON CONFLICT(source) DO UPDATE SET value=excluded.value,loaded_at=excluded.loaded_at""",
                            ('planning:' + scope, json.dumps({'batchId': checkpoint, 'dataAsOf': data_as_of}), completed))
-            db.execute("UPDATE etl.batch SET status='LOADED',completed_at=? WHERE id=?", (completed, batch_id))
+            db.execute("UPDATE etl.batch SET status='LOADED',completed_at=?,row_count=? WHERE id=?",
+                       (completed, sum(map(len, entities.values())), batch_id))
             # Payloads live in source_record; staging is not retained indefinitely.
             db.execute("DELETE FROM stg.record WHERE batch_id=?", (batch_id,))
         return {"batchId": batch_id, "status": "LOADED", "rows": sum(map(len, entities.values())), "dataAsOf": data_as_of}
@@ -247,6 +248,13 @@ def complete_planning_requests(db, data_as_of, pending):
                            "AND aggregate_id=? AND requested_at=?", (aggregate, requested))
 
 
+def complete_reload_requests(db, source, since):
+    """A request for the whole source (manual or after reconciliation drift) is served by a load that began after it."""
+    with db.transaction():
+        db.execute("UPDATE etl.reload_request SET status='COMPLETED' WHERE source=? AND aggregate_id='*' "
+                   "AND status='PENDING' AND requested_at<=?", (source, since))
+
+
 def catalog_extract(client, source):
     started = now()
     if source == "reference":
@@ -283,7 +291,10 @@ def run_once(args):
             extract = lambda: tracker_extract(client)
         else:
             extract = lambda: catalog_extract(client, args.source)
-        return load(db, args.source, extract)
+        begun = now()
+        result = load(db, args.source, extract)
+        complete_reload_requests(db, args.source, begun)
+        return result
     except Rejected as error:
         return {"status": "REJECTED", "error": str(error)}
     finally:

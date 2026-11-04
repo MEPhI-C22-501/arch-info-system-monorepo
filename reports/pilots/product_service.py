@@ -7,7 +7,9 @@ from zoneinfo import ZoneInfo
 
 from delivery import encode, next_run, printable
 from product_store import audit, local_principal, notify, packed, stamp
-from report_engine import AD, AN, MB, PM, QA, TL, ACCESS, Engine, Problem, Scope, definition, instant, roles, validate_query
+from report_engine import AD, AN, MB, PM, QA, TL, ACCESS, SOURCE_NAMES, Engine, Problem, Scope, definition, instant, roles, validate_query
+
+ETL_SOURCES = {name: source for source, name in SOURCE_NAMES.items()}
 
 
 def identity(value):
@@ -104,13 +106,49 @@ class Service:
             current=int(params.get('page','1'));size=int(params.get('pageSize','100'))
             if current<1 or not 1<=size<=200: raise ValueError()
         except (ValueError,TypeError): raise Problem(422,'INVALID_PARAMETER') from None
-        count=self.db.execute(f'SELECT COUNT(*) FROM app.{table} WHERE '+where,args).fetchone()[0]
-        rows=self.db.execute(f'SELECT {columns} FROM app.{table} WHERE '+where+f' ORDER BY {order} LIMIT ? OFFSET ?',tuple(args)+(size,(current-1)*size)).fetchall()
+        table=table if '.' in table else 'app.'+table
+        count=self.db.execute(f'SELECT COUNT(*) FROM {table} WHERE '+where,args).fetchone()[0]
+        rows=self.db.execute(f'SELECT {columns} FROM {table} WHERE '+where+f' ORDER BY {order} LIMIT ? OFFSET ?',tuple(args)+(size,(current-1)*size)).fetchall()
         return rows,count
+
+    def etl(self,method,resource,body,params):
+        """SCR-10: the batch and reconciliation journal for RL-05 and RL-06; a manual load request for RL-06 only."""
+        if not self.roles & {AD,AN}: raise Problem(403,'FORBIDDEN')
+        where,args=['1=1'],[]
+        if 'source' in params:
+            if params['source'] not in ETL_SOURCES: raise Problem(422,'INVALID_PARAMETER')
+            where.append('source=?');args.append(ETL_SOURCES[params['source']])
+        if resource=='batches' and method=='GET':
+            if 'status' in params:
+                if params['status'] not in {'EXTRACTING','LOADED','REJECTED'}: raise Problem(422,'INVALID_PARAMETER')
+                where.append('status=?');args.append(params['status'])
+            rows,count=self.db_page('etl.batch',' AND '.join(where),args,'id,source,status,started_at,completed_at,row_count,error_code','started_at DESC,id',params)
+            return 200,{'items':[{'batchId':r[0],'source':SOURCE_NAMES[r[1]],'status':r[2],'startedAt':r[3],'finishedAt':r[4],'rows':r[5],'error':r[6]}
+                                  for r in rows],'total':count},{}
+        if 'status' in params: raise Problem(422,'INVALID_PARAMETER')
+        if resource=='reconciliations' and method=='GET':
+            rows,count=self.db_page('etl.reconciliation',' AND '.join(where),args,
+                                    'id,source,entity,source_count,stored_count,missing_count,extra_count,created_at,status','created_at DESC,id',params)
+            return 200,{'items':[{'reconciliationId':r[0],'source':SOURCE_NAMES[r[1]],'entity':r[2],'sourceCount':r[3],'dwhCount':r[4],'missing':r[5],'extra':r[6],
+                                  'checkedAt':r[7],'mode':r[8].split('_')[0],'result':r[8].split('_')[1]} for r in rows],'total':count},{}
+        if resource=='loads' and method=='GET':
+            rows=self.db.execute("SELECT source,requested_at,reason,status FROM etl.reload_request WHERE aggregate_id='*' AND "+' AND '.join(where)+
+                                 ' ORDER BY requested_at DESC LIMIT 50',args).fetchall()
+            return 200,{'items':[{'source':SOURCE_NAMES[r[0]],'requestedAt':r[1],'reason':r[2],'status':r[3]} for r in rows]},{}
+        if resource=='loads' and method=='POST':
+            if AD not in self.roles: raise Problem(403,'FORBIDDEN')
+            if not isinstance(body,dict) or set(body)!={'source'} or body['source'] not in ETL_SOURCES: raise Problem(422,'INVALID_PARAMETER')
+            source=ETL_SOURCES[body['source']]
+            current=self.db.execute("SELECT status FROM etl.reload_request WHERE source=? AND aggregate_id='*'",(source,)).fetchone()
+            if current and current[0]=='PENDING': raise Problem(409,'LOAD_ALREADY_REQUESTED')
+            from events import reload_request
+            at=stamp();reload_request(self.db,source,'*',at,'MANUAL_LOAD')
+            return 202,{'source':body['source'],'requestedAt':at,'reason':'MANUAL_LOAD','status':'PENDING'},{}
+        raise Problem(404,'NOT_FOUND')
 
     def route(self,method,path,body=None,params=None,headers=None):
         params=params or {};headers={k.lower():v for k,v in (headers or {}).items()};parts=path.strip('/').split('/')
-        if set(params)-{'page','pageSize','reportId'}: raise Problem(422,'INVALID_PARAMETER')
+        if set(params)-{'page','pageSize','reportId','source','status'}: raise Problem(422,'INVALID_PARAMETER')
         if parts==['reports'] and method=='GET':
             items=[definition(f'R-{n:02d}') for n in range(1,12) if self.roles & ACCESS[n] or AD in self.roles]
             return 200,{'items':items},{}
@@ -124,6 +162,8 @@ class Service:
                 values.append({'source':{'tracker':'task-tracker','planning':'planning-system','reference':'reference-manager','qa':'qa-system'}[source],
                                'stream':'reports','dataAsOf':row[0] if row else None,'lagSeconds':lag,'thresholdSeconds':3600,'state':('FRESH' if lag is not None and 0<=lag<=3600 and (not last_failure or last_failure<=loaded[0]) else 'STALE') if row else 'UNKNOWN'})
             return 200,{'items':values},{}
+        if parts[:1]==['etl'] and len(parts)==2:
+            return self.etl(method,parts[1],body,params)
         if parts==['audit'] and method=='GET':
             if AD not in self.roles: raise Problem(403,'FORBIDDEN')
             cols=['auditId','actor','action','reportId','resourceId','queryHash','result','at','correlationId']

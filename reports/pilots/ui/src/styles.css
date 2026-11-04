@@ -152,6 +152,7 @@ tfoot th, tfoot td { font-weight: 700; }
 .status-completed::before { content: '✓ '; }
 .status-failed::before, .status-expired::before { content: '✕ '; }
 .status-failed { color: var(--danger); }
+.status-queued::before { content: '◷ '; }
 
 @media (max-width: 860px) {
   .report-layout { grid-template-columns: 1fr; }

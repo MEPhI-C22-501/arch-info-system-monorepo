@@ -23,6 +23,10 @@ npm ci --prefix reports/pilots/ui
 PYTHON=reports/pilots/.venv/bin/python sh reports/ci/check.sh
 ```
 
+SQL API Cube на стенде — `psql -h localhost -p 15432 -U reports_bi -d db`
+(пароль — `REPORTS_CUBE_SQL_PASSWORD` в `~/secrets.env`), например
+`SELECT TimeLogs.projectId, sum(TimeLogs.hours) FROM TimeLogs GROUP BY 1`.
+
 SQLite в unit-тестах — изолированная проверка алгоритмов и API, не замена
 PostgreSQL в архитектуре. Для настоящей временной PostgreSQL без Docker:
 

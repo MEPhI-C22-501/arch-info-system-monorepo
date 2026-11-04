@@ -38,6 +38,8 @@ def main():
         connection.execute('GRANT INSERT,UPDATE,DELETE ON app.saved_view,app.export_job,app.subscription,app.delivery,app.notification TO reports_app')
         connection.execute('GRANT INSERT ON app.audit_log TO reports_app')
         connection.execute('GRANT INSERT ON etl.outbox TO reports_app')
+        # Manual load (POST /etl/loads) only queues a request; the ETL workers run the load.
+        connection.execute('GRANT INSERT,UPDATE(requested_at,reason,status) ON etl.reload_request TO reports_app')
         connection.execute('GRANT INSERT(subject,roles,token_scope,valid_until),UPDATE(roles,token_scope,valid_until) ON app.principal TO reports_app')
     base = 'http://keycloak:8080'
     token = None
