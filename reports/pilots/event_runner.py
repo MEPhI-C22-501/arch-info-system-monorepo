@@ -47,7 +47,7 @@ def reload_local(db):
     pending=db.execute("SELECT source,aggregate_id,requested_at FROM etl.reload_request WHERE status='PENDING'").fetchall();db.connection.commit()
     if not pending:return
     from product_fixture import business_fixture
-    from etl import load,tracker_extract
+    from etl import Rejected,load,tracker_extract
     subjects=json.loads(Path('/demo/subjects.json').read_text());data=business_fixture(subjects)
     for source in sorted({r[0] for r in pending}):
         if source=='tracker':
@@ -55,7 +55,8 @@ def reload_local(db):
             extract=lambda:tracker_extract(Client('http://mock-tracker:8080',allow_http=True))
         else:
             value=stamp();extract=lambda s=source,t=value:(data[s],t,t,None)
-        result=load(db,source,extract)
+        try:result=load(db,source,extract)
+        except Rejected:continue  # e.g. the scheduler is loading this source now: the request stays PENDING for the next tick
         if result['status']=='LOADED':
             with db.transaction():
                 for s,identity,requested in pending:

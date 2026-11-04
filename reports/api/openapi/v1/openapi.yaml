@@ -664,40 +664,63 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
   /etl/loads:
+    get:
+      tags: [etl]
+      operationId: listLoadRequests
+      summary: Заявки на загрузку всего источника — ручные и после расхождения сверки, последние 50
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Source'
+      responses:
+        '200':
+          description: Заявки
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       tags: [etl]
       operationId: startLoad
-      summary: Запустить загрузку потока вручную
+      summary: Загрузить источник вручную — заявку выполняет ближайший цикл загрузки этого источника (только RL-06)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [source, stream]
+              required: [source]
+              additionalProperties: false
               properties:
                 source:
                   $ref: '#/components/schemas/Source'
-                stream:
-                  type: string
-                  example: work-items
-                kind:
-                  type: string
-                  enum: [INCREMENTAL, FULL, RECONCILIATION]
-                  default: INCREMENTAL
       responses:
         '202':
-          description: Пакет создан
+          description: Заявка поставлена в очередь
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Batch'
+                $ref: '#/components/schemas/LoadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
   /etl/reconciliations:
     get:
       tags: [etl]
@@ -899,7 +922,7 @@ components:
       enum: [task-tracker, planning-system, reference-manager, qa-system]
     BatchStatus:
       type: string
-      enum: [STARTED, EXTRACTED, VALIDATED, LOADED, REJECTED, FAILED]
+      enum: [EXTRACTING, LOADED, REJECTED]
     Problem:
       type: object
       required: [type, title, status, code, correlationId]
@@ -1310,17 +1333,13 @@ components:
           enum: [UNKNOWN, FRESH, STALE]
     Batch:
       type: object
-      required: [batchId, source, stream, kind, status, startedAt]
+      required: [batchId, source, status, startedAt]
       properties:
         batchId:
-          type: integer
+          type: string
+          format: uuid
         source:
           $ref: '#/components/schemas/Source'
-        stream:
-          type: string
-        kind:
-          type: string
-          enum: [INCREMENTAL, FULL, RECONCILIATION]
         status:
           $ref: '#/components/schemas/BatchStatus'
         startedAt:
@@ -1330,23 +1349,25 @@ components:
           type: string
           format: date-time
           nullable: true
-        rowsExtracted:
+        rows:
           type: integer
-        rowsLoaded:
-          type: integer
+          nullable: true
+          description: Записей в загруженном пакете; null — пакет не загружен или загружен до учёта числа записей
         error:
           type: string
           nullable: true
     Reconciliation:
       type: object
-      required: [reconciliationId, source, stream, status]
+      required: [reconciliationId, source, entity, mode, result, checkedAt]
       properties:
         reconciliationId:
-          type: integer
+          type: string
+          format: uuid
         source:
           $ref: '#/components/schemas/Source'
-        stream:
+        entity:
           type: string
+          example: work-items
         sourceCount:
           type: integer
         dwhCount:
@@ -1355,11 +1376,33 @@ components:
           type: integer
         extra:
           type: integer
-        fixed:
-          type: integer
+        mode:
+          type: string
+          enum: [SOURCE, LOCAL]
+          description: SOURCE — сверка с ответом источника при загрузке; LOCAL — ночная сверка хранилища с оперативной витриной
+        result:
+          type: string
+          enum: [MATCH, DRIFT]
+          description: DRIFT ставит заявку на загрузку всего источника
+        checkedAt:
+          type: string
+          format: date-time
+    LoadRequest:
+      type: object
+      required: [source, requestedAt, reason, status]
+      properties:
+        source:
+          $ref: '#/components/schemas/Source'
+        requestedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          example: MANUAL_LOAD
+          description: MANUAL_LOAD — администратор; RECONCILIATION_DRIFT — расхождение сверки
         status:
           type: string
-          enum: [STARTED, COMPLETED, FAILED]
+          enum: [PENDING, COMPLETED]
     IterationCard:
       type: object
       required: [iterationId, freshness]

@@ -48,6 +48,18 @@ export interface QueryParams {
 
 export interface DimensionOption { id: string; label: string }
 
+export interface Batch {
+  batchId: string; source: string; status: 'EXTRACTING' | 'LOADED' | 'REJECTED';
+  startedAt: string; finishedAt: string | null; rows: number | null; error: string | null;
+}
+
+export interface Reconciliation {
+  reconciliationId: string; source: string; entity: string; sourceCount: number; dwhCount: number;
+  missing: number; extra: number; mode: 'SOURCE' | 'LOCAL'; result: 'MATCH' | 'DRIFT'; checkedAt: string;
+}
+
+export interface LoadRequest { source: string; requestedAt: string; reason: string; status: 'PENDING' | 'COMPLETED' }
+
 export interface ReportQuery { params: QueryParams; slice: string[]; compareWithPrevious?: boolean }
 
 export interface SavedView { viewId: string; reportId: string; name: string; query: ReportQuery; createdAt: string }

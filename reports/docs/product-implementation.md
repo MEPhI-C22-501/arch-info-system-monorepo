@@ -146,7 +146,11 @@ tracker-status-category, employee-role. Нет автоматической пр
 или совпавшим UUID. Изменение конфигурации тоже попадает в аудит.
 
 API/worker подключаются ролью `reports_app`: SELECT источников своей БД,
-операции своих служебных таблиц и INSERT аудита. Изменять scopes/links и
+операции своих служебных таблиц и INSERT аудита. В `etl` роль только читает,
+кроме очереди `etl.reload_request`: «Загрузить сейчас» (`POST /api/v1/etl/loads`,
+только RL-06) кладёт туда заявку на весь источник, а загрузку выполняют
+процессы ETL — ближайший цикл этого источника. Журнал пакетов, сверок и заявок —
+`GET /api/v1/etl/batches`, `/etl/reconciliations`, `/etl/loads` для RL-05 и RL-06. Изменять scopes/links и
 обновлять enabled principals эта роль не может. Аудит не содержит токенов,
 полных ответов и исходных payload: актор, действие, report/resource ID,
 хеш запроса, результат, timestamp и correlation ID. UPDATE/DELETE/TRUNCATE
