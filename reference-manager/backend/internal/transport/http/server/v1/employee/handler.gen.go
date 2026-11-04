@@ -24,7 +24,7 @@ type Service interface {
 	Create(ctx context.Context, fields *employeedmn.Fields) (*record.Expanded[employeedmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[employeedmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[employeedmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[employeedmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[employeedmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[employeedmn.Fields]) (*record.Expanded[employeedmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[employeedmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -72,7 +72,7 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request, id employe
 }
 
 func (h *Handler) ListEmployees(w http.ResponseWriter, r *http.Request, params employeev1.ListEmployeesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -82,9 +82,9 @@ func (h *Handler) ListEmployees(w http.ResponseWriter, r *http.Request, params e
 	render.JSON(w, r, recordhndl.ListPageToAPI("employees", page, expandedToAPI))
 }
 
-// ExportEmployees responds with an Excel file of all active employees.
-func (h *Handler) ExportEmployees(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportEmployees responds with an Excel file of the active employees of the selection.
+func (h *Handler) ExportEmployees(w http.ResponseWriter, r *http.Request, params employeev1.ExportEmployeesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

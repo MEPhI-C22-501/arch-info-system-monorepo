@@ -52,6 +52,15 @@ type ListRequest struct {
 	Filter       string
 	OrderBy      string
 	AllowDeleted bool
+	// ReadTime asks for the records as they were at the moment, rebuilt from the revisions; zero means now (FR-RM-61).
+	ReadTime time.Time
+}
+
+// ExportRequest narrows the export of the active records, every field is optional (FR-RM-62).
+type ExportRequest struct {
+	Filter   string
+	OrderBy  string
+	ReadTime time.Time
 }
 
 // ListQuery is a validated request for records that repositories can execute.
@@ -61,7 +70,9 @@ type ListQuery struct {
 	// OrderBy is an AIP-132 ordering validated against the sortable fields, empty when absent.
 	OrderBy      ordering.OrderBy
 	AllowDeleted bool
-	Offset       int64
+	// ReadTime selects the slice of the records at the moment instead of their current state, zero means now.
+	ReadTime time.Time
+	Offset   int64
 	// Limit is the maximum number of records, zero means no limit, the offset is ignored then.
 	Limit int32
 }

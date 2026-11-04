@@ -22,7 +22,7 @@ type Service interface {
 	Create(ctx context.Context, fields *gradedmn.Fields) (*record.Expanded[gradedmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[gradedmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[gradedmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[gradedmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[gradedmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[gradedmn.Fields]) (*record.Expanded[gradedmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[gradedmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -68,7 +68,7 @@ func (h *Handler) GetGrade(w http.ResponseWriter, r *http.Request, id gradev1.Gr
 }
 
 func (h *Handler) ListGrades(w http.ResponseWriter, r *http.Request, params gradev1.ListGradesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -78,9 +78,9 @@ func (h *Handler) ListGrades(w http.ResponseWriter, r *http.Request, params grad
 	render.JSON(w, r, recordhndl.ListPageToAPI("grades", page, expandedToAPI))
 }
 
-// ExportGrades responds with an Excel file of all active grades.
-func (h *Handler) ExportGrades(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportGrades responds with an Excel file of the active grades of the selection.
+func (h *Handler) ExportGrades(w http.ResponseWriter, r *http.Request, params gradev1.ExportGradesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

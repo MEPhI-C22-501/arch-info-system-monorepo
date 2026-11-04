@@ -49,11 +49,11 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:8081/*"],
-      "webOrigins": ["http://localhost:8081"],
+      "redirectUris": ["http://localhost:8084/*", "http://localhost:8089/*"],
+      "webOrigins": ["http://localhost:8084", "http://localhost:8089"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:8081/*"
+        "post.logout.redirect.uris": "http://localhost:8084/*"
       },
       "protocol": "openid-connect",
       "protocolMappers": [
@@ -82,6 +82,114 @@
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "protocol": "openid-connect"
+    },
+    {
+      "clientId": "reports-client",
+      "name": "Reports ETL job",
+      "description": "Local service client of a consumer with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "__CONSUMER_SECRET__",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "reference-manager-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "reference-manager",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "planning-service",
+      "name": "Planning System backend",
+      "description": "Local service client of a consumer with the role reference-hr-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "__CONSUMER_SECRET__",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "reference-manager-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "reference-manager",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "task-tracker-service",
+      "name": "Task Tracker directory cache",
+      "description": "Local service client of a consumer with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "__CONSUMER_SECRET__",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "reference-manager-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "reference-manager",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "qa-service",
+      "name": "QA System directory cache",
+      "description": "Local service client of a consumer with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "__CONSUMER_SECRET__",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "reference-manager-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "reference-manager",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -92,6 +200,30 @@
       "clientRoles": {
         "realm-management": [ "manage-users", "view-users", "query-users", "view-realm" ]
       }
+    },
+    {
+      "username": "service-account-reports-client",
+      "enabled": true,
+      "serviceAccountClientId": "reports-client",
+      "realmRoles": ["reference-reader"]
+    },
+    {
+      "username": "service-account-planning-service",
+      "enabled": true,
+      "serviceAccountClientId": "planning-service",
+      "realmRoles": ["reference-hr-reader"]
+    },
+    {
+      "username": "service-account-task-tracker-service",
+      "enabled": true,
+      "serviceAccountClientId": "task-tracker-service",
+      "realmRoles": ["reference-reader"]
+    },
+    {
+      "username": "service-account-qa-service",
+      "enabled": true,
+      "serviceAccountClientId": "qa-service",
+      "realmRoles": ["reference-reader"]
     },
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",

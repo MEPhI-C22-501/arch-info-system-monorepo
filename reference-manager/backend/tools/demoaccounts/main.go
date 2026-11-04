@@ -1,7 +1,7 @@
 // Command demoaccounts creates or repeats the Keycloak accounts of every employee through the API of the service.
 // It logs in to Keycloak as an HR administrator by the password grant of the local realm and calls SyncAccount
 // for every employee, so the employees of the demonstration data set get their accounts (FR-RM-56).
-// Run it from backend/ with `go run ./tools/demoaccounts` after `task up` and `task demo:data`.
+// `task up` runs it as the one-shot job reference-manager-demo-accounts, `task demo:accounts` repeats it.
 package main
 
 import (
@@ -35,8 +35,8 @@ type apiError struct {
 }
 
 func main() {
-	api := flag.String("api", "http://localhost:8080", "address of the service")
-	keycloakURL := flag.String("keycloak", "http://localhost:8180", "address of Keycloak")
+	api := flag.String("api", "http://localhost:8083", "address of the service")
+	keycloakURL := flag.String("keycloak", "http://localhost:8183", "address of Keycloak")
 	realm := flag.String("realm", "arch-info-system", "realm of the users")
 	clientID := flag.String("client", "reference-manager-ui", "public client with the password grant enabled")
 	user := flag.String("user", "hr-admin", "HR administrator, the password is read from DEMO_PASSWORD, by default it equals the user")

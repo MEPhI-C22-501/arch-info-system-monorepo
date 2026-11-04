@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager {{.Title}} API
   description: {{printf "%q" .Description}}
-  version: 1.0.0
+  version: 1.1.0
 
 security:
   - KeycloakOAuth2: []
@@ -52,11 +52,12 @@ paths:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/OrderBy'
         - $ref: '#/components/parameters/AllowDeleted'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpanded{{.PluralTitle}}'
         '400':
-          description: Bad Request. Invalid filter, ordering or page token.
+          description: Bad Request. Invalid filter, ordering, page token or moment.
           $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
@@ -72,11 +73,21 @@ paths:
     post:
       operationId: export{{.PluralTitle}}
       summary: Export {{.Plural}} in Excel format
-      description: Generates and returns an Excel file with all active {{.Plural}} in creation order.
+      description: >
+        Generates and returns an Excel file with the active {{.Plural}}: all of them in creation order without
+        parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment.
+        Deleted records and revisions are never exported.
       x-required-roles: {{.ReadRoles}}
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExcelFile'
+        '400':
+          description: Bad Request. Invalid filter, ordering or moment.
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
           $ref: '#/components/responses/Error'
@@ -185,14 +196,20 @@ paths:
           description: Internal Server Error.
           $ref: '#/components/responses/Error'
 {{range .Custom}}
+{{- if .Collection}}
+  /v1/{{$.Plural}}/{{.Path}}:
+{{- else}}
   /v1/{{$.Plural}}/{{"{"}}{{$.PathParam}}{{"}"}}/{{.Path}}:
+{{- end}}
     post:
       operationId: {{.OperationID}}
       summary: {{.Summary}}
       description: {{printf "%q" .Description}}
       x-required-roles: {{$.WriteRoles}}
+{{- if not .Collection}}
       parameters:
         - $ref: '#/components/parameters/{{$.ParamType}}'
+{{- end}}
 {{- if .BodySchema}}
       requestBody:
         required: true
@@ -203,7 +220,15 @@ paths:
 {{- end}}
       responses:
         '200':
+{{- if .ResultSchema}}
+          description: The result of the operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/{{.ResultSchema}}'
+{{- else}}
           $ref: '#/components/responses/SuccessWithExpanded{{$.Title}}'
+{{- end}}
         '400':
           description: Bad Request. Invalid input data or the operation is not allowed in the current state.
           $ref: '#/components/responses/Error'
@@ -214,10 +239,14 @@ paths:
           description: Forbidden. The client lacks the role required for the operation.
           $ref: '#/components/responses/Error'
         '404':
+{{- if .Collection}}
+          description: Not Found. A record the request refers to does not exist or is deleted.
+{{- else}}
           description: Not Found. The {{$.Singular}} does not exist or is deleted.
+{{- end}}
           $ref: '#/components/responses/Error'
         '409':
-          description: Conflict. The {{$.Singular}} was modified concurrently.
+          description: Conflict. A record was modified concurrently.
           $ref: '#/components/responses/Error'
         '500':
           description: Internal Server Error.
@@ -297,11 +326,11 @@ components:
         The URLs below point to the local environment.
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/auth
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          authorizationUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
         clientCredentials:
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
 
   schemas:
@@ -459,6 +488,8 @@ components:
 {{range .Custom}}{{if .BodySchema}}
     {{.BodySchema}}:
 {{.BodyYAML}}
+{{- end}}{{if .SchemasYAML}}
+{{.SchemasYAML}}
 {{- end}}{{end}}
   parameters:
     {{.ParamType}}:
@@ -542,10 +573,24 @@ components:
       required: false
       description: >
         A comma-separated list of sort fields. Ascending order is used by default. To change the direction,
-        use the `desc` suffix (e.g., `created_at desc, id`).
+        use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
       schema:
         type: string
         example: 'created_at desc'
+
+    ReadTime:
+      name: readTime
+      in: query
+      required: false
+      description: >
+        A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their
+        revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields
+        are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged
+        record is absent. Without the parameter the current state is returned (FR-RM-61).
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-01T00:00:00Z'
 
     RevisionNumber:
       name: revisionNumber

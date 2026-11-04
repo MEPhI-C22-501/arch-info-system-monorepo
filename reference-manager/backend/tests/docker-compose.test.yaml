@@ -64,7 +64,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       # the issuer stays the same as in the local environment, whatever host port the tests get tokens from
-      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME: http://localhost:8183
       KC_HEALTH_ENABLED: "true"
       KEYCLOAK_PROVISIONER_SECRET: test-provisioner-secret
 

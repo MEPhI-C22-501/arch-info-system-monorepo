@@ -50,6 +50,63 @@ type AssignmentRevision struct {
 	RevisionNumber *int32 `json:"revision_number,omitempty"`
 }
 
+// AssignmentTransfer A transfer of the employees of an org unit to another unit from one date.
+type AssignmentTransfer struct {
+	// IncludeSubunits Also the employees of the units below the unit.
+	IncludeSubunits *bool `json:"include_subunits,omitempty"`
+
+	// OrgUnitId Identifier of the unit the employees leave.
+	OrgUnitId int64 `json:"org_unit_id"`
+
+	// PositionId Position in the target unit, the current position of each employee when empty.
+	PositionId *int64 `json:"position_id,omitempty"`
+
+	// StartDate First day in the target unit, the assignments in effect end the day before.
+	StartDate openapi_types.Date `json:"start_date"`
+
+	// TargetOrgUnitId Identifier of the unit the employees move to.
+	TargetOrgUnitId int64 `json:"target_org_unit_id"`
+
+	// ValidateOnly Return the plan and change nothing (AIP-163).
+	ValidateOnly *bool `json:"validate_only,omitempty"`
+}
+
+// AssignmentTransferItem The move of one employee.
+type AssignmentTransferItem struct {
+	// AssignmentId The created assignment, empty in a validation.
+	AssignmentId *int64 `json:"assignment_id,omitempty"`
+
+	// ClosedAssignmentId The assignment that ends the day before start_date.
+	ClosedAssignmentId int64 `json:"closed_assignment_id"`
+
+	// EmployeeId Identifier of the employee.
+	EmployeeId int64 `json:"employee_id"`
+
+	// EndDate Last day of the new assignment, the end of the closed one, empty while it is in effect.
+	EndDate *openapi_types.Date `json:"end_date,omitempty"`
+
+	// OrgUnitId The unit of the closed assignment.
+	OrgUnitId int64 `json:"org_unit_id"`
+
+	// PositionId The position of the new assignment.
+	PositionId int64 `json:"position_id"`
+
+	// StartDate First day of the new assignment.
+	StartDate openapi_types.Date `json:"start_date"`
+
+	// TargetOrgUnitId The unit of the new assignment.
+	TargetOrgUnitId int64 `json:"target_org_unit_id"`
+}
+
+// AssignmentTransferResult The moves in the order of the employee identifiers.
+type AssignmentTransferResult struct {
+	Items   []AssignmentTransferItem `json:"items"`
+	Skipped []SkippedEmployee        `json:"skipped"`
+
+	// ValidateOnly True when nothing was changed and the items are the plan.
+	ValidateOnly bool `json:"validate_only"`
+}
+
 // Error Standardized error response format for all API errors.
 type Error struct {
 	// Details Optional field-specific errors.
@@ -107,6 +164,15 @@ type ExpandedAssignment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// SkippedEmployee An employee of the unit the operation leaves as is.
+type SkippedEmployee struct {
+	// EmployeeId Identifier of the employee.
+	EmployeeId int64 `json:"employee_id"`
+
+	// Reason Why the employee is left as is.
+	Reason string `json:"reason"`
+}
+
 // AllowDeleted defines model for AllowDeleted.
 type AllowDeleted = bool
 
@@ -127,6 +193,9 @@ type ListPageToken = string
 
 // OrderBy defines model for OrderBy.
 type OrderBy = string
+
+// ReadTime defines model for ReadTime.
+type ReadTime = time.Time
 
 // RevisionNumber defines model for RevisionNumber.
 type RevisionNumber = int32
@@ -169,11 +238,26 @@ type ListAssignmentsParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.
 	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
+}
+
+// ExportAssignmentsParams defines parameters for ExportAssignments.
+type ExportAssignmentsParams struct {
+	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
 }
 
 // DeleteAssignmentParams defines parameters for DeleteAssignment.
@@ -205,7 +289,7 @@ type ListAssignmentRevisionsParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.
@@ -220,6 +304,9 @@ type GetAssignmentRevisionParams struct {
 
 // CreateAssignmentJSONRequestBody defines body for CreateAssignment for application/json ContentType.
 type CreateAssignmentJSONRequestBody = Assignment
+
+// TransferAssignmentsJSONRequestBody defines body for TransferAssignments for application/json ContentType.
+type TransferAssignmentsJSONRequestBody = AssignmentTransfer
 
 // UpdateAssignmentJSONRequestBody defines body for UpdateAssignment for application/json ContentType.
 type UpdateAssignmentJSONRequestBody = Assignment

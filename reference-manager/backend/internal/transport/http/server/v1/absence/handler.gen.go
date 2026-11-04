@@ -23,7 +23,7 @@ type Service interface {
 	Create(ctx context.Context, fields *absencedmn.Fields) (*record.Expanded[absencedmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[absencedmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[absencedmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[absencedmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[absencedmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[absencedmn.Fields]) (*record.Expanded[absencedmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[absencedmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -69,7 +69,7 @@ func (h *Handler) GetAbsence(w http.ResponseWriter, r *http.Request, id absencev
 }
 
 func (h *Handler) ListAbsences(w http.ResponseWriter, r *http.Request, params absencev1.ListAbsencesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -79,9 +79,9 @@ func (h *Handler) ListAbsences(w http.ResponseWriter, r *http.Request, params ab
 	render.JSON(w, r, recordhndl.ListPageToAPI("absences", page, expandedToAPI))
 }
 
-// ExportAbsences responds with an Excel file of all active absences.
-func (h *Handler) ExportAbsences(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportAbsences responds with an Excel file of the active absences of the selection.
+func (h *Handler) ExportAbsences(w http.ResponseWriter, r *http.Request, params absencev1.ExportAbsencesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

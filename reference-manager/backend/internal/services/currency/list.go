@@ -8,6 +8,7 @@ import (
 	"hash/crc32"
 	"io"
 	"strconv"
+	"time"
 
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"
@@ -162,7 +163,7 @@ func parseListParams(fields listFields, pageSize int32, filter, orderBy, token s
 
 // listQuery validates the client request and turns it into a query, the returned page token is the current one.
 func listQuery(r *currencydmn.ListRequest) (*currencydmn.ListQuery, pageToken, error) {
-	checksum := requestChecksum(r.Filter, r.OrderBy, strconv.FormatBool(r.AllowDeleted))
+	checksum := requestChecksum(r.Filter, r.OrderBy, strconv.FormatBool(r.AllowDeleted), momentKey(r.ReadTime))
 
 	params, err := parseListParams(currencyFields, r.PageSize, r.Filter, r.OrderBy, r.PageToken, checksum)
 	if err != nil {
@@ -173,9 +174,31 @@ func listQuery(r *currencydmn.ListRequest) (*currencydmn.ListQuery, pageToken, e
 		Filter:       params.filter,
 		OrderBy:      params.orderBy,
 		AllowDeleted: r.AllowDeleted,
+		ReadTime:     r.ReadTime.UTC(),
 		Offset:       params.token.Offset,
 		Limit:        params.limit,
 	}, params.token, nil
+}
+
+// exportQuery validates the selection of an export: the active currencies, no paging.
+func exportQuery(r *currencydmn.ExportRequest) (*currencydmn.ListQuery, error) {
+	query, _, err := listQuery(&currencydmn.ListRequest{Filter: r.Filter, OrderBy: r.OrderBy, ReadTime: r.ReadTime})
+	if err != nil {
+		return nil, err
+	}
+
+	query.Limit = 0
+
+	return query, nil
+}
+
+// momentKey is the part of the page token checksum for the moment of a slice, empty for the current state.
+func momentKey(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.UTC().Format(time.RFC3339Nano)
 }
 
 // revisionListQuery validates the client request and turns it into a query, the returned page token is the current one.

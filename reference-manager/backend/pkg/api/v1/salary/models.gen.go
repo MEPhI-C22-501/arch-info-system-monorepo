@@ -68,6 +68,66 @@ type ExpandedSalary struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// GroupSalaryChange A revision of the salaries of the employees of an org unit from one date. Exactly one of percent and amount.
+type GroupSalaryChange struct {
+	// Amount The same new amount for every employee.
+	Amount *float64 `json:"amount,omitempty"`
+
+	// CurrencyId Currency of the new amount, the currency of the current salary when empty. Allowed with amount only.
+	CurrencyId *int64 `json:"currency_id,omitempty"`
+
+	// IncludeSubunits Also the employees of the units below the unit.
+	IncludeSubunits *bool `json:"include_subunits,omitempty"`
+
+	// OrgUnitId Identifier of the unit whose employees get the new salaries.
+	OrgUnitId int64 `json:"org_unit_id"`
+
+	// Percent Change of the current amount in percent, the new amount is rounded to two decimals.
+	Percent *float64 `json:"percent,omitempty"`
+
+	// StartDate First day of the new salaries, the salaries in effect end the day before.
+	StartDate openapi_types.Date `json:"start_date"`
+
+	// ValidateOnly Return the plan and change nothing (AIP-163).
+	ValidateOnly *bool `json:"validate_only,omitempty"`
+}
+
+// GroupSalaryChangeItem The change of the salary of one employee.
+type GroupSalaryChangeItem struct {
+	// Amount The new amount.
+	Amount float64 `json:"amount"`
+
+	// ClosedSalaryId The salary that ends the day before start_date, empty for a first salary.
+	ClosedSalaryId *int64 `json:"closed_salary_id,omitempty"`
+
+	// CurrencyId Currency of the new amount.
+	CurrencyId int64 `json:"currency_id"`
+
+	// EmployeeId Identifier of the employee.
+	EmployeeId int64 `json:"employee_id"`
+
+	// EndDate Last day of the new salary, the end of the closed one, empty while it is in effect.
+	EndDate *openapi_types.Date `json:"end_date,omitempty"`
+
+	// PreviousAmount The amount of the closed salary.
+	PreviousAmount *float64 `json:"previous_amount,omitempty"`
+
+	// SalaryId The created salary, empty in a validation.
+	SalaryId *int64 `json:"salary_id,omitempty"`
+
+	// StartDate First day of the new salary.
+	StartDate openapi_types.Date `json:"start_date"`
+}
+
+// GroupSalaryChangeResult The changes of the salaries in the order of the employee identifiers.
+type GroupSalaryChangeResult struct {
+	Items   []GroupSalaryChangeItem `json:"items"`
+	Skipped []SkippedEmployee       `json:"skipped"`
+
+	// ValidateOnly True when nothing was changed and the items are the plan.
+	ValidateOnly bool `json:"validate_only"`
+}
+
 // Salary The fields of a salary a client sets on creation and update.
 type Salary struct {
 	// Amount Monthly salary, a positive amount with two decimals.
@@ -107,6 +167,15 @@ type SalaryRevision struct {
 	SalaryId *int64 `json:"salary_id,omitempty"`
 }
 
+// SkippedEmployee An employee of the unit the operation leaves as is.
+type SkippedEmployee struct {
+	// EmployeeId Identifier of the employee.
+	EmployeeId int64 `json:"employee_id"`
+
+	// Reason Why the employee is left as is.
+	Reason string `json:"reason"`
+}
+
 // AllowDeleted defines model for AllowDeleted.
 type AllowDeleted = bool
 
@@ -124,6 +193,9 @@ type ListPageToken = string
 
 // OrderBy defines model for OrderBy.
 type OrderBy = string
+
+// ReadTime defines model for ReadTime.
+type ReadTime = time.Time
 
 // RevisionNumber defines model for RevisionNumber.
 type RevisionNumber = int32
@@ -169,11 +241,26 @@ type ListSalariesParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.
 	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
+}
+
+// ExportSalariesParams defines parameters for ExportSalaries.
+type ExportSalariesParams struct {
+	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
 }
 
 // DeleteSalaryParams defines parameters for DeleteSalary.
@@ -205,7 +292,7 @@ type ListSalaryRevisionsParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.
@@ -220,6 +307,9 @@ type GetSalaryRevisionParams struct {
 
 // CreateSalaryJSONRequestBody defines body for CreateSalary for application/json ContentType.
 type CreateSalaryJSONRequestBody = Salary
+
+// ReviseSalariesJSONRequestBody defines body for ReviseSalaries for application/json ContentType.
+type ReviseSalariesJSONRequestBody = GroupSalaryChange
 
 // UpdateSalaryJSONRequestBody defines body for UpdateSalary for application/json ContentType.
 type UpdateSalaryJSONRequestBody = Salary

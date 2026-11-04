@@ -6,6 +6,7 @@ package salaryhndl
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/render"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -23,12 +24,13 @@ type Service interface {
 	Create(ctx context.Context, fields *salarydmn.Fields) (*record.Expanded[salarydmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[salarydmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[salarydmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[salarydmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[salarydmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[salarydmn.Fields]) (*record.Expanded[salarydmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[salarydmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
 	GetRevision(ctx context.Context, id int64, revisionNumber int32, allowDeleted bool) (*record.Revision, error)
 	ListRevisions(ctx context.Context, request *record.RevisionListRequest) (*record.RevisionListPage, error)
+	Revise(ctx context.Context, request *salarydmn.GroupChangeRequest) (*salarydmn.GroupChangeResult, error)
 }
 
 type Handler struct {
@@ -69,7 +71,7 @@ func (h *Handler) GetSalary(w http.ResponseWriter, r *http.Request, id salaryv1.
 }
 
 func (h *Handler) ListSalaries(w http.ResponseWriter, r *http.Request, params salaryv1.ListSalariesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -79,9 +81,9 @@ func (h *Handler) ListSalaries(w http.ResponseWriter, r *http.Request, params sa
 	render.JSON(w, r, recordhndl.ListPageToAPI("salaries", page, expandedToAPI))
 }
 
-// ExportSalaries responds with an Excel file of all active salaries.
-func (h *Handler) ExportSalaries(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportSalaries responds with an Excel file of the active salaries of the selection.
+func (h *Handler) ExportSalaries(w http.ResponseWriter, r *http.Request, params salaryv1.ExportSalariesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -200,3 +202,6 @@ func expandedToAPI(m *record.Expanded[salarydmn.Fields]) salaryv1.ExpandedSalary
 		DeletedAt:   m.DeletedAt,
 	}
 }
+
+// the custom methods of the catalog are implemented next to this file
+var _ time.Time

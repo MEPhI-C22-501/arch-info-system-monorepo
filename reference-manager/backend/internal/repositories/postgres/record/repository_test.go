@@ -3,6 +3,7 @@ package recordrepo
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"
@@ -109,6 +110,56 @@ func TestRepositoryListQuery(t *testing.T) {
 	}
 	if strings.Contains(all, "WHERE") || strings.Contains(all, "LIMIT") || len(args) != 0 {
 		t.Errorf("an unlimited query of all records must have no conditions:\n%s", all)
+	}
+}
+
+func TestRepositorySliceQuery(t *testing.T) {
+	t.Parallel()
+
+	r := NewRepository(nil, desc)
+
+	declarations, err := filtering.NewDeclarations(filtering.DeclareStandardFunctions(), filtering.DeclareIdent("code", filtering.TypeString))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filter, err := filtering.ParseFilterString(`code = "dev"`, declarations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	moment := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+
+	query, args, err := r.buildListQuery(&record.ListQuery{Filter: filter, ReadTime: moment, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, part := range []string{
+		"SELECT id, code, since, parent, is_deleted, revision, last_changer, created_at, updated_at, deleted_at\nFROM (\nWITH revs AS (",
+		"FROM unit_revisions r\n    WHERE r.changed_at <= $1\n",
+		"SELECT s.record_id AS id, p.code, p.since, NULL::bigint AS parent, COALESCE((s.state ->> 'is_deleted')::boolean, FALSE) AS is_deleted,",
+		"CROSS JOIN LATERAL jsonb_populate_record(NULL::units, s.state) AS p\n) AS slice",
+		"WHERE is_deleted = FALSE AND (code = $2)",
+		"LIMIT $3 OFFSET $4",
+	} {
+		if !strings.Contains(query, part) {
+			t.Errorf("slice query lacks %q:\n%s", part, query)
+		}
+	}
+	if strings.Contains(query, "v_expanded_unit") {
+		t.Errorf("a slice must not read the view of the current state:\n%s", query)
+	}
+	if len(args) != 4 || args[0] != moment || args[1] != "dev" {
+		t.Errorf("the moment must be the first argument, got %v", args)
+	}
+
+	current, _, err := r.buildListQuery(&record.ListQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(current, r.selectQuery) || strings.Contains(current, "unit_revisions") {
+		t.Errorf("without a moment the list reads the view:\n%s", current)
 	}
 }
 

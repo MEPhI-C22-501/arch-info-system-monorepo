@@ -28,6 +28,12 @@ Every catalog is a collection under `/v1/` with the same methods: create, list, 
 
 To add a catalog: append a definition to `defs.go`, run `task generate`, write `rules.go` when the catalog has cross-field rules, register the service in `internal/app/reference-manager/catalogs.go` and add feature files under `tests/features/`.
 
+Lists and exports take `readTime` (RFC 3339): the records are returned as they were at that moment, rebuilt from their revisions by the last JSON Patch operation of every field before it, with the usual filter, ordering and pages. A record created later is absent, a purged one too, the computed unit and position of an employee are empty in a slice. The export takes `filter` and `order_by` of the list as well. Without parameters both behave as before (specs `1.1.0`, ADR-023).
+
+Two operations change a whole org unit from one date in one transaction: `POST /v1/salaries/revise` (new salaries by `percent` or `amount`) and `POST /v1/assignments/transfer` (a move to `target_org_unit_id`). The record in effect of every employee of the unit (with `include_subunits`, of the units below it too) ends the day before, the new one starts on the date. `validate_only` returns the plan and rolls everything back. The decisions are a pure plan in `internal/services/groupops/plan.go`, the writes go through the standard methods of the catalog, so every record passes its rules and gets a revision.
+
+The shared `api/` folder of the monorepo keeps copies of these specs and the clients generated from them for every team. `task api:sync` copies the specs, `task api:check` (part of `task lint`) fails on a stale copy, the clients are regenerated in `api/` with its own `task generate`.
+
 Employees carry `employment_state` and `dismissal_date`, both set by the service. `POST /v1/employees/{employeeID}/dismiss` closes the assignment and the salary in effect with the dismissal date. The unit and the position of an employee are computed from the assignment in effect today (migration `000011`).
 
 Every employee has a Keycloak account managed by the service through the Admin REST API under the client `reference-manager-provisioner` (FR-RM-53..58). `account_state` and `account_user_id` are read-only fields of the record: the creation stores the record with `PENDING`, creates a disabled account with a random temporary password (the employee changes it at the first login), gives it the realm roles from the configuration, enables it and stores its ID with `ENABLED`. The dismissal disables the account (`DISABLED`, the ID stays), a changed name or email is passed to the account, a working employee with an account cannot be deleted. When Keycloak is unavailable the record stays `PENDING` and the method answers `503`; `POST /v1/employees/{employeeID}/syncAccount` repeats the operation and never creates a second account (the account is found by its ID, or by username when the email matches). The `pkg/keycloak` package holds the client, `internal/services/employee` the coordination.
@@ -213,40 +219,57 @@ Telemetry is configured under `telemetry`.
 
 ## Run local environment
 
-The local development environment is managed using [Task](https://taskfile.dev/) and Docker Compose.
-
-Build the application, create Docker images, and start all required services:
+The local development environment is managed using [Task](https://taskfile.dev/) and Docker Compose. One command starts it on a clean machine:
 
 ```bash
 task up
 ```
 
-The command builds the application binary and Docker images before starting the environment defined in `deployments/docker-compose.yaml`: the database with the one-shot migrations and seed jobs, Keycloak, the collector, the service and the admin panel. The panel from `frontend/admin/` is served at `http://localhost:8081/admin/` (port `REFERENCE_MANAGER_UI_PORT` in `deployments/.env`), it logs in through Keycloak (users of the local realm, the password equals the username: `admin`, `hr-admin`, `reader`, `hr-reader`) and talks to the service through the `/v1/` proxy of its own nginx, so the browser uses one origin.
+When `deployments/.env` is missing, the command creates it from `deployments/.env.example`, which holds every secret of the environment (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PROVISIONER_SECRET`, `KEYCLOAK_CONSUMER_SECRET`), the configuration files hold none. Then it builds the images and starts `deployments/docker-compose.yaml`: the database, the one-shot jobs of the migrations, the demonstration data set and the Keycloak accounts of its employees, Keycloak, the collector, the service and the admin panel. The service account of the database is created on the first start of the database, so run `task down` before `task up` on an environment created before this version.
 
-Copy `deployments/.env.example` to `deployments/.env` first: it holds every secret of the environment (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PROVISIONER_SECRET`), the configuration files hold none. The service account of the database is created on the first start of the database, so run `task down` before `task up` on an environment created before this version. When port `5432` is taken on the host, set `POSTGRES_PORT`.
+The host ports leave room for the stands of the other modules and the shared environment of Infra, which take 8080, 8081, 8180, 4317 and 4318:
 
-The environment includes a local Keycloak at `http://localhost:8180` (admin console credentials `KEYCLOAK_ADMIN_USERNAME` / `KEYCLOAK_ADMIN_PASSWORD` in `deployments/.env`). It imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` (its secret is substituted from `KEYCLOAK_PROVISIONER_SECRET` by `deployments/configs/keycloak/import-realm.sh` on the start of Keycloak) and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+| Component | Address | Variable |
+| --- | --- | --- |
+| Admin panel | `http://localhost:8084/admin/` | `REFERENCE_MANAGER_UI_PORT` |
+| Service API | `http://localhost:8083/v1/` | `REFERENCE_MANAGER_PORT` |
+| Keycloak | `http://localhost:8183` | fixed: it is the token issuer, the panel config and its CSP name it |
+| PostgreSQL | `localhost:5437` | `POSTGRES_PORT` |
+| Collector | `localhost:14317` gRPC, `localhost:14318` HTTP | `OTEL_COLLECTOR_GRPC_PORT`, `OTEL_COLLECTOR_HTTP_PORT` |
+| Swagger UI | `http://localhost:8089`, after `task swagger` | `SWAGGER_PORT` |
 
-The environment also includes an OpenTelemetry Collector at `localhost:4317` (gRPC) and `localhost:4318` (HTTP), config `deployments/configs/otel-collector/local/otel-collector.yaml`. It prints a summary of every received batch to its log (`docker logs reference_manager_otel_collector`) and stores nothing. The storage and the browsing of telemetry are provided by Infra on the shared stand, where only `telemetry.exporter.endpoint` changes. A trace of a request is found there by the `X-Trace-Id` of the response.
+The panel logs in through Keycloak (users of the local realm, the password equals the username: `admin`, `hr-admin`, `reader`, `hr-reader`) and talks to the service through the `/v1/` proxy of its own nginx, so the browser uses one origin. `task swagger` starts Swagger UI of every spec on the same network: the Authorize button logs in with PKCE through the local Keycloak and "Try it out" goes through the `/v1/` proxy of its nginx.
 
-Get a token and call the API:
+The local Keycloak imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). For the consumers it has service clients with the client ids of the realm of Infra where they exist: `reports-client` (`reference-reader`), `planning-service` (`reference-hr-reader`), `task-tracker-service` and `qa-service` (`reference-reader`). `deployments/configs/keycloak/import-realm.sh` substitutes `KEYCLOAK_PROVISIONER_SECRET` and `KEYCLOAK_CONSUMER_SECRET` into the realm on the start of Keycloak. The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+
+The collector prints a summary of every received batch to its log (`docker logs reference_manager_otel_collector`) and stores nothing. The storage and the browsing of telemetry are provided by Infra on the shared stand, where only `telemetry.exporter.endpoint` changes. A trace of a request is found there by the `X-Trace-Id` of the response.
+
+Get a token of a consumer and call the API. The secret and the token go through files, so they never reach the command line:
 
 ```bash
-TOKEN=$(curl -s -d grant_type=password -d client_id=reference-manager-ui -d username=admin -d password=admin \
-  http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token | jq -r .access_token)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/currencies/
+umask 077
+sed -n 's/^KEYCLOAK_CONSUMER_SECRET=/client_secret=/p' deployments/.env > /tmp/rm-secret.form
+curl -s -d @/tmp/rm-secret.form -d grant_type=client_credentials -d client_id=reports-client \
+  http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token \
+  | jq -r '"Authorization: Bearer " + .access_token' > /tmp/rm-token.hdr
+curl -H @/tmp/rm-token.hdr 'http://localhost:8083/v1/employees/?readTime=2026-10-01T00:00:00Z'
+rm /tmp/rm-secret.form /tmp/rm-token.hdr
 ```
 
 ### Demonstration data
 
-`task demo` fills the running environment with a demonstration data set and creates the Keycloak accounts of its employees:
+`task up` loads the demonstration data set and creates the Keycloak accounts of its employees. Both jobs can be repeated by hand:
 
 ```bash
 task demo:data      # loads deployments/seed/demo.sql: classifiers, units, positions, 8 employees with assignments, salaries and absences
 task demo:accounts  # calls POST /v1/employees/{id}/syncAccount for every employee as hr-admin (backend/tools/demoaccounts)
 ```
 
-The data set is loaded once: a second `task demo:data` finds the employees and changes nothing. Every record has its first revision. The accounts appear in the Keycloak admin console under the realm `arch-info-system`, each with a temporary password and a forced password change; `task demo:accounts` is safe to repeat. A typical demonstration after that: hire an employee (`POST /v1/employees/`), show the enabled account in Keycloak, export `POST /v1/employees/export`, dismiss the employee (`POST /v1/employees/{id}/dismiss`) and show the disabled account and the revisions of the record.
+The data set is loaded once: a second run finds the employees and changes nothing. Every record has its first revision. The accounts appear in the Keycloak admin console under the realm `arch-info-system`, each with a temporary password and a forced password change, and the accounts job is safe to repeat. A typical demonstration: hire an employee (`POST /v1/employees/`), show the enabled account in Keycloak, export `POST /v1/employees/export`, plan new salaries of a unit (`POST /v1/salaries/revise` with `validate_only`), dismiss the employee (`POST /v1/employees/{id}/dismiss`) and show the disabled account and the revisions of the record.
+
+### Browser tests
+
+`task tests:e2e` runs the Playwright tests of the admin panel in `frontend/e2e/` against the running environment (not in CI). It needs Node 18+ and a Chromium: `npx playwright install chromium` in `frontend/e2e/`, or `E2E_CHROMIUM` with the path of a Chromium already on the machine. `E2E_BASE_URL` points the tests at another stand.
 
 To stop the local environment and remove its associated volumes:
 

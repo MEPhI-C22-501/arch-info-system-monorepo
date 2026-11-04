@@ -17,6 +17,7 @@ import (
 	salarydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/salary"
 	recordrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres/record"
 	employeesrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/employee"
+	groupopssrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/groupops"
 	recordsrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/record"
 	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
 	absencehndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/absence"
@@ -61,7 +62,10 @@ func catalogMounts(log *slog.Logger, txManager *postgres.TxManager, client *post
 	assignments := newCatalogService(assignmentdmn.Descriptor, txManager, client)
 	salaries := newCatalogService(salarydmn.Descriptor, txManager, client)
 	absences := newCatalogService(absencedmn.Descriptor, txManager, client)
-	employees := employeesrv.NewService(log, newCatalogService(employeedmn.Descriptor, txManager, client), txManager, assignments, salaries, accounts)
+	employeeRecords := newCatalogService(employeedmn.Descriptor, txManager, client)
+	employees := employeesrv.NewService(log, employeeRecords, txManager, assignments, salaries, accounts)
+	// the group operations over the employees of an org unit extend the salaries and assignments handlers
+	groupOps := groupopssrv.NewService(txManager, client, orgUnits, employeeRecords, assignments, salaries)
 
 	return []httptr.Mount{
 		func(r chi.Router) {
@@ -89,11 +93,11 @@ func catalogMounts(log *slog.Logger, txManager *postgres.TxManager, client *post
 			employeev1.HandlerWithOptions(h, employeev1.ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: h.HandleParamError})
 		},
 		func(r chi.Router) {
-			h := assignmenthndl.NewHandler(assignments)
+			h := assignmenthndl.NewHandler(groupOps.Assignments())
 			assignmentv1.HandlerWithOptions(h, assignmentv1.ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: h.HandleParamError})
 		},
 		func(r chi.Router) {
-			h := salaryhndl.NewHandler(salaries)
+			h := salaryhndl.NewHandler(groupOps.Salaries())
 			salaryv1.HandlerWithOptions(h, salaryv1.ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: h.HandleParamError})
 		},
 		func(r chi.Router) {

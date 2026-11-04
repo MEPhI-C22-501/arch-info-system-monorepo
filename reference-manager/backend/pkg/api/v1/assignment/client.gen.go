@@ -115,10 +115,28 @@ type ClientInterface interface {
 
 	// ExportAssignments Export assignments in Excel format
 	//
-	// Generates and returns an Excel file with all active assignments in creation order.
+	// Generates and returns an Excel file with the active assignments: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/assignments/export (the `ExportAssignments` operationId).
-	ExportAssignments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportAssignments(ctx context.Context, params *ExportAssignmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TransferAssignmentsWithBody Transfer the employees of an org unit to another unit
+	//
+	// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+	TransferAssignmentsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TransferAssignments Transfer the employees of an org unit to another unit
+	//
+	// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+	TransferAssignments(ctx context.Context, body TransferAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteAssignment Delete a assignment
 	//
@@ -222,11 +240,49 @@ func (c *Client) CreateAssignment(ctx context.Context, body CreateAssignmentJSON
 
 // ExportAssignments Export assignments in Excel format
 //
-// Generates and returns an Excel file with all active assignments in creation order.
+// Generates and returns an Excel file with the active assignments: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/assignments/export (the `ExportAssignments` operationId).
-func (c *Client) ExportAssignments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportAssignmentsRequest(c.Server)
+func (c *Client) ExportAssignments(ctx context.Context, params *ExportAssignmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAssignmentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TransferAssignmentsWithBody Transfer the employees of an org unit to another unit
+//
+// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+func (c *Client) TransferAssignmentsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransferAssignmentsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TransferAssignments Transfer the employees of an org unit to another unit
+//
+// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+func (c *Client) TransferAssignments(ctx context.Context, body TransferAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransferAssignmentsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +487,18 @@ func NewListAssignmentsRequest(server string, params *ListAssignmentsParams) (*h
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +554,7 @@ func NewCreateAssignmentRequestWithBody(server string, contentType string, body 
 }
 
 // NewExportAssignmentsRequest constructs an http.Request for the ExportAssignments method
-func NewExportAssignmentsRequest(server string) (*http.Request, error) {
+func NewExportAssignmentsRequest(server string, params *ExportAssignmentsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -504,10 +572,101 @@ func NewExportAssignmentsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewTransferAssignmentsRequest calls the generic TransferAssignments builder with application/json body
+func NewTransferAssignmentsRequest(server string, body TransferAssignmentsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTransferAssignmentsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewTransferAssignmentsRequestWithBody constructs an http.Request for the TransferAssignments method, with any body, and a specified content type
+func NewTransferAssignmentsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/assignments/transfer")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -956,12 +1115,30 @@ type ClientWithResponsesInterface interface {
 
 	// ExportAssignmentsWithResponse Export assignments in Excel format
 	//
-	// Generates and returns an Excel file with all active assignments in creation order.
+	// Generates and returns an Excel file with the active assignments: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/assignments/export (the `ExportAssignments` operationId).
-	ExportAssignmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportAssignmentsResponse, error)
+	ExportAssignmentsWithResponse(ctx context.Context, params *ExportAssignmentsParams, reqEditors ...RequestEditorFn) (*ExportAssignmentsResponse, error)
+
+	// TransferAssignmentsWithBodyWithResponse Transfer the employees of an org unit to another unit
+	//
+	// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+	TransferAssignmentsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferAssignmentsResponse, error)
+
+	// TransferAssignmentsWithResponse Transfer the employees of an org unit to another unit
+	//
+	// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+	TransferAssignmentsWithResponse(ctx context.Context, body TransferAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferAssignmentsResponse, error)
 
 	// DeleteAssignmentWithResponse Delete a assignment
 	//
@@ -1171,6 +1348,8 @@ type ExportAssignmentsResponse200Headers struct {
 type ExportAssignmentsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -1179,6 +1358,11 @@ type ExportAssignmentsResponse struct {
 	JSON500 *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportAssignmentsResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportAssignmentsResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1219,6 +1403,89 @@ func (r ExportAssignmentsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExportAssignmentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type TransferAssignmentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AssignmentTransferResult
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON200() *AssignmentTransferResult {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r TransferAssignmentsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r TransferAssignmentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TransferAssignmentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TransferAssignmentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TransferAssignmentsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1664,17 +1931,47 @@ func (c *ClientWithResponses) CreateAssignmentWithResponse(ctx context.Context, 
 
 // ExportAssignmentsWithResponse Export assignments in Excel format
 //
-// Generates and returns an Excel file with all active assignments in creation order.
+// Generates and returns an Excel file with the active assignments: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/assignments/export (the `ExportAssignments` operationId).
-func (c *ClientWithResponses) ExportAssignmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportAssignmentsResponse, error) {
-	rsp, err := c.ExportAssignments(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportAssignmentsWithResponse(ctx context.Context, params *ExportAssignmentsParams, reqEditors ...RequestEditorFn) (*ExportAssignmentsResponse, error) {
+	rsp, err := c.ExportAssignments(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseExportAssignmentsResponse(rsp)
+}
+
+// TransferAssignmentsWithBodyWithResponse Transfer the employees of an org unit to another unit
+//
+// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+func (c *ClientWithResponses) TransferAssignmentsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferAssignmentsResponse, error) {
+	rsp, err := c.TransferAssignmentsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTransferAssignmentsResponse(rsp)
+}
+
+// TransferAssignmentsWithResponse Transfer the employees of an org unit to another unit
+//
+// Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/assignments/transfer (the `TransferAssignments` operationId).
+func (c *ClientWithResponses) TransferAssignmentsWithResponse(ctx context.Context, body TransferAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferAssignmentsResponse, error) {
+	rsp, err := c.TransferAssignments(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTransferAssignmentsResponse(rsp)
 }
 
 // DeleteAssignmentWithResponse Delete a assignment
@@ -1896,6 +2193,13 @@ func ParseExportAssignmentsResponse(rsp *http.Response) (*ExportAssignmentsRespo
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1930,6 +2234,74 @@ func ParseExportAssignmentsResponse(rsp *http.Response) (*ExportAssignmentsRespo
 			headers.ContentDisposition = &value
 		}
 		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseTransferAssignmentsResponse parses an HTTP response from a TransferAssignmentsWithResponse call
+func ParseTransferAssignmentsResponse(rsp *http.Response) (*TransferAssignmentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TransferAssignmentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AssignmentTransferResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil

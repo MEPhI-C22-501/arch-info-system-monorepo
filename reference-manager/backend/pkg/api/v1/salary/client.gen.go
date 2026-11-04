@@ -115,10 +115,28 @@ type ClientInterface interface {
 
 	// ExportSalaries Export salaries in Excel format
 	//
-	// Generates and returns an Excel file with all active salaries in creation order.
+	// Generates and returns an Excel file with the active salaries: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/salaries/export (the `ExportSalaries` operationId).
-	ExportSalaries(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportSalaries(ctx context.Context, params *ExportSalariesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReviseSalariesWithBody Revise the salaries of the employees of an org unit
+	//
+	// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+	ReviseSalariesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReviseSalaries Revise the salaries of the employees of an org unit
+	//
+	// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+	ReviseSalaries(ctx context.Context, body ReviseSalariesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSalary Delete a salary
 	//
@@ -222,11 +240,49 @@ func (c *Client) CreateSalary(ctx context.Context, body CreateSalaryJSONRequestB
 
 // ExportSalaries Export salaries in Excel format
 //
-// Generates and returns an Excel file with all active salaries in creation order.
+// Generates and returns an Excel file with the active salaries: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/salaries/export (the `ExportSalaries` operationId).
-func (c *Client) ExportSalaries(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportSalariesRequest(c.Server)
+func (c *Client) ExportSalaries(ctx context.Context, params *ExportSalariesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportSalariesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReviseSalariesWithBody Revise the salaries of the employees of an org unit
+//
+// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+func (c *Client) ReviseSalariesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReviseSalariesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReviseSalaries Revise the salaries of the employees of an org unit
+//
+// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+func (c *Client) ReviseSalaries(ctx context.Context, body ReviseSalariesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReviseSalariesRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +487,18 @@ func NewListSalariesRequest(server string, params *ListSalariesParams) (*http.Re
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +554,7 @@ func NewCreateSalaryRequestWithBody(server string, contentType string, body io.R
 }
 
 // NewExportSalariesRequest constructs an http.Request for the ExportSalaries method
-func NewExportSalariesRequest(server string) (*http.Request, error) {
+func NewExportSalariesRequest(server string, params *ExportSalariesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -504,10 +572,101 @@ func NewExportSalariesRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewReviseSalariesRequest calls the generic ReviseSalaries builder with application/json body
+func NewReviseSalariesRequest(server string, body ReviseSalariesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReviseSalariesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewReviseSalariesRequestWithBody constructs an http.Request for the ReviseSalaries method, with any body, and a specified content type
+func NewReviseSalariesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/salaries/revise")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -956,12 +1115,30 @@ type ClientWithResponsesInterface interface {
 
 	// ExportSalariesWithResponse Export salaries in Excel format
 	//
-	// Generates and returns an Excel file with all active salaries in creation order.
+	// Generates and returns an Excel file with the active salaries: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/salaries/export (the `ExportSalaries` operationId).
-	ExportSalariesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportSalariesResponse, error)
+	ExportSalariesWithResponse(ctx context.Context, params *ExportSalariesParams, reqEditors ...RequestEditorFn) (*ExportSalariesResponse, error)
+
+	// ReviseSalariesWithBodyWithResponse Revise the salaries of the employees of an org unit
+	//
+	// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+	ReviseSalariesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReviseSalariesResponse, error)
+
+	// ReviseSalariesWithResponse Revise the salaries of the employees of an org unit
+	//
+	// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+	ReviseSalariesWithResponse(ctx context.Context, body ReviseSalariesJSONRequestBody, reqEditors ...RequestEditorFn) (*ReviseSalariesResponse, error)
 
 	// DeleteSalaryWithResponse Delete a salary
 	//
@@ -1171,6 +1348,8 @@ type ExportSalariesResponse200Headers struct {
 type ExportSalariesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -1179,6 +1358,11 @@ type ExportSalariesResponse struct {
 	JSON500 *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportSalariesResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportSalariesResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1219,6 +1403,89 @@ func (r ExportSalariesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExportSalariesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ReviseSalariesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupSalaryChangeResult
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReviseSalariesResponse) GetJSON200() *GroupSalaryChangeResult {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReviseSalariesResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReviseSalariesResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ReviseSalariesResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReviseSalariesResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r ReviseSalariesResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ReviseSalariesResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ReviseSalariesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReviseSalariesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReviseSalariesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReviseSalariesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1664,17 +1931,47 @@ func (c *ClientWithResponses) CreateSalaryWithResponse(ctx context.Context, body
 
 // ExportSalariesWithResponse Export salaries in Excel format
 //
-// Generates and returns an Excel file with all active salaries in creation order.
+// Generates and returns an Excel file with the active salaries: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/salaries/export (the `ExportSalaries` operationId).
-func (c *ClientWithResponses) ExportSalariesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportSalariesResponse, error) {
-	rsp, err := c.ExportSalaries(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportSalariesWithResponse(ctx context.Context, params *ExportSalariesParams, reqEditors ...RequestEditorFn) (*ExportSalariesResponse, error) {
+	rsp, err := c.ExportSalaries(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseExportSalariesResponse(rsp)
+}
+
+// ReviseSalariesWithBodyWithResponse Revise the salaries of the employees of an org unit
+//
+// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+func (c *ClientWithResponses) ReviseSalariesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReviseSalariesResponse, error) {
+	rsp, err := c.ReviseSalariesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReviseSalariesResponse(rsp)
+}
+
+// ReviseSalariesWithResponse Revise the salaries of the employees of an org unit
+//
+// Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/salaries/revise (the `ReviseSalaries` operationId).
+func (c *ClientWithResponses) ReviseSalariesWithResponse(ctx context.Context, body ReviseSalariesJSONRequestBody, reqEditors ...RequestEditorFn) (*ReviseSalariesResponse, error) {
+	rsp, err := c.ReviseSalaries(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReviseSalariesResponse(rsp)
 }
 
 // DeleteSalaryWithResponse Delete a salary
@@ -1896,6 +2193,13 @@ func ParseExportSalariesResponse(rsp *http.Response) (*ExportSalariesResponse, e
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1930,6 +2234,74 @@ func ParseExportSalariesResponse(rsp *http.Response) (*ExportSalariesResponse, e
 			headers.ContentDisposition = &value
 		}
 		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReviseSalariesResponse parses an HTTP response from a ReviseSalariesWithResponse call
+func ParseReviseSalariesResponse(rsp *http.Response) (*ReviseSalariesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReviseSalariesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupSalaryChangeResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil

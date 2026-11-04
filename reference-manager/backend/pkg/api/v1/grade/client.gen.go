@@ -115,10 +115,10 @@ type ClientInterface interface {
 
 	// ExportGrades Export grades in Excel format
 	//
-	// Generates and returns an Excel file with all active grades in creation order.
+	// Generates and returns an Excel file with the active grades: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/grades/export (the `ExportGrades` operationId).
-	ExportGrades(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportGrades(ctx context.Context, params *ExportGradesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteGrade Delete a grade
 	//
@@ -222,11 +222,11 @@ func (c *Client) CreateGrade(ctx context.Context, body CreateGradeJSONRequestBod
 
 // ExportGrades Export grades in Excel format
 //
-// Generates and returns an Excel file with all active grades in creation order.
+// Generates and returns an Excel file with the active grades: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/grades/export (the `ExportGrades` operationId).
-func (c *Client) ExportGrades(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportGradesRequest(c.Server)
+func (c *Client) ExportGrades(ctx context.Context, params *ExportGradesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportGradesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +431,18 @@ func NewListGradesRequest(server string, params *ListGradesParams) (*http.Reques
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +498,7 @@ func NewCreateGradeRequestWithBody(server string, contentType string, body io.Re
 }
 
 // NewExportGradesRequest constructs an http.Request for the ExportGrades method
-func NewExportGradesRequest(server string) (*http.Request, error) {
+func NewExportGradesRequest(server string, params *ExportGradesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -502,6 +514,57 @@ func NewExportGradesRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
@@ -956,12 +1019,12 @@ type ClientWithResponsesInterface interface {
 
 	// ExportGradesWithResponse Export grades in Excel format
 	//
-	// Generates and returns an Excel file with all active grades in creation order.
+	// Generates and returns an Excel file with the active grades: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/grades/export (the `ExportGrades` operationId).
-	ExportGradesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportGradesResponse, error)
+	ExportGradesWithResponse(ctx context.Context, params *ExportGradesParams, reqEditors ...RequestEditorFn) (*ExportGradesResponse, error)
 
 	// DeleteGradeWithResponse Delete a grade
 	//
@@ -1171,6 +1234,8 @@ type ExportGradesResponse200Headers struct {
 type ExportGradesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -1179,6 +1244,11 @@ type ExportGradesResponse struct {
 	JSON500 *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportGradesResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportGradesResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1664,13 +1734,13 @@ func (c *ClientWithResponses) CreateGradeWithResponse(ctx context.Context, body 
 
 // ExportGradesWithResponse Export grades in Excel format
 //
-// Generates and returns an Excel file with all active grades in creation order.
+// Generates and returns an Excel file with the active grades: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/grades/export (the `ExportGrades` operationId).
-func (c *ClientWithResponses) ExportGradesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportGradesResponse, error) {
-	rsp, err := c.ExportGrades(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportGradesWithResponse(ctx context.Context, params *ExportGradesParams, reqEditors ...RequestEditorFn) (*ExportGradesResponse, error) {
+	rsp, err := c.ExportGrades(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1896,6 +1966,13 @@ func ParseExportGradesResponse(rsp *http.Response) (*ExportGradesResponse, error
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

@@ -22,7 +22,7 @@ type Service interface {
 	Create(ctx context.Context, fields *projectroledmn.Fields) (*record.Expanded[projectroledmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[projectroledmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[projectroledmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[projectroledmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[projectroledmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[projectroledmn.Fields]) (*record.Expanded[projectroledmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[projectroledmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -68,7 +68,7 @@ func (h *Handler) GetProjectRole(w http.ResponseWriter, r *http.Request, id proj
 }
 
 func (h *Handler) ListProjectRoles(w http.ResponseWriter, r *http.Request, params projectrolev1.ListProjectRolesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -78,9 +78,9 @@ func (h *Handler) ListProjectRoles(w http.ResponseWriter, r *http.Request, param
 	render.JSON(w, r, recordhndl.ListPageToAPI("project_roles", page, expandedToAPI))
 }
 
-// ExportProjectRoles responds with an Excel file of all active project_roles.
-func (h *Handler) ExportProjectRoles(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportProjectRoles responds with an Excel file of the active project_roles of the selection.
+func (h *Handler) ExportProjectRoles(w http.ResponseWriter, r *http.Request, params projectrolev1.ExportProjectRolesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

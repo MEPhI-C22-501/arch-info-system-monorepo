@@ -1,7 +1,7 @@
 auth:
   keycloak:
     # the issuer is the address clients get tokens from, it is set in Keycloak by KC_HOSTNAME
-    issuer_url: http://localhost:8180/realms/arch-info-system
+    issuer_url: http://localhost:8183/realms/arch-info-system
     # the service reaches Keycloak inside the compose network
     jwks_url: http://reference-manager-keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
     audience: reference-manager

@@ -28,7 +28,7 @@ type Service interface {
 	Create(ctx context.Context, fields *{{.DomainPkg}}.Fields) (*record.Expanded[{{.DomainPkg}}.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[{{.DomainPkg}}.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[{{.DomainPkg}}.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[{{.DomainPkg}}.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[{{.DomainPkg}}.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[{{.DomainPkg}}.Fields]) (*record.Expanded[{{.DomainPkg}}.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[{{.DomainPkg}}.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -77,7 +77,7 @@ func (h *Handler) Get{{.Title}}(w http.ResponseWriter, r *http.Request, id {{.Pa
 }
 
 func (h *Handler) List{{.PluralTitle}}(w http.ResponseWriter, r *http.Request, params {{.Package}}.List{{.PluralTitle}}Params) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -87,9 +87,9 @@ func (h *Handler) List{{.PluralTitle}}(w http.ResponseWriter, r *http.Request, p
 	render.JSON(w, r, recordhndl.ListPageToAPI("{{.Plural}}", page, expandedToAPI))
 }
 
-// Export{{.PluralTitle}} responds with an Excel file of all active {{.Plural}}.
-func (h *Handler) Export{{.PluralTitle}}(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// Export{{.PluralTitle}} responds with an Excel file of the active {{.Plural}} of the selection.
+func (h *Handler) Export{{.PluralTitle}}(w http.ResponseWriter, r *http.Request, params {{.Package}}.Export{{.PluralTitle}}Params) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

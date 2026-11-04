@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/render"
 
@@ -93,13 +94,23 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 }
 
 // ListRequest builds the service request from the optional list parameters of a generated handler.
-func ListRequest(pageSize *int32, pageToken, filter, orderBy *string, allowDeleted *bool) *record.ListRequest {
+func ListRequest(pageSize *int32, pageToken, filter, orderBy *string, allowDeleted *bool, readTime *time.Time) *record.ListRequest {
 	return &record.ListRequest{
 		PageSize:     ValueOrZero(pageSize),
 		PageToken:    ValueOrZero(pageToken),
 		Filter:       ValueOrZero(filter),
 		OrderBy:      ValueOrZero(orderBy),
 		AllowDeleted: ValueOrZero(allowDeleted),
+		ReadTime:     ValueOrZero(readTime),
+	}
+}
+
+// ExportRequest builds the service request from the optional export parameters of a generated handler.
+func ExportRequest(filter, orderBy *string, readTime *time.Time) *record.ExportRequest {
+	return &record.ExportRequest{
+		Filter:   ValueOrZero(filter),
+		OrderBy:  ValueOrZero(orderBy),
+		ReadTime: ValueOrZero(readTime),
 	}
 }
 
