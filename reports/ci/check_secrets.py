@@ -13,7 +13,8 @@ KEYS = (
     'REPORTS_KC_ADMIN_PASSWORD', 'REPORTS_DEMO_ADMIN_PASSWORD',
     'REPORTS_DEMO_MEMBER_PASSWORD', 'REPORTS_SOURCE_TOKEN', 'REPORTS_DATABASE_URL',
 )
-EXCLUDED = {'.venv', 'node_modules', '__pycache__', '.cubestore', '.git'}
+# ui/dist is built from ui/src, which is scanned.
+EXCLUDED = {'.venv', 'node_modules', 'dist', '__pycache__', '.cubestore', '.git'}
 PRIVATE_KEY = re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----')
 JWT = re.compile(rb'(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{16,}')
 

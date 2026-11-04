@@ -9,7 +9,8 @@ else
   "${PYTHON:-python3}" -m unittest discover -s reports/pilots/tests -v
 fi
 "${NODE:-node}" --test reports/pilots/tests/cube-auth.test.cjs
-"${NODE:-node}" --check reports/pilots/ui/app.js
+"${NPM:-npm}" --prefix reports/pilots/ui test
+"${NPM:-npm}" --prefix reports/pilots/ui run build
 "${NODE:-node}" reports/ci/check_diagrams.mjs
 git diff --check -- reports
 "${PYTHON:-python3}" reports/ci/check_secrets.py

@@ -19,6 +19,7 @@
 python3 -m venv reports/pilots/.venv
 reports/pilots/.venv/bin/python -m pip install -r reports/pilots/requirements.txt
 npm install --prefix reports/ci
+npm ci --prefix reports/pilots/ui
 PYTHON=reports/pilots/.venv/bin/python sh reports/ci/check.sh
 ```
 

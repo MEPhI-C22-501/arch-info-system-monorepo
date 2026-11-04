@@ -40,13 +40,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: reports/pilots/ui/package-lock.json
       - name: Install dependencies
         run: |
           python -m pip install -r reports/pilots/requirements-test.txt
           npm install --prefix reports/ci
           npm install --prefix reports/pilots/cube
+          npm ci --prefix reports/pilots/ui
       # Links, contracts, tests on a temporary PostgreSQL, Cube measures and scope,
-      # UI syntax, diagrams and the secret scan; exits non-zero on any failure.
+      # UI tests and build, diagrams and the secret scan; exits non-zero on any failure.
       - name: Run Reports checks
         run: python reports/ci/record_checks.py --native-postgres
       # The log has passed the secret scan; show it so a failure is readable.

@@ -274,10 +274,13 @@ class ContractAndEncoders(unittest.TestCase):
             seed(db)
             for n in range(1,12): Draft202012Validator(schema,format_checker=FormatChecker()).validate(Engine(db).query(f'R-{n:02d}',claims(),QUERY))
         finally: db.close()
-        script=(root/'reports/pilots/ui/app.js').read_text()
-        for sink in ['.innerHTML','.outerHTML','document.write','localStorage.setItem']:
-            self.assertNotIn(sink,script)
-        self.assertNotIn("sessionStorage.setItem('token",script)
+        sources=sorted((root/'reports/pilots/ui/src').rglob('*.ts*'))
+        self.assertTrue(sources)
+        for source in sources:
+            script=source.read_text(encoding='utf-8')
+            for sink in ['.innerHTML','.outerHTML','document.write','localStorage.setItem','dangerouslySetInnerHTML','eval(','new Function']:
+                self.assertNotIn(sink,script,source.name)
+            self.assertNotRegex(script,r'sessionStorage\.setItem\([^)]*token',source.name)
 
     def test_xlsx_xml_valid_and_dangerous_strings_stay_strings(self):
         from xml.etree import ElementTree
