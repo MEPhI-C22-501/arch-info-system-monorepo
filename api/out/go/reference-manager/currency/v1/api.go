@@ -5,7 +5,7 @@
  *
  * API endpoints for currency lifecycle management according to ISO 4217.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package currency_v1
@@ -13,6 +13,7 @@ package currency_v1
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListCurrencies(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListCurrencies(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateCurrency(context.Context, Currency) (ImplResponse, error)
-	ExportCurrencies(context.Context) (ImplResponse, error)
+	ExportCurrencies(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetCurrency(context.Context, int64, bool) (ImplResponse, error)
 	DeleteCurrency(context.Context, int64, bool) (ImplResponse, error)
 	UpdateCurrency(context.Context, int64, Currency, string) (ImplResponse, error)

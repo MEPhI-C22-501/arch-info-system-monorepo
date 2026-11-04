@@ -5,21 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reference Manager - администрирование</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="/admin/theme.css">
 <link rel="stylesheet" href="/admin/app.css">
+<script src="/admin/js/theme.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#view">Перейти к содержимому</a>
 <header class="topbar">
   <h1><a href="/admin/" class="plain">Reference Manager</a> <span class="muted small">/admin/</span></h1>
   <div class="spacer"></div>
   <span id="who" class="small"></span>
+  <button type="button" id="theme" title="Тема оформления: системная, светлая или тёмная">Тема: системная</button>
   <button type="button" id="logout" hidden>Выйти</button>
 </header>
 <main>
-  <nav class="crumbs" id="crumbs" aria-label="Навигация"></nav>
+  <nav class="crumbs" id="crumbs" aria-label="Путь"></nav>
   <div id="flash" aria-live="polite"></div>
-  <div id="view"><p class="muted">Загрузка…</p></div>
+  <div id="view" tabindex="-1" aria-live="polite" aria-busy="true">
+    <div class="loading" role="status"><span class="spinner" aria-hidden="true"></span> Загрузка…</div>
+  </div>
 </main>
-<dialog id="confirm">
+<dialog id="confirm" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+  <h2 id="confirmTitle">Подтвердите действие</h2>
   <p id="confirmText"></p>
   <div class="toolbar">
     <button type="button" id="confirmYes" class="danger">Подтвердить</button>
@@ -28,10 +35,12 @@
 </dialog>
 <script src="/admin/js/config.js"></script>
 <script src="/admin/js/dom.js"></script>
+<script src="/admin/js/format.js"></script>
 <script src="/admin/js/jsonpatch.js"></script>
 <script src="/admin/js/auth.js"></script>
 <script src="/admin/js/api.js"></script>
 <script src="/admin/js/catalogs.js"></script>
+<script src="/admin/js/views.js"></script>
 <script src="/admin/js/app.js"></script>
 </body>
 </html>

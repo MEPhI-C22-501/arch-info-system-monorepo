@@ -5,7 +5,7 @@
  *
  * Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_assignment

@@ -209,6 +209,14 @@
     return `#${rec.id}`;
   }
 
+  // the name of a record for a table cell: the name without the code, an employee by family and given name
+  function shortLabel(collection, rec) {
+    if (!rec) return '';
+    if (collection === 'employees') return [rec.family_name, rec.given_name].filter(Boolean).join(' ') || `#${rec.id}`;
+    if (rec.name) return String(rec.name);
+    return recordLabel(collection, rec);
+  }
+
   function normalize(value) {
     return value === null || value === undefined ? '' : String(value).trim();
   }
@@ -242,5 +250,5 @@
     return mask;
   }
 
-  return { GROUPS, ROLES, COMMON, CATALOGS, levels, can, hasAnyRole, inputFields, readOnlyFields, fieldByName, queryFields, fieldLabel, listColumns, recordLabel, toBody, updateMask, normalize };
+  return { GROUPS, ROLES, COMMON, CATALOGS, levels, can, hasAnyRole, inputFields, readOnlyFields, fieldByName, queryFields, fieldLabel, listColumns, recordLabel, shortLabel, toBody, updateMask, normalize };
 });

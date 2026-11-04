@@ -115,10 +115,10 @@ type ClientInterface interface {
 
 	// ExportOrgUnits Export org_units in Excel format
 	//
-	// Generates and returns an Excel file with all active org_units in creation order.
+	// Generates and returns an Excel file with the active org_units: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/org_units/export (the `ExportOrgUnits` operationId).
-	ExportOrgUnits(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportOrgUnits(ctx context.Context, params *ExportOrgUnitsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteOrgUnit Delete a org_unit
 	//
@@ -222,11 +222,11 @@ func (c *Client) CreateOrgUnit(ctx context.Context, body CreateOrgUnitJSONReques
 
 // ExportOrgUnits Export org_units in Excel format
 //
-// Generates and returns an Excel file with all active org_units in creation order.
+// Generates and returns an Excel file with the active org_units: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/org_units/export (the `ExportOrgUnits` operationId).
-func (c *Client) ExportOrgUnits(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportOrgUnitsRequest(c.Server)
+func (c *Client) ExportOrgUnits(ctx context.Context, params *ExportOrgUnitsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportOrgUnitsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +431,18 @@ func NewListOrgUnitsRequest(server string, params *ListOrgUnitsParams) (*http.Re
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +498,7 @@ func NewCreateOrgUnitRequestWithBody(server string, contentType string, body io.
 }
 
 // NewExportOrgUnitsRequest constructs an http.Request for the ExportOrgUnits method
-func NewExportOrgUnitsRequest(server string) (*http.Request, error) {
+func NewExportOrgUnitsRequest(server string, params *ExportOrgUnitsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -502,6 +514,57 @@ func NewExportOrgUnitsRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
@@ -956,12 +1019,12 @@ type ClientWithResponsesInterface interface {
 
 	// ExportOrgUnitsWithResponse Export org_units in Excel format
 	//
-	// Generates and returns an Excel file with all active org_units in creation order.
+	// Generates and returns an Excel file with the active org_units: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/org_units/export (the `ExportOrgUnits` operationId).
-	ExportOrgUnitsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportOrgUnitsResponse, error)
+	ExportOrgUnitsWithResponse(ctx context.Context, params *ExportOrgUnitsParams, reqEditors ...RequestEditorFn) (*ExportOrgUnitsResponse, error)
 
 	// DeleteOrgUnitWithResponse Delete a org_unit
 	//
@@ -1171,6 +1234,8 @@ type ExportOrgUnitsResponse200Headers struct {
 type ExportOrgUnitsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -1179,6 +1244,11 @@ type ExportOrgUnitsResponse struct {
 	JSON500 *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportOrgUnitsResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportOrgUnitsResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1664,13 +1734,13 @@ func (c *ClientWithResponses) CreateOrgUnitWithResponse(ctx context.Context, bod
 
 // ExportOrgUnitsWithResponse Export org_units in Excel format
 //
-// Generates and returns an Excel file with all active org_units in creation order.
+// Generates and returns an Excel file with the active org_units: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/org_units/export (the `ExportOrgUnits` operationId).
-func (c *ClientWithResponses) ExportOrgUnitsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportOrgUnitsResponse, error) {
-	rsp, err := c.ExportOrgUnits(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportOrgUnitsWithResponse(ctx context.Context, params *ExportOrgUnitsParams, reqEditors ...RequestEditorFn) (*ExportOrgUnitsResponse, error) {
+	rsp, err := c.ExportOrgUnits(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1896,6 +1966,13 @@ func ParseExportOrgUnitsResponse(rsp *http.Response) (*ExportOrgUnitsResponse, e
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

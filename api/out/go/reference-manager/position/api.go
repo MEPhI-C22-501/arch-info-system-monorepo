@@ -5,7 +5,7 @@
  *
  * Positions employees are assigned to.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_position
@@ -13,6 +13,7 @@ package reference_manager_position
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListPositions(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListPositions(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreatePosition(context.Context, Position) (ImplResponse, error)
-	ExportPositions(context.Context) (ImplResponse, error)
+	ExportPositions(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetPosition(context.Context, int64, bool) (ImplResponse, error)
 	DeletePosition(context.Context, int64, bool) (ImplResponse, error)
 	UpdatePosition(context.Context, int64, Position, string) (ImplResponse, error)

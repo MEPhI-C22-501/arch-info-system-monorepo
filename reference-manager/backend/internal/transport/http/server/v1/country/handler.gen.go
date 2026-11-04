@@ -22,7 +22,7 @@ type Service interface {
 	Create(ctx context.Context, fields *countrydmn.Fields) (*record.Expanded[countrydmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[countrydmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[countrydmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[countrydmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[countrydmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[countrydmn.Fields]) (*record.Expanded[countrydmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[countrydmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -68,7 +68,7 @@ func (h *Handler) GetCountry(w http.ResponseWriter, r *http.Request, id countryv
 }
 
 func (h *Handler) ListCountries(w http.ResponseWriter, r *http.Request, params countryv1.ListCountriesParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -78,9 +78,9 @@ func (h *Handler) ListCountries(w http.ResponseWriter, r *http.Request, params c
 	render.JSON(w, r, recordhndl.ListPageToAPI("countries", page, expandedToAPI))
 }
 
-// ExportCountries responds with an Excel file of all active countries.
-func (h *Handler) ExportCountries(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportCountries responds with an Excel file of the active countries of the selection.
+func (h *Handler) ExportCountries(w http.ResponseWriter, r *http.Request, params countryv1.ExportCountriesParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

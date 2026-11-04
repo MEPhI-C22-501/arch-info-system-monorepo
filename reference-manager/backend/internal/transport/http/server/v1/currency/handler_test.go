@@ -1464,7 +1464,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
 					m.EXPECT().
-						ExportCurrencies(gomock.Any()).
+						ExportCurrencies(gomock.Any(), gomock.Any()).
 						Return([]*currencydmn.ExpandedCurrency{
 							{
 								ID: 1, Code: "USD", Number: "840", Name: "US Dollar", Decimals: 2,
@@ -1496,7 +1496,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
 					m.EXPECT().
-						ExportCurrencies(gomock.Any()).
+						ExportCurrencies(gomock.Any(), gomock.Any()).
 						Return([]*currencydmn.ExpandedCurrency{}, nil)
 				},
 			},
@@ -1509,7 +1509,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
 					m.EXPECT().
-						ExportCurrencies(gomock.Any()).
+						ExportCurrencies(gomock.Any(), gomock.Any()).
 						Return(nil, domains.ErrUnauthenticated)
 				},
 			},
@@ -1522,7 +1522,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
 					m.EXPECT().
-						ExportCurrencies(gomock.Any()).
+						ExportCurrencies(gomock.Any(), gomock.Any()).
 						Return(nil, fmt.Errorf("authorize: %w", domains.ErrPermissionDenied))
 				},
 			},
@@ -1535,7 +1535,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			fields: fields{
 				setupServiceMock: func(m *mocks.MockService) {
 					m.EXPECT().
-						ExportCurrencies(gomock.Any()).
+						ExportCurrencies(gomock.Any(), gomock.Any()).
 						Return(nil, errors.New("connection refused"))
 				},
 			},
@@ -1559,7 +1559,7 @@ func TestHandlerExportCurrencies(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/v1/currencies/export", nil)
 			rec := httptest.NewRecorder()
 
-			handler.ExportCurrencies(rec, r)
+			handler.ExportCurrencies(rec, r, currencyv1.ExportCurrenciesParams{})
 
 			assert.Equal(t, tc.want.responseStatus, rec.Code)
 

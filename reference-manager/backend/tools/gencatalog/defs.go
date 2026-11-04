@@ -50,7 +50,9 @@ type Field struct {
 // its handler and service code are written by hand.
 type CustomOp struct {
 	// Path is the sub-path after the record: "dismiss" gives POST /v1/employees/{employeeID}/dismiss.
+	// An operation on the collection has no record: "revise" gives POST /v1/salaries/revise.
 	Path        string
+	Collection  bool
 	OperationID string
 	Summary     string
 	Description string
@@ -58,6 +60,10 @@ type CustomOp struct {
 	// An operation without a body leaves both empty.
 	BodySchema string
 	BodyYAML   string
+	// ResultSchema names the schema of the answer, the expanded record is answered when it is empty;
+	// SchemasYAML holds the definitions of the result and its parts as entries of components.schemas.
+	ResultSchema string
+	SchemasYAML  string
 	// ServiceMethod is the Go signature the handler expects from the service.
 	ServiceMethod string
 }
@@ -213,6 +219,138 @@ var Catalogs = []Catalog{
 		Constraints: periodConstraints,
 		Extensions:  []string{"btree_gist"},
 		HasRules:    true,
+		Custom: []CustomOp{{
+			Path: "transfer", Collection: true, OperationID: "transferAssignments", Summary: "Transfer the employees of an org unit to another unit",
+			Description: "Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64).",
+			BodySchema:  "AssignmentTransfer",
+			BodyYAML: "      type: object\n" +
+				"      description: A transfer of the employees of an org unit to another unit from one date.\n" +
+				"      required:\n" +
+				"        - org_unit_id\n" +
+				"        - target_org_unit_id\n" +
+				"        - start_date\n" +
+				"      properties:\n" +
+				"        org_unit_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          minimum: 1\n" +
+				"          description: Identifier of the unit the employees leave.\n" +
+				"          example: 3\n" +
+				"        target_org_unit_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          minimum: 1\n" +
+				"          description: Identifier of the unit the employees move to.\n" +
+				"          example: 4\n" +
+				"        include_subunits:\n" +
+				"          type: boolean\n" +
+				"          default: false\n" +
+				"          description: Also the employees of the units below the unit.\n" +
+				"        start_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: First day in the target unit, the assignments in effect end the day before.\n" +
+				"          example: \"2027-01-01\"\n" +
+				"        position_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          minimum: 1\n" +
+				"          description: Position in the target unit, the current position of each employee when empty.\n" +
+				"          example: 2\n" +
+				"        validate_only:\n" +
+				"          type: boolean\n" +
+				"          default: false\n" +
+				"          description: Return the plan and change nothing (AIP-163).\n",
+			ResultSchema: "AssignmentTransferResult",
+			SchemasYAML: "    AssignmentTransferResult:\n" +
+				"      type: object\n" +
+				"      description: The moves in the order of the employee identifiers.\n" +
+				"      required:\n" +
+				"        - validate_only\n" +
+				"        - items\n" +
+				"        - skipped\n" +
+				"      properties:\n" +
+				"        validate_only:\n" +
+				"          type: boolean\n" +
+				"          description: True when nothing was changed and the items are the plan.\n" +
+				"        items:\n" +
+				"          type: array\n" +
+				"          items:\n" +
+				"            $ref: '#/components/schemas/AssignmentTransferItem'\n" +
+				"        skipped:\n" +
+				"          type: array\n" +
+				"          items:\n" +
+				"            $ref: '#/components/schemas/SkippedEmployee'\n" +
+				"    AssignmentTransferItem:\n" +
+				"      type: object\n" +
+				"      description: The move of one employee.\n" +
+				"      required:\n" +
+				"        - employee_id\n" +
+				"        - closed_assignment_id\n" +
+				"        - org_unit_id\n" +
+				"        - target_org_unit_id\n" +
+				"        - position_id\n" +
+				"        - start_date\n" +
+				"      properties:\n" +
+				"        employee_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: Identifier of the employee.\n" +
+				"          example: 7\n" +
+				"        closed_assignment_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The assignment that ends the day before start_date.\n" +
+				"          example: 9\n" +
+				"        org_unit_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The unit of the closed assignment.\n" +
+				"          example: 3\n" +
+				"        assignment_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The created assignment, empty in a validation.\n" +
+				"          example: 21\n" +
+				"        target_org_unit_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The unit of the new assignment.\n" +
+				"          example: 4\n" +
+				"        position_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The position of the new assignment.\n" +
+				"          example: 2\n" +
+				"        start_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: First day of the new assignment.\n" +
+				"          example: \"2027-01-01\"\n" +
+				"        end_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: Last day of the new assignment, the end of the closed one, empty while it is in effect.\n" +
+				"          example: \"2027-12-31\"\n" +
+				"\n" +
+				"    SkippedEmployee:\n" +
+				"      type: object\n" +
+				"      description: An employee of the unit the operation leaves as is.\n" +
+				"      required:\n" +
+				"        - employee_id\n" +
+				"        - reason\n" +
+				"      properties:\n" +
+				"        employee_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: Identifier of the employee.\n" +
+				"          example: 7\n" +
+				"        reason:\n" +
+				"          type: string\n" +
+				"          description: Why the employee is left as is.\n" +
+				"          example: the employee has no salary in effect on start_date\n",
+			ServiceMethod: "Transfer(ctx context.Context, request *assignmentdmn.TransferRequest) (*assignmentdmn.TransferResult, error)",
+		}},
 	},
 	{
 		Singular: "salary", Plural: "salaries", Title: "Salary", Group: "GroupRestrictedHR", Migration: 9,
@@ -227,6 +365,142 @@ var Catalogs = []Catalog{
 		Constraints: append([]string{"CONSTRAINT chk_salaries_amount CHECK (amount > 0)"}, periodConstraints...),
 		Extensions:  []string{"btree_gist"},
 		HasRules:    true,
+		Custom: []CustomOp{{
+			Path: "revise", Collection: true, OperationID: "reviseSalaries", Summary: "Revise the salaries of the employees of an org unit",
+			Description: "Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63).",
+			BodySchema:  "GroupSalaryChange",
+			BodyYAML: "      type: object\n" +
+				"      description: A revision of the salaries of the employees of an org unit from one date. Exactly one of percent and amount.\n" +
+				"      required:\n" +
+				"        - org_unit_id\n" +
+				"        - start_date\n" +
+				"      properties:\n" +
+				"        org_unit_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          minimum: 1\n" +
+				"          description: Identifier of the unit whose employees get the new salaries.\n" +
+				"          example: 2\n" +
+				"        include_subunits:\n" +
+				"          type: boolean\n" +
+				"          default: false\n" +
+				"          description: Also the employees of the units below the unit.\n" +
+				"        start_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: First day of the new salaries, the salaries in effect end the day before.\n" +
+				"          example: \"2027-01-01\"\n" +
+				"        percent:\n" +
+				"          type: number\n" +
+				"          format: double\n" +
+				"          minimum: -99.99\n" +
+				"          maximum: 1000\n" +
+				"          description: Change of the current amount in percent, the new amount is rounded to two decimals.\n" +
+				"          example: 10\n" +
+				"        amount:\n" +
+				"          type: number\n" +
+				"          format: double\n" +
+				"          minimum: 0.01\n" +
+				"          description: The same new amount for every employee.\n" +
+				"          example: 150000.00\n" +
+				"        currency_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          minimum: 1\n" +
+				"          description: Currency of the new amount, the currency of the current salary when empty. Allowed with amount only.\n" +
+				"          example: 1\n" +
+				"        validate_only:\n" +
+				"          type: boolean\n" +
+				"          default: false\n" +
+				"          description: Return the plan and change nothing (AIP-163).\n",
+			ResultSchema: "GroupSalaryChangeResult",
+			SchemasYAML: "    GroupSalaryChangeResult:\n" +
+				"      type: object\n" +
+				"      description: The changes of the salaries in the order of the employee identifiers.\n" +
+				"      required:\n" +
+				"        - validate_only\n" +
+				"        - items\n" +
+				"        - skipped\n" +
+				"      properties:\n" +
+				"        validate_only:\n" +
+				"          type: boolean\n" +
+				"          description: True when nothing was changed and the items are the plan.\n" +
+				"        items:\n" +
+				"          type: array\n" +
+				"          items:\n" +
+				"            $ref: '#/components/schemas/GroupSalaryChangeItem'\n" +
+				"        skipped:\n" +
+				"          type: array\n" +
+				"          items:\n" +
+				"            $ref: '#/components/schemas/SkippedEmployee'\n" +
+				"    GroupSalaryChangeItem:\n" +
+				"      type: object\n" +
+				"      description: The change of the salary of one employee.\n" +
+				"      required:\n" +
+				"        - employee_id\n" +
+				"        - amount\n" +
+				"        - currency_id\n" +
+				"        - start_date\n" +
+				"      properties:\n" +
+				"        employee_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: Identifier of the employee.\n" +
+				"          example: 7\n" +
+				"        closed_salary_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The salary that ends the day before start_date, empty for a first salary.\n" +
+				"          example: 12\n" +
+				"        previous_amount:\n" +
+				"          type: number\n" +
+				"          format: double\n" +
+				"          description: The amount of the closed salary.\n" +
+				"          example: 150000.00\n" +
+				"        salary_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: The created salary, empty in a validation.\n" +
+				"          example: 31\n" +
+				"        amount:\n" +
+				"          type: number\n" +
+				"          format: double\n" +
+				"          description: The new amount.\n" +
+				"          example: 165000.00\n" +
+				"        currency_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: Currency of the new amount.\n" +
+				"          example: 1\n" +
+				"        start_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: First day of the new salary.\n" +
+				"          example: \"2027-01-01\"\n" +
+				"        end_date:\n" +
+				"          type: string\n" +
+				"          format: date\n" +
+				"          description: Last day of the new salary, the end of the closed one, empty while it is in effect.\n" +
+				"          example: \"2027-12-31\"\n" +
+				"\n" +
+				"    SkippedEmployee:\n" +
+				"      type: object\n" +
+				"      description: An employee of the unit the operation leaves as is.\n" +
+				"      required:\n" +
+				"        - employee_id\n" +
+				"        - reason\n" +
+				"      properties:\n" +
+				"        employee_id:\n" +
+				"          type: integer\n" +
+				"          format: int64\n" +
+				"          description: Identifier of the employee.\n" +
+				"          example: 7\n" +
+				"        reason:\n" +
+				"          type: string\n" +
+				"          description: Why the employee is left as is.\n" +
+				"          example: the employee has no salary in effect on start_date\n",
+			ServiceMethod: "Revise(ctx context.Context, request *salarydmn.GroupChangeRequest) (*salarydmn.GroupChangeResult, error)",
+		}},
 	},
 	{
 		Singular: "absence", Plural: "absences", Title: "Absence", Group: "GroupRestrictedHR", Migration: 10,

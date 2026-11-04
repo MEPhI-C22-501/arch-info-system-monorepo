@@ -942,7 +942,7 @@ func TestServiceExportCurrencies(t *testing.T) {
 				mockExpandedCurrencyRepository,
 			)
 
-			currencies, err := service.ExportCurrencies(tc.args.ctx)
+			currencies, err := service.ExportCurrencies(tc.args.ctx, &currencydmn.ExportRequest{})
 
 			assert.ErrorIs(t, err, tc.want.err)
 			assert.Equal(t, tc.want.currencies, currencies)

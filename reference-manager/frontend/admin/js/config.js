@@ -3,7 +3,7 @@
 window.RM_CONFIG = {
   apiBase: '/v1',
   keycloak: {
-    url: 'http://localhost:8180',
+    url: 'http://localhost:8183',
     realm: 'arch-info-system',
     clientId: 'reference-manager-ui',
     // the client whose roles are read from resource_access besides the realm roles

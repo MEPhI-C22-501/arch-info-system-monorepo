@@ -50,3 +50,11 @@ test('labels and columns: an employee by the full name, a dated record by its id
   assert.equal(fieldLabel('employees', 'account_state'), 'Учётная запись');
   assert.equal(fieldLabel('employees', 'unknown'), 'unknown');
 });
+
+test('table cells name a referenced record shortly: the name without the code, an employee without the patronymic', () => {
+  const { shortLabel } = catalogs;
+  assert.equal(shortLabel('org_units', { id: 5, code: 'dev-backend', name: 'Команда backend' }), 'Команда backend');
+  assert.equal(shortLabel('employees', { id: 1, family_name: 'Иванов', given_name: 'Иван', middle_name: 'Иванович' }), 'Иванов Иван');
+  assert.equal(shortLabel('assignments', { id: 7 }), '#7');
+  assert.equal(shortLabel('currencies', { id: 1, code: 'RUB', name: 'Российский рубль' }), 'Российский рубль');
+});

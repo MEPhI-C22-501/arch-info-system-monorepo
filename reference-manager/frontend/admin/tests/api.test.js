@@ -95,6 +95,25 @@ test('401 calls the unauthenticated handler, 429 waits for Retry-After and repea
   assert.equal(limited.calls.length, 2);
 });
 
+test('the export and the list carry the selection: filter, order, moment; the group operations post their bodies', async () => {
+  const { api, calls } = client((url) => (url.includes('/export')
+    ? response(200, 'bytes', { 'Content-Disposition': 'attachment; filename="employees.xlsx"' })
+    : response(200, { employees: [], salaries: [] })));
+  await api.exportFile('employees', { filter: 'employment_state = "EMPLOYED"', orderBy: 'hire_date desc', readTime: '2026-10-01T09:00:00.000Z' });
+  await api.exportFile('employees', { filter: '', orderBy: '', readTime: '' });
+  await api.list('employees', { readTime: '2026-10-01T09:00:00.000Z' });
+  await api.reviseSalaries({ org_unit_id: 2, start_date: '2027-01-01', percent: 10, validate_only: true });
+  await api.transferAssignments({ org_unit_id: 3, target_org_unit_id: 4, start_date: '2027-01-01' });
+  assert.deepEqual(calls.map((c) => `${c.init.method} ${c.url}`), [
+    'POST /v1/employees/export?filter=employment_state+%3D+%22EMPLOYED%22&order_by=hire_date+desc&readTime=2026-10-01T09%3A00%3A00.000Z',
+    'POST /v1/employees/export',
+    'GET /v1/employees/?readTime=2026-10-01T09%3A00%3A00.000Z',
+    'POST /v1/salaries/revise',
+    'POST /v1/assignments/transfer',
+  ]);
+  assert.equal(calls[3].init.body, '{"org_unit_id":2,"start_date":"2027-01-01","percent":10,"validate_only":true}');
+});
+
 test('export asks for the file and names it from the header', async () => {
   const { api, calls } = client(() => response(200, 'bytes', { 'Content-Disposition': 'attachment; filename="grades.xlsx"' }));
   const file = await api.exportFile('grades');

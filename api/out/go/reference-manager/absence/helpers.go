@@ -5,7 +5,7 @@
  *
  * Absences of employees: vacations, sick leaves and other periods. Readable by the HR roles only.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_absence

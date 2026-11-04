@@ -5,7 +5,7 @@
  *
  * Qualification grades of employees used by the planning of work.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_grade
@@ -13,6 +13,7 @@ package reference_manager_grade
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListGrades(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListGrades(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateGrade(context.Context, Grade) (ImplResponse, error)
-	ExportGrades(context.Context) (ImplResponse, error)
+	ExportGrades(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetGrade(context.Context, int64, bool) (ImplResponse, error)
 	DeleteGrade(context.Context, int64, bool) (ImplResponse, error)
 	UpdateGrade(context.Context, int64, Grade, string) (ImplResponse, error)

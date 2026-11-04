@@ -1,0 +1,126 @@
+/* theme of the interfaces of the system: the variables of the common style (review of 2026-11-01, part A2),
+   light values by default, dark ones by the system setting or by data-theme="dark" on the html element;
+   the file holds tokens only, so another interface can take it as is and keep its own rules;
+   break points cannot be variables in media queries: 900px (tablet), 600px (narrow screen) */
+:root {
+  color-scheme: light;
+
+  /* colors */
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --line: #d8dde4;
+  --text: #1c2430;
+  --muted: #5f6b7c;
+  --accent: #1d4ed8;
+  --accent-soft: #e8eefc;
+  --accent-strong: #1e40af;
+  --on-accent: #ffffff;
+  --ok: #067647;
+  --ok-soft: #e6f4ea;
+  --ok-line: #bfe3cc;
+  --warn: #b54708;
+  --warn-soft: #fff4e5;
+  --warn-line: #f5d3a8;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --danger-line: #f5c6c1;
+  --hover: #e3e9f4;
+  --stripe: #eef1f5;
+  --chip: #eef0f3;
+  --chip-text: #344054;
+  --field: #ffffff;
+  --field-readonly: #f3f4f6;
+  --field-readonly-text: #475467;
+  --code: #f1f3f6;
+  --overlay: rgba(0, 0, 0, 0.3);
+
+  /* type */
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --leading-text: 1.4;
+  --leading-heading: 1.2;
+
+  /* spacing scale, no values outside it */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* radii: fields and buttons, cards, dialogs */
+  --radius-field: 6px;
+  --radius-card: 10px;
+  --radius-dialog: 14px;
+
+  --focus-ring: 2px solid var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f141b;
+    --card: #171d26;
+    --line: #2c3542;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --accent: #7aa2ff;
+    --accent-soft: #1c2740;
+    --accent-strong: #a7c0ff;
+    --on-accent: #0b1020;
+    --ok: #4cc38a;
+    --ok-soft: #10291d;
+    --ok-line: #1f4d36;
+    --warn: #f0a24b;
+    --warn-soft: #2d200f;
+    --warn-line: #5a3e18;
+    --danger: #ff7b72;
+    --danger-soft: #2d1414;
+    --danger-line: #5c2626;
+    --hover: #283244;
+    --stripe: #1c232d;
+    --chip: #232b37;
+    --chip-text: #c9d1dc;
+    --field: #10151c;
+    --field-readonly: #1a2029;
+    --field-readonly-text: #a9b3c1;
+    --code: #1f2631;
+    --overlay: rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f141b;
+  --card: #171d26;
+  --line: #2c3542;
+  --text: #e6e9ee;
+  --muted: #9aa4b2;
+  --accent: #7aa2ff;
+  --accent-soft: #1c2740;
+  --accent-strong: #a7c0ff;
+  --on-accent: #0b1020;
+  --ok: #4cc38a;
+  --ok-soft: #10291d;
+  --ok-line: #1f4d36;
+  --warn: #f0a24b;
+  --warn-soft: #2d200f;
+  --warn-line: #5a3e18;
+  --danger: #ff7b72;
+  --danger-soft: #2d1414;
+  --danger-line: #5c2626;
+  --hover: #283244;
+  --stripe: #1c232d;
+  --chip: #232b37;
+  --chip-text: #c9d1dc;
+  --field: #10151c;
+  --field-readonly: #1a2029;
+  --field-readonly-text: #a9b3c1;
+  --code: #1f2631;
+  --overlay: rgba(0, 0, 0, 0.6);
+}

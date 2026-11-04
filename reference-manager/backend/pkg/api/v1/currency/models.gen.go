@@ -123,6 +123,9 @@ type ListPageToken = string
 // OrderBy defines model for OrderBy.
 type OrderBy = string
 
+// ReadTime defines model for ReadTime.
+type ReadTime = time.Time
+
 // RevisionNumber defines model for RevisionNumber.
 type RevisionNumber = int32
 
@@ -164,11 +167,26 @@ type ListCurrenciesParams struct {
 	// Filter An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT), and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `author.name desc, title`).
+	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, code`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.
 	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The currencies are returned as they were at that moment, rebuilt from their revisions: a currency created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. A purged currency is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
+}
+
+// ExportCurrenciesParams defines parameters for ExportCurrencies.
+type ExportCurrenciesParams struct {
+	// Filter An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT), and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, code`). The identifier is not a sort field.
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The currencies are returned as they were at that moment, rebuilt from their revisions: a currency created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. A purged currency is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
 }
 
 // DeleteCurrencyParams defines parameters for DeleteCurrency.
@@ -200,7 +218,7 @@ type ListCurrencyRevisionsParams struct {
 	// Filter An expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT), and containment checks (e.g., `status = "ACTIVE" AND author.name : "John"`).
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `author.name desc, title`).
+	// OrderBy A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, code`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, allows reading, modifying, or interacting with resources that have been marked as deleted.

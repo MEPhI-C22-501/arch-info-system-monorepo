@@ -88,11 +88,12 @@
 
     const recordPath = (collection, id) => `/${collection}/${encodeURIComponent(String(id))}`;
 
-    // list(collection, {filter, orderBy, pageSize, pageToken, allowDeleted}) -> {items, nextPageToken}
+    // list(collection, {filter, orderBy, pageSize, pageToken, allowDeleted, readTime}) -> {items, nextPageToken},
+    // readTime (RFC 3339) asks for the records as they were at that moment
     async function list(collection, params) {
       const p = params || {};
       const page = await request('GET', `/${collection}/`, {
-        query: { filter: p.filter, order_by: p.orderBy, pageSize: p.pageSize, pageToken: p.pageToken, allowDeleted: p.allowDeleted },
+        query: { filter: p.filter, order_by: p.orderBy, pageSize: p.pageSize, pageToken: p.pageToken, allowDeleted: p.allowDeleted, readTime: p.readTime },
       });
       return { items: (page && page[collection]) || [], nextPageToken: (page && page.nextPageToken) || '' };
     }
@@ -126,8 +127,19 @@
       return request('DELETE', recordPath(collection, id), { query: { force } });
     }
 
-    function exportFile(collection) {
-      return request('POST', `/${collection}/export`, { blob: `${collection}.xlsx` });
+    // the .xlsx file of the active records, narrowed by {filter, orderBy, readTime} when given
+    function exportFile(collection, selection) {
+      const s = selection || {};
+      return request('POST', `/${collection}/export`, { query: { filter: s.filter, order_by: s.orderBy, readTime: s.readTime }, blob: `${collection}.xlsx` });
+    }
+
+    // group operations over the employees of an org unit (FR-RM-63, FR-RM-64): validateOnly returns the plan only
+    function reviseSalaries(body) {
+      return request('POST', '/salaries/revise', { body });
+    }
+
+    function transferAssignments(body) {
+      return request('POST', '/assignments/transfer', { body });
     }
 
     async function listRevisions(collection, id, params) {
@@ -162,7 +174,7 @@
       return request('POST', `${recordPath('employees', id)}/syncAccount`);
     }
 
-    return { request, list, listAll, get, create, update, remove, exportFile, listRevisions, allRevisions, getRevision, dismiss, syncAccount };
+    return { request, list, listAll, get, create, update, remove, exportFile, listRevisions, allRevisions, getRevision, dismiss, syncAccount, reviseSalaries, transferAssignments };
   }
 
   return { createApi, ApiError, buildQuery, parseFilename };

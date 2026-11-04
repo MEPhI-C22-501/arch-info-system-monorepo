@@ -14,7 +14,7 @@ services:
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET}
 
     ports:
-      - "${REFERENCE_MANAGER_PORT:-8080}:8080"
+      - "${REFERENCE_MANAGER_PORT:-8083}:8080"
 
     volumes:
       - ./configs/reference-manager/local/:/app/configs/reference-manager:ro
@@ -83,7 +83,7 @@ services:
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
 
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5437}:5432"
 
     volumes:
       - reference_manager_database_data:/var/lib/postgresql
@@ -103,19 +103,21 @@ services:
     container_name: reference_manager_keycloak
     image: quay.io/keycloak/keycloak:26.7.4
 
-    # the entry point writes the realm with the secret of the provisioner client, then starts Keycloak
+    # the entry point writes the realm with the secrets of the service clients, then starts Keycloak
     entrypoint: [ "/bin/bash", "/opt/keycloak/import-realm.sh" ]
 
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       # the issuer of the tokens, it has to match auth.keycloak.issuer_url of the service
-      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME: http://localhost:8183
       KC_HEALTH_ENABLED: "true"
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET}
+      # secret of the local service clients of the consumers (reports-client, planning-service, task-tracker-service, qa-service)
+      KEYCLOAK_CONSUMER_SECRET: ${KEYCLOAK_CONSUMER_SECRET}
 
     ports:
-      - "8180:8080"
+      - "8183:8080"
 
     volumes:
       - ./configs/keycloak/arch-info-system-realm.json:/opt/keycloak/realm-template/arch-info-system-realm.json:ro
@@ -140,8 +142,8 @@ services:
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
     ports:
-      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
-      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+      - "${OTEL_COLLECTOR_GRPC_PORT:-14317}:4317"
+      - "${OTEL_COLLECTOR_HTTP_PORT:-14318}:4318"
 
     volumes:
       - ./configs/otel-collector/local/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -156,7 +158,7 @@ services:
       dockerfile: ../deployments/docker/reference-manager-ui.dockerfile
 
     ports:
-      - "${REFERENCE_MANAGER_UI_PORT:-8081}:8080"
+      - "${REFERENCE_MANAGER_UI_PORT:-8084}:8080"
 
     volumes:
       - ./configs/reference-manager-ui/local/reference-manager-ui.conf:/etc/nginx/conf.d/default.conf:ro
@@ -174,6 +176,64 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  # creates or repeats the Keycloak accounts of the employees of the demonstration data set after every start,
+  # so the stand shows the accounts without a manual step; `task demo:accounts` runs it by hand
+  reference-manager-demo-accounts:
+    container_name: reference_manager_demo_accounts
+    image: erp/reference-manager-demo-accounts:dev
+    build:
+      context: ../backend
+      dockerfile: ../deployments/docker/reference-manager.dockerfile
+      target: demo-accounts
+
+    command: [ "-api", "http://reference-manager:8080", "-keycloak", "http://reference-manager-keycloak:8080" ]
+
+    depends_on:
+      reference-manager:
+        condition: service_healthy
+      reference-manager-seed:
+        condition: service_completed_successfully
+
+    restart: "no"
+
+  # the Swagger UI of every spec of the module, started by `task swagger` only: "Try it out" goes through the /v1/ proxy
+  # of its nginx, the Authorize button logs in through the local Keycloak with PKCE
+  reference-manager-swagger:
+    container_name: reference_manager_swagger
+    image: swaggerapi/swagger-ui:v5.33.3
+    profiles: [ "swagger" ]
+
+    environment:
+      URLS_PRE_FILTER: "true"
+      URLS: >-
+        [{"url":"/api/openapi/v1/employee/openapi.yaml","name":"employees"},
+        {"url":"/api/openapi/v1/org_unit/openapi.yaml","name":"org_units"},
+        {"url":"/api/openapi/v1/position/openapi.yaml","name":"positions"},
+        {"url":"/api/openapi/v1/assignment/openapi.yaml","name":"assignments"},
+        {"url":"/api/openapi/v1/salary/openapi.yaml","name":"salaries"},
+        {"url":"/api/openapi/v1/absence/openapi.yaml","name":"absences"},
+        {"url":"/api/openapi/v1/currency/openapi.yaml","name":"currencies"},
+        {"url":"/api/openapi/v1/country/openapi.yaml","name":"countries"},
+        {"url":"/api/openapi/v1/project_role/openapi.yaml","name":"project_roles"},
+        {"url":"/api/openapi/v1/grade/openapi.yaml","name":"grades"},
+        {"url":"/api/openapi/v1/health/openapi.yaml","name":"health"}]
+      OAUTH_CLIENT_ID: reference-manager-ui
+      OAUTH_USE_PKCE: "true"
+      PERSIST_AUTHORIZATION: "true"
+
+    ports:
+      - "${SWAGGER_PORT:-8089}:8080"
+
+    volumes:
+      - ../backend/api/openapi:/usr/share/nginx/html/api/openapi:ro
+      - ./configs/swagger-ui/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+    depends_on:
+      reference-manager:
+        condition: service_healthy
+
+    restart: unless-stopped
 
 volumes:
   reference_manager_database_data:

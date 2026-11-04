@@ -22,7 +22,7 @@ type Service interface {
 	Create(ctx context.Context, fields *orgunitdmn.Fields) (*record.Expanded[orgunitdmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[orgunitdmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[orgunitdmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[orgunitdmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[orgunitdmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[orgunitdmn.Fields]) (*record.Expanded[orgunitdmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[orgunitdmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
@@ -68,7 +68,7 @@ func (h *Handler) GetOrgUnit(w http.ResponseWriter, r *http.Request, id orgunitv
 }
 
 func (h *Handler) ListOrgUnits(w http.ResponseWriter, r *http.Request, params orgunitv1.ListOrgUnitsParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -78,9 +78,9 @@ func (h *Handler) ListOrgUnits(w http.ResponseWriter, r *http.Request, params or
 	render.JSON(w, r, recordhndl.ListPageToAPI("org_units", page, expandedToAPI))
 }
 
-// ExportOrgUnits responds with an Excel file of all active org_units.
-func (h *Handler) ExportOrgUnits(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportOrgUnits responds with an Excel file of the active org_units of the selection.
+func (h *Handler) ExportOrgUnits(w http.ResponseWriter, r *http.Request, params orgunitv1.ExportOrgUnitsParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return

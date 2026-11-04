@@ -5,7 +5,7 @@
  *
  * HR profiles of employees. The unit and the position come from the assignment in effect today.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_employee

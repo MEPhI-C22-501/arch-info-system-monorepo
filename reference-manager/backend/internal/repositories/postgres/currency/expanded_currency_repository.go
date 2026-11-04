@@ -14,6 +14,7 @@ import (
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
 	postgresrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres"
+	recordrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres/record"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/aipsql"
 )
 
@@ -92,11 +93,26 @@ func (r *ExpandedCurrencyRepository) ListExpandedCurrencies(
 	return currencies, nil
 }
 
+// sliceColumns are the columns of v_expanded_currency the slice of the currencies at a moment rebuilds.
+var sliceColumns = []recordrepo.SliceColumn{
+	{Name: "code", Stored: true},
+	{Name: "number", Stored: true},
+	{Name: "name", Stored: true},
+	{Name: "decimals", Stored: true},
+}
+
 func buildListExpandedCurrenciesQuery(q *currencydmn.ListQuery) (string, []any, error) {
 	var (
 		args       aipsql.Args
 		conditions []string
 	)
+
+	// a slice at a moment replaces the view, its placeholder comes first
+	query := strings.TrimSpace(listExpandedCurrenciesQuery)
+	if !q.ReadTime.IsZero() {
+		source := recordrepo.SliceSource("currencies", "currency_revisions", "currency_id", sliceColumns, args.Add(q.ReadTime))
+		query = strings.Replace(query, "FROM v_expanded_currency", "FROM (\n"+source+"\n) AS slice", 1)
+	}
 
 	if !q.AllowDeleted {
 		conditions = append(conditions, "is_deleted = FALSE")
@@ -116,7 +132,7 @@ func buildListExpandedCurrenciesQuery(q *currencydmn.ListQuery) (string, []any, 
 	}
 
 	var b strings.Builder
-	b.WriteString(strings.TrimSpace(listExpandedCurrenciesQuery))
+	b.WriteString(query)
 	if len(conditions) > 0 {
 		b.WriteString("\nWHERE " + strings.Join(conditions, " AND "))
 	}

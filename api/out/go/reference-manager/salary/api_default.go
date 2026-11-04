@@ -5,7 +5,7 @@
  *
  * Monthly salaries of employees with the period they are in effect. Periods of one employee do not overlap. Readable by the HR roles only.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_salary
@@ -15,6 +15,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -88,6 +89,12 @@ func (c *DefaultAPIController) Routes() Routes {
 			"/v1/salaries/{salaryID}",
 			c.UpdateSalary,
 		},
+		"ReviseSalaries": Route{
+			"ReviseSalaries",
+			strings.ToUpper("Post"),
+			"/v1/salaries/revise",
+			c.ReviseSalaries,
+		},
 		"ListSalaryRevisions": Route{
 			"ListSalaryRevisions",
 			strings.ToUpper("Get"),
@@ -141,6 +148,12 @@ func (c *DefaultAPIController) OrderedRoutes() []Route {
 			strings.ToUpper("Patch"),
 			"/v1/salaries/{salaryID}",
 			c.UpdateSalary,
+		},
+		Route{
+			"ReviseSalaries",
+			strings.ToUpper("Post"),
+			"/v1/salaries/revise",
+			c.ReviseSalaries,
 		},
 		Route{
 			"ListSalaryRevisions",
@@ -219,7 +232,18 @@ func (c *DefaultAPIController) ListSalaries(w http.ResponseWriter, r *http.Reque
 		var param bool = false
 		allowDeletedParam = param
 	}
-	result, err := c.service.ListSalaries(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam)
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ListSalaries(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
@@ -263,7 +287,37 @@ func (c *DefaultAPIController) CreateSalary(w http.ResponseWriter, r *http.Reque
 
 // ExportSalaries - Export salaries in Excel format
 func (c *DefaultAPIController) ExportSalaries(w http.ResponseWriter, r *http.Request) {
-	result, err := c.service.ExportSalaries(r.Context())
+	query, err := parseQuery(r.URL.RawQuery)
+	if err != nil {
+		c.errorHandler(w, r, &ParsingError{Err: err}, nil)
+		return
+	}
+	var filterParam string
+	if query.Has("filter") {
+		param := query.Get("filter")
+
+		filterParam = param
+	} else {
+	}
+	var orderByParam string
+	if query.Has("order_by") {
+		param := query.Get("order_by")
+
+		orderByParam = param
+	} else {
+	}
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ExportSalaries(r.Context(), filterParam, orderByParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
@@ -401,6 +455,38 @@ func (c *DefaultAPIController) UpdateSalary(w http.ResponseWriter, r *http.Reque
 	} else {
 	}
 	result, err := c.service.UpdateSalary(r.Context(), salaryIDParam, salaryParam, updateMaskParam)
+	// If an error occurred, encode the error with the status code
+	if err != nil {
+		c.errorHandler(w, r, err, &result)
+		return
+	}
+	// If no error, encode the body and the result code
+	_ = EncodeJSONResponse(result.Body, &result.Code, w)
+}
+
+// ReviseSalaries - Revise the salaries of the employees of an org unit
+func (c *DefaultAPIController) ReviseSalaries(w http.ResponseWriter, r *http.Request) {
+	var groupSalaryChangeParam GroupSalaryChange
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	if err := d.Decode(&groupSalaryChangeParam); err != nil {
+		var requiredErr *RequiredError
+		if errors.As(err, &requiredErr) {
+			c.errorHandler(w, r, err, nil)
+			return
+		}
+		c.errorHandler(w, r, &ParsingError{Err: err}, nil)
+		return
+	}
+	if err := AssertGroupSalaryChangeRequired(groupSalaryChangeParam); err != nil {
+		c.errorHandler(w, r, err, nil)
+		return
+	}
+	if err := AssertGroupSalaryChangeConstraints(groupSalaryChangeParam); err != nil {
+		c.errorHandler(w, r, err, nil)
+		return
+	}
+	result, err := c.service.ReviseSalaries(r.Context(), groupSalaryChangeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)

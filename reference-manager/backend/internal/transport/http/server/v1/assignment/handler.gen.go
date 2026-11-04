@@ -6,6 +6,7 @@ package assignmenthndl
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/render"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -23,12 +24,13 @@ type Service interface {
 	Create(ctx context.Context, fields *assignmentdmn.Fields) (*record.Expanded[assignmentdmn.Fields], error)
 	Get(ctx context.Context, id int64, allowDeleted bool) (*record.Expanded[assignmentdmn.Fields], error)
 	List(ctx context.Context, request *record.ListRequest) (*record.ListPage[assignmentdmn.Fields], error)
-	Export(ctx context.Context) ([]*record.Expanded[assignmentdmn.Fields], error)
+	Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[assignmentdmn.Fields], error)
 	Update(ctx context.Context, request *record.UpdateRequest[assignmentdmn.Fields]) (*record.Expanded[assignmentdmn.Fields], error)
 	Delete(ctx context.Context, id int64) (*record.Expanded[assignmentdmn.Fields], error)
 	Purge(ctx context.Context, id int64) error
 	GetRevision(ctx context.Context, id int64, revisionNumber int32, allowDeleted bool) (*record.Revision, error)
 	ListRevisions(ctx context.Context, request *record.RevisionListRequest) (*record.RevisionListPage, error)
+	Transfer(ctx context.Context, request *assignmentdmn.TransferRequest) (*assignmentdmn.TransferResult, error)
 }
 
 type Handler struct {
@@ -69,7 +71,7 @@ func (h *Handler) GetAssignment(w http.ResponseWriter, r *http.Request, id assig
 }
 
 func (h *Handler) ListAssignments(w http.ResponseWriter, r *http.Request, params assignmentv1.ListAssignmentsParams) {
-	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted))
+	page, err := h.service.List(r.Context(), recordhndl.ListRequest(params.PageSize, params.PageToken, params.Filter, params.OrderBy, params.AllowDeleted, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -79,9 +81,9 @@ func (h *Handler) ListAssignments(w http.ResponseWriter, r *http.Request, params
 	render.JSON(w, r, recordhndl.ListPageToAPI("assignments", page, expandedToAPI))
 }
 
-// ExportAssignments responds with an Excel file of all active assignments.
-func (h *Handler) ExportAssignments(w http.ResponseWriter, r *http.Request) {
-	records, err := h.service.Export(r.Context())
+// ExportAssignments responds with an Excel file of the active assignments of the selection.
+func (h *Handler) ExportAssignments(w http.ResponseWriter, r *http.Request, params assignmentv1.ExportAssignmentsParams) {
+	records, err := h.service.Export(r.Context(), recordhndl.ExportRequest(params.Filter, params.OrderBy, params.ReadTime))
 	if err != nil {
 		recordhndl.RenderError(w, r, err, singular)
 		return
@@ -200,3 +202,6 @@ func expandedToAPI(m *record.Expanded[assignmentdmn.Fields]) assignmentv1.Expand
 		DeletedAt:   m.DeletedAt,
 	}
 }
+
+// the custom methods of the catalog are implemented next to this file
+var _ time.Time

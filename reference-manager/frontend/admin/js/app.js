@@ -3,9 +3,11 @@
   'use strict';
 
   const { el, replace, clear, $ } = RM.dom;
-  const { CATALOGS, GROUPS, COMMON, can, hasAnyRole, inputFields, readOnlyFields, fieldByName, queryFields, fieldLabel, listColumns, recordLabel, toBody, updateMask, normalize } = RM.catalogs;
+  const { CATALOGS, GROUPS, COMMON, can, hasAnyRole, fieldByName, queryFields, fieldLabel, listColumns, recordLabel, shortLabel, toBody, updateMask, normalize } = RM.catalogs;
   const { ApiError } = RM.api;
   const { stateAt, fieldOf } = RM.jsonpatch;
+  const fmt = RM.format;
+  const views = RM.views;
 
   const config = window.RM_CONFIG || { apiBase: '/v1', keycloak: {} };
   const auth = RM.auth.createAuth(config.keycloak, sessionStorage, window);
@@ -99,7 +101,22 @@
 
   function fmtTime(iso) {
     if (!iso || iso === ZERO_TIME) return el('span', { class: 'muted' }, '-');
-    return el('time', { datetime: iso, title: `${iso} (UTC)` }, new Date(iso).toLocaleString('ru-RU'));
+    return el('time', { datetime: iso, title: `${iso} (UTC)` }, fmt.dateTime(iso));
+  }
+
+  function fmtDate(value) {
+    if (fmt.isEmpty(value)) return fmtValue(value);
+    return el('time', { datetime: String(value) }, fmt.date(value));
+  }
+
+  // a value of a catalog field as text: dates and money in Russian notation, the rest as is
+  function fmtField(collection, name, value) {
+    const model = views.cell(collection, name, value);
+    if (model.kind === 'empty') return fmtValue(value);
+    if (model.kind === 'date') return fmtDate(value);
+    if (model.kind === 'time') return fmtTime(value);
+    if (model.kind === 'state' || model.kind === 'id') return fmtValue(value);
+    return model.text;
   }
 
   function banner(kind, ...content) {
@@ -107,21 +124,54 @@
   }
 
   function explain(error) {
-    if (!(error instanceof ApiError)) return `Ошибка интерфейса: ${error && error.message ? error.message : error}`;
+    if (!(error instanceof ApiError)) return `${views.errorState(error).title}: ${error && error.message ? error.message : error}`;
     const hint = STATUS_HINTS[error.status] || '';
     return `${error.status}: ${error.message}. ${hint}`.trim();
   }
 
-  function errorBanner(error, extra) {
+  function errorBanner(error, extra, onRetry) {
+    const retry = onRetry ? el('button', { type: 'button', on: { click: onRetry } }, 'Повторить') : null;
     if (!(error instanceof ApiError)) {
       console.error(error);
-      return banner('error', explain(error));
+      const state = views.errorState(error);
+      return banner('error', el('b', {}, state.title), '. ', state.text, retry);
     }
     const details = error.details.filter((d) => !d.field).map((d) => d.message);
     return banner('error',
       el('b', {}, `${error.status}`), ' ', error.message, details.length ? ` ${details.join('. ')}` : '',
       el('div', { class: 'hint' }, STATUS_HINTS[error.status] || '', ' ', error.traceId ? el('span', { class: 'mono' }, `trace: ${error.traceId}`) : null),
-      extra || null);
+      extra || null, retry);
+  }
+
+  // a whole screen or block that failed: what happened, the trace for the team and the way out
+  function stateCard(error, options) {
+    const opts = options || {};
+    if (!(error instanceof ApiError)) console.error(error);
+    const state = views.errorState(error);
+    const actions = el('div', { class: 'toolbar' });
+    if (state.retry && opts.onRetry) actions.appendChild(el('button', { type: 'button', class: 'primary', on: { click: opts.onRetry } }, 'Повторить'));
+    if (opts.backHref) actions.appendChild(el('a', { class: 'button', href: opts.backHref }, opts.backLabel || 'К списку справочников'));
+    const heading = opts.level === 3 ? 'h3' : 'h2';
+    return el('div', { class: 'card state state-error', role: 'alert' },
+      el(heading, {}, state.title),
+      el('p', {}, state.text),
+      error instanceof ApiError && error.traceId ? el('p', { class: 'hint mono' }, `trace: ${error.traceId}`) : null,
+      actions.childNodes.length ? actions : null);
+  }
+
+  function loadingBlock(text) {
+    return el('div', { class: 'loading', role: 'status' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), ' ', text || 'Загрузка…');
+  }
+
+  // the state of an empty page: an empty catalog or a selection without records
+  function emptyBlock(state, links) {
+    const actions = el('div', { class: 'toolbar' });
+    if (state.action === 'create' && links.create) actions.appendChild(el('a', { class: 'button primary', href: links.create }, 'Создать запись'));
+    if (state.action === 'reset' && links.reset) actions.appendChild(el('a', { class: 'button', href: links.reset }, 'Сбросить отбор'));
+    return el('div', { class: 'card state', role: 'status' },
+      el('h3', {}, state.title),
+      el('p', {}, state.text),
+      actions.childNodes.length ? actions : null);
   }
 
   function flash(kind, text) {
@@ -138,29 +188,38 @@
 
   function crumbs(parts) {
     const nav = $('#crumbs');
-    clear(nav);
-    parts.forEach(([label, target], index) => {
-      if (index) nav.appendChild(document.createTextNode(' / '));
-      nav.appendChild(target ? el('a', { href: target }, label) : el('span', {}, label));
-    });
+    const list = el('ol', {}, parts.map(([label, target], index) => el('li', {},
+      target ? el('a', { href: target }, label) : el('span', { 'aria-current': index === parts.length - 1 ? 'page' : null }, label))));
+    replace(nav, list);
   }
 
-  function confirmDialog(text) {
+  // a modal confirmation, the safe answer has the focus
+  function confirmDialog(text, title) {
     return new Promise((resolve) => {
       const dialog = $('#confirm');
+      $('#confirmTitle').textContent = title || 'Подтвердите действие';
       $('#confirmText').textContent = text;
       dialog.returnValue = '';
       $('#confirmYes').onclick = () => dialog.close('yes');
       $('#confirmNo').onclick = () => dialog.close('no');
       dialog.addEventListener('close', () => resolve(dialog.returnValue === 'yes'), { once: true });
       dialog.showModal();
+      $('#confirmNo').focus();
     });
   }
 
-  function table(headers, rows) {
-    return el('table', {},
-      el('thead', {}, el('tr', {}, headers.map((h) => el('th', { scope: 'col', class: h.class || null }, h.label)))),
-      el('tbody', {}, rows));
+  // a table with a caption for screen readers, every cell carries its column name for the card layout of a narrow screen
+  function table(headers, rows, caption) {
+    const body = el('tbody', {}, rows);
+    for (const row of body.rows) {
+      [...row.cells].forEach((cell, index) => {
+        if (!cell.hasAttribute('colspan') && headers[index]) cell.dataset.label = headers[index].label;
+      });
+    }
+    return el('table', { class: 'responsive' },
+      caption ? el('caption', { class: 'sr-only' }, caption) : null,
+      el('thead', {}, el('tr', {}, headers.map((h) => el('th', { scope: 'col', class: h.class || null }, h.label || el('span', { class: 'sr-only' }, h.srLabel || ''))))),
+      body);
   }
 
   function todayIso() {
@@ -174,10 +233,19 @@
       session.labels[collection] = api.listAll(collection, { allowDeleted: true })
         .then((items) => {
           const map = new Map();
-          for (const item of items) map.set(String(item.id), recordLabel(collection, item));
+          // the short names of table cells ride along with the full labels of forms and hints
+          map.short = new Map();
+          for (const item of items) {
+            map.set(String(item.id), recordLabel(collection, item));
+            map.short.set(String(item.id), shortLabel(collection, item));
+          }
           return map;
         })
-        .catch(() => new Map());
+        .catch((error) => {
+          // the names are a convenience, the cells keep the identifiers, the cause goes to the console
+          console.error(`names of ${collection}`, error);
+          return Object.assign(new Map(), { short: new Map() });
+        });
     }
     return session.labels[collection];
   }
@@ -186,11 +254,13 @@
     delete session.labels[collection];
   }
 
-  async function refCell(field, value) {
+  // a link to the referenced record: the full label in forms and cards, the short name in table cells
+  async function refCell(field, value, compact) {
     if (value === null || value === undefined) return fmtValue(value);
     const labels = await labelsOf(field.ref);
     const label = labels.get(String(value));
-    return el('a', { href: recordHref(field.ref, value) }, label ? `${label} ` : '', el('span', { class: 'mono muted small' }, `#${value}`));
+    const text = compact ? labels.short.get(String(value)) : label;
+    return el('a', { href: recordHref(field.ref, value), title: compact && label ? label : null }, text ? `${text} ` : '', el('span', { class: 'mono muted small' }, `#${value}`));
   }
 
   // ---- rendering ----
@@ -201,6 +271,9 @@
     const view = $('#view');
     showFlash();
     const current = route();
+    view.setAttribute('aria-busy', 'true');
+    // a slow screen shows the loading state, a fast one replaces the previous screen at once
+    const loadingTimer = setTimeout(() => { if (sequence === renderSequence) replace(view, loadingBlock()); }, 200);
     let node;
     try {
       if (!hasAnyRole(session.user)) node = screenNoAccess();
@@ -211,27 +284,38 @@
       else if (CATALOGS[current.collection].card) node = await screenCard(current);
       else node = await screenForm(current.collection, current.id, current.query);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) node = el('div', { class: 'card' }, el('p', {}, 'Сессия истекла, выполняется повторный вход…'));
-      else node = el('div', {}, errorBanner(error), el('p', {}, el('a', { href: href('/') }, 'К списку справочников')));
+      node = stateCard(error, { onRetry: render, backHref: error instanceof ApiError && error.status === 401 ? null : href('/') });
     }
+    clearTimeout(loadingTimer);
     if (sequence !== renderSequence) return;
     replace(view, node);
+    view.setAttribute('aria-busy', 'false');
     window.scrollTo(0, 0);
+    // after a transition the heading of the new screen takes the focus, so that a screen reader announces it
+    if (session.rendered) {
+      const heading = view.querySelector('h2');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
+    }
+    session.rendered = true;
   }
 
   function screenUnknown(collection) {
     crumbs([['Справочники', href('/')], [collection, null]]);
-    return el('div', { class: 'card' }, el('h2', {}, 'Нет такого справочника'),
-      el('p', {}, 'Коллекции ', el('code', {}, `/v1/${collection}/`), ' нет в спецификации. ', el('a', { href: href('/') }, 'К списку справочников')));
+    return el('div', { class: 'card state' }, el('h2', {}, 'Нет такого справочника'),
+      el('p', {}, 'Коллекции ', el('code', {}, `/v1/${collection}/`), ' нет в спецификации.'),
+      el('div', { class: 'toolbar' }, el('a', { class: 'button', href: href('/') }, 'К списку справочников')));
   }
 
   // S-04: a signed-in user without a role of the service
   function screenNoAccess() {
     crumbs([['Нет доступа', null]]);
-    return el('div', { class: 'card' },
+    return el('div', { class: 'card state state-error', role: 'alert' },
       el('h2', {}, 'Нет доступа'),
       el('p', {}, 'Учётная запись ', el('b', {}, session.user ? session.user.username : ''), ' вошла, но у неё нет роли сервиса справочников. Роли: reference-reader, reference-hr-reader, reference-admin, reference-hr-admin. Обратитесь к команде справочников.'),
-      el('p', {}, el('button', { type: 'button', on: { click: () => auth.logout() } }, 'Выйти и войти другой учётной записью')));
+      el('div', { class: 'toolbar' }, el('button', { type: 'button', on: { click: () => auth.logout() } }, 'Выйти и войти другой учётной записью')));
   }
 
   // S-01: catalogs by group with the number of active records
@@ -244,26 +328,34 @@
       if (!collections.length) continue;
       const rows = collections.map((collection) => {
         const cat = CATALOGS[collection];
-        const count = el('td', { class: 'num' }, '…');
+        const count = el('td', { class: 'num', 'aria-busy': 'true' }, el('span', { class: 'loading inline' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), el('span', { class: 'sr-only' }, 'загрузка')));
         api.list(collection, { pageSize: 100 })
-          .then((page) => { count.textContent = `${page.items.length}${page.nextPageToken ? '+' : ''}`; })
-          .catch(() => { count.textContent = '-'; });
-        return el('tr', { dataset: { title: cat.title.toLowerCase() } },
+          .then((page) => { replace(count, `${page.items.length}${page.nextPageToken ? '+' : ''}`); })
+          .catch((error) => { replace(count, el('span', { class: 'muted', title: views.errorState(error).title }, '-')); })
+          .finally(() => count.setAttribute('aria-busy', 'false'));
+        return el('tr', { class: 'clickable', dataset: { title: cat.title.toLowerCase(), href: href(`/${collection}`) } },
           el('td', {}, el('a', { href: href(`/${collection}`) }, cat.title)),
           el('td', {}, el('span', { class: 'mono muted' }, `/v1/${collection}/`)),
           count);
       });
-      sections.push(el('section', { class: 'card' },
-        el('h2', {}, group.title, ' ', el('span', { class: 'muted small' }, groupId)),
-        table([{ label: 'Справочник' }, { label: 'Коллекция' }, { label: 'Активных записей', class: 'num' }], rows)));
+      sections.push(el('section', { class: 'card', 'aria-labelledby': `group-${groupId}` },
+        el('h2', { id: `group-${groupId}` }, group.title, ' ', el('span', { class: 'muted small' }, groupId)),
+        table([{ label: 'Справочник' }, { label: 'Коллекция' }, { label: 'Активных записей', class: 'num' }], rows, `${group.title}: справочники и число активных записей`)));
     }
+    const nothing = el('div', { class: 'card state', role: 'status', hidden: true }, el('h3', {}, 'Ничего не найдено'), el('p', {}, 'Нет справочника с таким названием. Измените строку поиска.'));
     const root = el('div', {},
-      el('div', { class: 'toolbar' }, el('label', { for: 'catalogSearch' }, 'Поиск'), search),
+      el('div', { class: 'toolbar', role: 'search' }, el('label', { for: 'catalogSearch' }, 'Поиск справочника'), search),
       sections,
+      nothing,
       el('p', { class: 'hint' }, 'Справочники salaries и absences видны только ролям reference-hr-reader и reference-hr-admin. Число записей считается по первой странице, "100+" означает, что страниц больше.'));
     search.addEventListener('input', () => {
       const needle = search.value.trim().toLowerCase();
-      for (const row of root.querySelectorAll('tbody tr')) row.hidden = needle !== '' && !row.dataset.title.includes(needle);
+      let shown = 0;
+      for (const row of root.querySelectorAll('tbody tr')) {
+        row.hidden = needle !== '' && !row.dataset.title.includes(needle);
+        if (!row.hidden) shown += 1;
+      }
+      nothing.hidden = shown > 0;
     });
     return root;
   }
@@ -293,6 +385,7 @@
       filter: query.get('filter') || '',
       orderBy: query.get('order_by') || '',
       allowDeleted: query.get('allowDeleted') === 'true',
+      readTime: query.get('readTime') || '',
       pageSize: Number(query.get('pageSize')) || 20,
       pageToken: query.get('pageToken') || '',
     };
@@ -303,25 +396,47 @@
       filter: params.filter,
       order_by: params.orderBy,
       allowDeleted: params.allowDeleted,
+      readTime: params.readTime,
       pageSize: params.pageSize === 20 ? '' : params.pageSize,
       pageToken: pageToken || '',
     });
   }
 
+  // the value of a datetime-local input for a moment: the local time of the browser to the minute
+  function localInputValue(iso) {
+    if (!iso) return '';
+    const moment = new Date(iso);
+    if (Number.isNaN(moment.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${moment.getFullYear()}-${pad(moment.getMonth() + 1)}-${pad(moment.getDate())}T${pad(moment.getHours())}:${pad(moment.getMinutes())}`;
+  }
+
   function cellFor(collection, rec, column) {
     const value = rec[column];
-    const field = fieldByName(collection, column);
-    if (column === 'id') return el('td', {}, el('a', { href: recordHref(collection, rec.id), class: 'mono' }, `#${rec.id}`));
-    if (column === 'is_deleted') return el('td', {}, stateBadge(rec));
-    if (field && field.type === 'enum') return el('td', {}, value ? badge(value) : fmtValue(value));
-    if (field && field.type === 'ref') {
-      const cell = el('td', {}, fmtValue(value));
-      refCell(field, value).then((node) => replace(cell, node));
-      return cell;
+    const model = views.cell(collection, column, value);
+    switch (model.kind) {
+      case 'id':
+        return el('td', { class: 'nowrap' }, el('a', { href: recordHref(collection, rec.id), class: 'mono' }, model.text));
+      case 'state':
+        return el('td', { class: 'nowrap' }, stateBadge(rec));
+      case 'enum':
+        return el('td', { class: 'nowrap' }, badge(value));
+      case 'ref': {
+        const cell = el('td', {}, el('span', { class: 'mono muted small' }, model.text));
+        refCell(fieldByName(collection, column), value, true).then((node) => replace(cell, node));
+        return cell;
+      }
+      case 'num':
+        return el('td', { class: 'num' }, model.text);
+      case 'date':
+        return el('td', { class: 'nowrap' }, fmtDate(value));
+      case 'time':
+        return el('td', { class: 'nowrap' }, fmtTime(value));
+      case 'empty':
+        return el('td', {}, fmtValue(value));
+      default:
+        return el('td', {}, model.text);
     }
-    if (typeof value === 'number') return el('td', { class: 'num' }, String(value));
-    if (column === 'created_at' || column === 'updated_at' || column === 'deleted_at') return el('td', {}, fmtTime(value));
-    return el('td', {}, fmtValue(value));
   }
 
   async function screenTable(current) {
@@ -331,60 +446,91 @@
     const params = tableParams(current.query);
     crumbs([['Справочники', href('/')], [cat.title, null]]);
 
-    const filterInput = el('input', { type: 'text', id: 'filter', class: 'mono wide', value: params.filter, placeholder: filterPlaceholder(collection), 'aria-describedby': 'filterHint' });
-    const orderSelect = el('select', { id: 'orderBy', 'aria-label': 'Сортировка' }, orderOptions(collection, params.orderBy));
+    const filterInput = el('input', { type: 'text', id: 'filter', name: 'filter', class: 'mono wide', value: params.filter, placeholder: filterPlaceholder(collection), 'aria-describedby': 'filterHint filterError' });
+    const filterError = el('div', { id: 'filterError', class: 'error', role: 'alert' });
+    const orderSelect = el('select', { id: 'orderBy', name: 'order_by' }, orderOptions(collection, params.orderBy));
     const allowDeleted = el('input', { type: 'checkbox', id: 'allowDeleted', checked: params.allowDeleted });
-    const pageSize = el('select', { id: 'pageSize', 'aria-label': 'Размер страницы' }, PAGE_SIZES.map((n) => el('option', { value: n, selected: n === params.pageSize }, `${n} на странице`)));
+    const readTime = el('input', { type: 'datetime-local', id: 'readTime', value: localInputValue(params.readTime), 'aria-describedby': 'readTimeHint' });
+    const pageSize = el('select', { id: 'pageSize' }, PAGE_SIZES.map((n) => el('option', { value: n, selected: n === params.pageSize }, `${n} на странице`)));
     const form = el('form', {
       class: 'toolbar',
+      role: 'search',
+      'aria-label': `Отбор записей: ${cat.title}`,
       on: {
         submit: (event) => {
           event.preventDefault();
           session.pager[collection] = [];
-          go(tableHref(collection, { filter: filterInput.value.trim(), orderBy: orderSelect.value, allowDeleted: allowDeleted.checked, pageSize: Number(pageSize.value) }, ''));
+          const moment = readTime.value ? new Date(readTime.value).toISOString() : '';
+          go(tableHref(collection, { filter: filterInput.value.trim(), orderBy: orderSelect.value, allowDeleted: allowDeleted.checked, readTime: moment, pageSize: Number(pageSize.value) }, ''));
         },
       },
     },
-    el('label', { for: 'filter' }, 'filter'), filterInput,
-    el('label', { for: 'orderBy' }, 'order_by'), orderSelect,
-    el('label', {}, allowDeleted, ' allowDeleted'),
-    pageSize,
-    el('button', { type: 'submit', class: 'primary' }, 'Применить'));
+    el('label', { for: 'filter' }, 'Фильтр'), filterInput,
+    el('label', { for: 'orderBy' }, 'Сортировка'), orderSelect,
+    el('span', { class: 'check' }, allowDeleted, el('label', { for: 'allowDeleted' }, 'Показывать удалённые')),
+    el('label', { for: 'readTime' }, 'На момент'), readTime,
+    el('label', { for: 'pageSize', class: 'sr-only' }, 'Размер страницы'), pageSize,
+    el('button', { type: 'submit', class: 'primary' }, 'Применить'),
+    views.hasSelection(params) || params.orderBy || params.readTime ? el('a', { class: 'button', href: href(`/${collection}`) }, 'Сбросить') : null);
 
     const resultBox = el('div', { id: 'tableBanner' });
     const actions = el('div', { class: 'toolbar' });
-    if (can(user, collection, 'X')) actions.appendChild(el('button', { type: 'button', id: 'export', on: { click: () => exportCatalog(collection, resultBox) } }, 'Выгрузить в Excel'));
-    if (can(user, collection, 'C')) actions.appendChild(el('a', { class: 'button primary', id: 'create', href: href(`/${collection}/new`) }, 'Создать запись'));
+    const narrowed = Boolean(params.filter || params.orderBy || params.readTime);
+    if (can(user, collection, 'X')) {
+      actions.appendChild(el('button', { type: 'button', id: 'export', on: { click: () => exportCatalog(collection, params, resultBox) } },
+        narrowed ? 'Выгрузить отобранное в Excel' : 'Выгрузить в Excel'));
+    }
+    if (can(user, collection, 'C') && !params.readTime) actions.appendChild(el('a', { class: 'button primary', id: 'create', href: href(`/${collection}/new`) }, 'Создать запись'));
     const hint = el('p', { class: 'hint', id: 'filterHint' },
-      'Поля фильтра: ', queryFields(collection).join(', '), '. Синтаксис AIP-160: =, !=, :, <, <=, >, >=, AND, OR, NOT, скобки, поле:* (есть значение), строки в кавычках. Сортировка: поле или "поле desc". Выгрузка содержит все неудалённые записи справочника без истории.');
+      'Поля фильтра (параметр filter): ', queryFields(collection).join(', '), '. Синтаксис AIP-160: =, !=, :, <, <=, >, >=, AND, OR, NOT, скобки, поле:* (есть значение), строки в кавычках. Сортировка (параметр order_by): поле или "поле desc". Выгрузка содержит неудалённые записи текущего отбора без истории.');
+    const readTimeHint = el('p', { class: 'hint', id: 'readTimeHint' },
+      '"На момент" (параметр readTime) показывает записи в состоянии на выбранный момент, восстановленном из ревизий: запись, созданная позже, не видна, изменения после момента не учтены.');
 
     const root = el('div', {},
       el('h2', {}, cat.title, ' ', el('span', { class: 'muted mono small' }, `/v1/${collection}/`)),
-      resultBox, form, hint, actions);
+      resultBox, form, filterError, hint, readTimeHint, actions);
+
+    if (params.readTime) {
+      const derived = collection === 'employees' ? ' Подразделение и должность сотрудника в срезе не заполняются, их даёт срез назначений.' : '';
+      root.insertBefore(banner('warn', el('b', {}, `Срез на ${fmt.dateTime(params.readTime)}. `), `Записи показаны в состоянии на этот момент, восстановленном из ревизий.${derived}`), form);
+    }
 
     let page;
     try {
       page = await api.list(collection, params);
     } catch (error) {
       if (error instanceof ApiError && error.status === 400) {
-        const errors = error.fieldErrors;
-        if (errors.filter || /filter/i.test(error.message)) filterInput.classList.add('invalid');
+        const reason = error.fieldErrors.filter || error.message;
+        if (error.fieldErrors.filter || /filter/i.test(error.message)) {
+          filterInput.classList.add('invalid');
+          filterInput.setAttribute('aria-invalid', 'true');
+          filterError.textContent = reason;
+        }
         root.appendChild(errorBanner(error));
+        return root;
+      }
+      if (error instanceof ApiError && error.status === 403) {
+        root.appendChild(stateCard(error, { backHref: href('/'), level: 3 }));
         return root;
       }
       throw error;
     }
 
-    const columns = listColumns(collection);
+    // the state column says only ACTIVE until deleted rows are shown
+    const columns = listColumns(collection).filter((column) => column !== 'is_deleted' || params.allowDeleted);
     const rows = page.items;
-    const body = rows.length
-      ? rows.map((rec) => el('tr', { class: rec.is_deleted ? 'deleted' : null }, columns.map((column) => cellFor(collection, rec, column))))
-      : [el('tr', {}, el('td', { colspan: columns.length, class: 'muted' }, 'Записей нет', can(user, collection, 'C') ? ', создайте первую' : '', '.'))];
-    root.appendChild(el('div', { class: 'table-wrap' }, table(columns.map((c) => ({ label: fieldLabel(collection, c) })), body)));
+    if (!rows.length && !params.pageToken) {
+      root.appendChild(emptyBlock(views.emptyState(collection, user, params), { create: params.readTime ? null : href(`/${collection}/new`), reset: href(`/${collection}`) }));
+      return root;
+    }
+    const body = rows.map((rec) => el('tr', { class: rec.is_deleted ? 'clickable deleted' : 'clickable', dataset: { href: recordHref(collection, rec.id) } },
+      columns.map((column) => cellFor(collection, rec, column))));
+    root.appendChild(el('div', { class: 'table-wrap', role: 'region', 'aria-label': `Записи: ${cat.title}` },
+      table(columns.map((c) => ({ label: fieldLabel(collection, c) })), body, `${cat.title}: ${views.selectionText(params)}`)));
 
     const stack = session.pager[collection] || [];
-    const pager = el('div', { class: 'pager' },
-      el('span', { class: 'muted' }, `на странице: ${rows.length}, pageSize: ${params.pageSize}`),
+    const pager = el('nav', { class: 'pager', 'aria-label': 'Страницы' },
+      el('span', { class: 'muted', role: 'status' }, `На странице: ${rows.length}, размер страницы: ${params.pageSize}`),
       el('button', {
         type: 'button',
         disabled: !stack.length,
@@ -408,14 +554,16 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function exportCatalog(collection, box) {
-    replace(box, banner('ok', 'Выгрузка выполняется…'));
+  // the export of the current selection: filter, order and moment of the table, never the deleted records
+  async function exportCatalog(collection, params, box) {
+    replace(box, el('div', { class: 'banner banner-ok', role: 'status' }, loadingBlock('Выгрузка выполняется…')));
+    const selection = { filter: params.filter, orderBy: params.orderBy, readTime: params.readTime };
     try {
-      const file = await api.exportFile(collection);
+      const file = await api.exportFile(collection, selection);
       download(file.blob, file.filename);
-      replace(box, banner('ok', `Файл ${file.filename} получен (${file.blob.size} байт). Запрос: POST /v1/${collection}/export.`));
+      replace(box, banner('ok', `Файл ${file.filename} получен (${fmt.integer(file.blob.size)} байт): ${views.selectionText(selection)}.`));
     } catch (error) {
-      replace(box, errorBanner(error));
+      replace(box, errorBanner(error, null, () => exportCatalog(collection, params, box)));
     }
   }
 
@@ -423,7 +571,8 @@
 
   function fieldInput(collection, field, value, locked) {
     const inputId = `f-${field.name}`;
-    const common = { id: inputId, name: field.name };
+    const describedBy = field.type === 'ref' ? `${inputId}-hint ${inputId}-ref ${inputId}-error` : `${inputId}-hint ${inputId}-error`;
+    const common = { id: inputId, name: field.name, 'aria-describedby': describedBy, 'aria-required': field.required ? 'true' : null };
     switch (field.type) {
       case 'enum':
         return el('select', { ...common, disabled: locked },
@@ -441,7 +590,7 @@
         const listId = `dl-${collection}-${field.name}`;
         const input = el('input', { ...common, type: 'text', class: 'mono', value: normalize(value), readOnly: locked, list: listId, placeholder: 'идентификатор', autocomplete: 'off', inputmode: 'numeric' });
         const datalist = el('datalist', { id: listId });
-        const chosen = el('span', { class: 'hint ref-label' });
+        const chosen = el('span', { class: 'hint ref-label', id: `${inputId}-ref`, 'aria-live': 'polite' });
         const showLabel = async () => {
           const labels = await labelsOf(field.ref);
           const label = labels.get(String(input.value.trim()));
@@ -459,20 +608,21 @@
     }
   }
 
-  function fieldBox(label, name, note, control) {
+  // one field of the form: the label above, the hint and the error below, both linked to the input for screen readers
+  function fieldBox(label, name, note, control, required) {
     const input = control.matches('input, select') ? control : control.querySelector('input, select');
     return el('div', { class: 'field', dataset: { field: name } },
-      el('label', { for: input.id }, label, ' ', el('span', { class: 'muted small' }, note)),
+      el('label', { for: input.id }, label, required ? el('span', { class: 'required-mark', 'aria-hidden': 'true' }, ' *') : null),
       control,
+      el('div', { class: 'hint', id: `${input.id}-hint` }, note),
       el('div', { class: 'error', id: `${input.id}-error` }));
   }
 
   // builds the form card: used standalone on S-03 and inside the employee card S-05
   function buildFormPanel(collection, rec, query, backTo) {
     const cat = CATALOGS[collection];
-    const user = session.user;
-    const isNew = !rec;
-    const editable = isNew ? can(user, collection, 'C') : can(user, collection, 'U') && !rec.is_deleted;
+    const model = views.formModel(collection, rec, session.user, query);
+    const { isNew, editable } = model;
     const draftKey = `rm.draft:${collection}:${isNew ? 'new' : rec.id}`;
     const draft = editable ? safeJson(storageGet(draftKey)) : null;
     const inputs = {};
@@ -484,52 +634,55 @@
       return rec ? rec[name] : '';
     };
 
-    const formBanner = el('div', {});
+    const formBanner = el('div', { role: 'status' });
     const fields = [];
-    for (const field of inputFields(collection)) {
-      const locked = !editable || (field.immutable && !isNew) || (isNew && field.immutable && query && query.has(field.name));
-      const control = fieldInput(collection, field, initial(field.name), locked);
+    for (const item of model.fields) {
+      const control = fieldInput(collection, item.field, initial(item.name), item.locked);
       const input = control.matches('input, select') ? control : control.querySelector('input, select');
-      inputs[field.name] = input;
-      const notes = [field.name];
-      if (field.required) notes.push('обязательно');
-      if (field.immutable && !isNew) notes.push('не меняется');
-      if (field.hint) notes.push(field.hint);
-      if (field.type === 'ref') notes.push(`идентификатор записи ${field.ref}`);
-      boxes[field.name] = fieldBox(field.label, field.name, notes.join(', '), control);
-      fields.push(boxes[field.name]);
+      inputs[item.name] = input;
+      boxes[item.name] = fieldBox(item.label, item.name, item.notes, control, item.required && !item.locked);
+      fields.push(boxes[item.name]);
     }
 
     const clearErrors = () => {
-      for (const box of Object.values(boxes)) { box.classList.remove('invalid'); box.querySelector('.error').textContent = ''; }
+      for (const [name, box] of Object.entries(boxes)) {
+        box.classList.remove('invalid');
+        box.querySelector('.error').textContent = '';
+        inputs[name].removeAttribute('aria-invalid');
+      }
       clear(formBanner);
     };
 
     const showFieldErrors = (error) => {
       const errors = error.fieldErrors;
-      let marked = 0;
+      let first = null;
       for (const [field, message] of Object.entries(errors)) {
         const box = boxes[field];
         if (!box) continue;
         box.classList.add('invalid');
         box.querySelector('.error').textContent = message;
-        marked += 1;
+        inputs[field].setAttribute('aria-invalid', 'true');
+        if (!first) first = inputs[field];
       }
       const rest = Object.entries(errors).filter(([field]) => !boxes[field]).map(([field, message]) => `${field}: ${message}`);
-      replace(formBanner, banner('error', el('b', {}, `400 ${error.message}`), marked ? ', см. подписи у полей.' : '.', rest.length ? ` ${rest.join('. ')}` : ''));
+      replace(formBanner, banner('error', el('b', {}, `400 ${error.message}`), first ? ', см. подписи у полей.' : '.', rest.length ? ` ${rest.join('. ')}` : ''));
+      if (first) first.focus();
     };
 
     const actions = el('div', { class: 'toolbar' });
-    const busy = (state) => { for (const button of actions.querySelectorAll('button')) button.disabled = state; };
-    if (editable) actions.appendChild(el('button', { type: 'submit', class: 'primary', id: 'save' }, 'Сохранить'));
-    if (!isNew && can(user, collection, 'D') && !rec.is_deleted) {
+    const busy = (state) => {
+      for (const button of actions.querySelectorAll('button')) button.disabled = state;
+      form.setAttribute('aria-busy', state ? 'true' : 'false');
+    };
+    if (model.actions.includes('save')) actions.appendChild(el('button', { type: 'submit', class: 'primary', id: 'save' }, 'Сохранить'));
+    if (model.actions.includes('delete')) {
       actions.appendChild(el('button', {
         type: 'button',
         class: 'danger',
         id: 'delete',
         on: {
           click: async () => {
-            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id})? Запись перейдёт в состояние DELETED, идентификатор останется занятым, восстановления нет: удалённая по ошибке запись создаётся заново.`)) return;
+            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id})? Запись перейдёт в состояние DELETED, идентификатор останется занятым, восстановления нет: удалённая по ошибке запись создаётся заново.`, 'Удалить запись?')) return;
             busy(true);
             try {
               await api.remove(collection, rec.id);
@@ -541,14 +694,14 @@
         },
       }, 'Удалить'));
     }
-    if (!isNew && can(user, collection, 'D') && rec.is_deleted) {
+    if (model.actions.includes('purge')) {
       actions.appendChild(el('button', {
         type: 'button',
         class: 'danger',
         id: 'purge',
         on: {
           click: async () => {
-            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id}) окончательно вместе с историей? Это действие нельзя отменить.`)) return;
+            if (!await confirmDialog(`Удалить ${recordLabel(collection, rec)} (#${rec.id}) окончательно вместе с историей? Это действие нельзя отменить.`, 'Удалить окончательно?')) return;
             busy(true);
             try {
               await api.remove(collection, rec.id, true);
@@ -562,7 +715,8 @@
     }
     actions.appendChild(el('a', { class: 'button', href: backTo }, 'Назад'));
 
-    const form = el('form', { class: 'record-form', autocomplete: 'off' }, fields, actions);
+    const form = el('form', { class: 'record-form', autocomplete: 'off', novalidate: true, 'aria-label': isNew ? `Новая запись: ${cat.title}` : `Запись ${recordLabel(collection, rec)}` },
+      editable ? el('p', { class: 'hint' }, 'Поля со знаком * обязательны.') : null, fields, actions);
     if (editable) {
       form.addEventListener('input', () => {
         const values = {};
@@ -616,7 +770,7 @@
       el('h2', {}, title, ' ', el('span', { class: 'muted mono small' }, isNew ? `POST /v1/${collection}/` : `/v1/${collection}/${rec.id}`)),
       formBanner,
       draft ? banner('warn', 'Восстановлен черновик формы из этого окна браузера.') : null,
-      !editable && !isNew ? el('p', { class: 'hint' }, rec.is_deleted ? 'Запись удалена: поля только для чтения, восстановления нет.' : 'Только чтение: у роли нет уровня update на эту группу справочников.') : null,
+      model.readOnlyReason ? el('p', { class: 'hint', role: 'note' }, model.readOnlyReason === 'deleted' ? 'Запись удалена: поля только для чтения, восстановления нет.' : 'Только чтение: у роли нет нужного уровня на эту группу справочников.') : null,
       form);
 
     // a new dated record is checked against the record still in effect for the same employee
@@ -625,7 +779,7 @@
         .then((page) => {
           const open = page.items[0];
           if (!open) return;
-          formBanner.appendChild(banner('warn', `Действующая запись #${open.id} с ${open.start_date} не закрыта. Сначала закройте её датой на карточке сотрудника, иначе периоды пересекутся и запрос будет отклонён.`));
+          formBanner.appendChild(banner('warn', `Действующая запись #${open.id} с ${fmt.date(open.start_date)} не закрыта. Сначала закройте её датой на карточке сотрудника, иначе периоды пересекутся и запрос будет отклонён.`));
         })
         .catch(() => {});
     }
@@ -680,7 +834,7 @@
       const state = stateAt(revisions, number);
       replace(asOf, el('div', { class: 'banner banner-warn' },
         el('b', {}, `Состояние на ревизию ${number}`), ' ', el('span', { class: 'hint' }, 'собрано из операций ревизий 1..', String(number)),
-        el('dl', { class: 'meta compact' }, Object.entries(state).map(([key, value]) => [el('dt', {}, fieldLabel(collection, key), ' ', el('span', { class: 'mono muted small' }, key)), el('dd', {}, fmtValue(value))]))));
+        el('dl', { class: 'meta compact' }, Object.entries(state).map(([key, value]) => [el('dt', {}, fieldLabel(collection, key), ' ', el('span', { class: 'mono muted small' }, key)), el('dd', {}, fmtField(collection, key, value))]))));
     };
     for (const revision of revisions) {
       box.appendChild(el('div', { class: 'revision' },
@@ -688,7 +842,7 @@
           el('b', {}, `${revision.revision_number}`), ' ', badge(revisionKind(revision)), ' ', fmtTime(revision.changed_at), ' ',
           el('span', { class: 'muted mono small' }, revision.changed_by), ' ',
           el('button', { type: 'button', class: 'link', on: { click: () => showAsOf(revision.revision_number) } }, 'на ревизию')),
-        el('ul', { class: 'changes' }, (revision.change || []).map((op) => el('li', {}, el('code', {}, `${op.op} ${fieldOf(op)}`), ': ', fmtValue(op.value))))));
+        el('ul', { class: 'changes' }, (revision.change || []).map((op) => el('li', {}, el('code', {}, `${op.op} ${fieldOf(op)}`), ': ', fmtField(collection, fieldOf(op), op.value))))));
     }
     if (!revisions.length) box.appendChild(el('p', { class: 'muted' }, 'Ревизий нет.'));
     box.appendChild(asOf);
@@ -704,7 +858,196 @@
     crumbs([['Справочники', href('/')], [cat.title, href(`/${collection}`)], [isNew ? 'Новая запись' : `#${rec.id}`, null]]);
     const panel = buildFormPanel(collection, rec, query, backTo);
     if (isNew) return el('div', { class: 'layout' }, panel, el('div', {}, el('div', { class: 'card' }, el('h3', {}, 'Сведения'), el('p', { class: 'muted' }, 'Идентификатор назначит сервис, первая ревизия появится после сохранения.'))));
-    return el('div', { class: 'layout' }, panel, el('div', {}, metaCard(collection, rec), await historyCard(collection, rec)));
+    const left = el('div', {}, panel, collection === 'org_units' && !rec.is_deleted ? groupOpsCard(rec) : null);
+    return el('div', { class: 'layout' }, left, el('div', {}, metaCard(collection, rec), await historyCard(collection, rec)));
+  }
+
+  // ---- group operations of an org unit (FR-RM-63, FR-RM-64): a check returns the plan, the run applies it ----
+
+  // a small labelled input of a group operation form, its error line is filled from the details of a 400 answer
+  function opField(form, name, label, control, hint) {
+    const input = control.matches('input, select') ? control : control.querySelector('input, select');
+    input.id = `${form}-${name}`;
+    input.name = name;
+    input.setAttribute('aria-describedby', `${input.id}-hint ${input.id}-error`);
+    return el('div', { class: 'field', dataset: { field: name } },
+      el('label', { for: input.id }, label),
+      control,
+      el('div', { class: 'hint', id: `${input.id}-hint` }, hint || ''),
+      el('div', { class: 'error', id: `${input.id}-error` }));
+  }
+
+  function refInput(collection, placeholder) {
+    const listId = `dl-op-${collection}-${Math.random().toString(36).slice(2, 8)}`;
+    const input = el('input', { type: 'text', class: 'mono', list: listId, placeholder, inputmode: 'numeric', autocomplete: 'off' });
+    const datalist = el('datalist', { id: listId });
+    const chosen = el('span', { class: 'hint ref-label', 'aria-live': 'polite' });
+    const show = async () => {
+      const labels = await labelsOf(collection);
+      const value = input.value.trim();
+      chosen.textContent = value ? (labels.get(value) || 'записи с таким идентификатором нет') : '';
+    };
+    labelsOf(collection).then((labels) => replace(datalist, [...labels.entries()].map(([id, label]) => el('option', { value: id }, label))));
+    input.addEventListener('input', show);
+    return el('span', { class: 'ref' }, input, datalist, chosen);
+  }
+
+  // runs a check or the operation, shows the plan or the result, marks the fields of a 400 answer
+  async function runGroupOp(box, form, call, body, validateOnly, describe) {
+    for (const field of form.querySelectorAll('.field')) {
+      field.classList.remove('invalid');
+      field.querySelector('.error').textContent = '';
+      const input = field.querySelector('input, select');
+      if (input) input.removeAttribute('aria-invalid');
+    }
+    replace(box, loadingBlock(validateOnly ? 'Проверка…' : 'Выполнение…'));
+    try {
+      const result = await call({ ...body, validate_only: validateOnly });
+      replace(box, describe(result));
+      if (!validateOnly) forgetLabels('employees');
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 400) {
+        let marked = false;
+        for (const [name, message] of Object.entries(error.fieldErrors)) {
+          const field = form.querySelector(`.field[data-field="${name}"]`);
+          if (!field) continue;
+          field.classList.add('invalid');
+          field.querySelector('.error').textContent = message;
+          const input = field.querySelector('input, select');
+          if (input) input.setAttribute('aria-invalid', 'true');
+          marked = true;
+        }
+        replace(box, banner('error', el('b', {}, `400 ${error.message}`), marked ? ', см. подписи у полей.' : '.'));
+        return;
+      }
+      replace(box, errorBanner(error, null, () => runGroupOp(box, form, call, body, validateOnly, describe)));
+    }
+  }
+
+  function skippedList(skipped) {
+    if (!skipped.length) return null;
+    return el('div', {},
+      el('h4', {}, `Пропущены: ${skipped.length}`),
+      el('ul', {}, skipped.map((s) => el('li', {}, el('a', { href: recordHref('employees', s.employee_id) }, `#${s.employee_id}`), ': ', s.reason))));
+  }
+
+  function employeeLink(id) {
+    const link = el('a', { href: recordHref('employees', id) }, `#${id}`);
+    labelsOf('employees').then((labels) => { if (labels.get(String(id))) replace(link, `${labels.get(String(id))} #${id}`); });
+    return link;
+  }
+
+  function groupOpsCard(rec) {
+    const user = session.user;
+    const canRevise = can(user, 'salaries', 'C') && can(user, 'salaries', 'U');
+    const canTransfer = can(user, 'assignments', 'C') && can(user, 'assignments', 'U');
+    if (!canRevise && !canTransfer) return null;
+
+    const card = el('section', { class: 'card', 'aria-labelledby': 'groupOpsTitle' },
+      el('h3', { id: 'groupOpsTitle' }, 'Групповые операции подразделения'),
+      el('p', { class: 'hint' }, 'Операция затрагивает сотрудников, назначенных в подразделение на выбранную дату. Действующая запись каждого закрывается днём раньше, новая начинается с даты. "Проверить" показывает план и ничего не меняет, "Выполнить" применяет его целиком или не применяет совсем.'));
+
+    if (canRevise) {
+      const date = el('input', { type: 'date', value: todayIso() });
+      const mode = el('select', {}, el('option', { value: 'percent' }, 'на процент'), el('option', { value: 'amount' }, 'новая сумма'));
+      const percent = el('input', { type: 'number', step: '0.01', value: '10' });
+      const amount = el('input', { type: 'number', step: '0.01', min: '0.01' });
+      const currency = refInput('currencies', 'валюта текущего оклада');
+      const subunits = el('input', { type: 'checkbox' });
+      const box = el('div', { class: 'preview', 'aria-live': 'polite' });
+      const form = el('form', { class: 'group-op', id: 'reviseForm', novalidate: true },
+        el('h4', {}, 'Новые оклады с даты'),
+        opField('revise', 'start_date', 'Дата начала новых окладов', date),
+        opField('revise', 'mode', 'Изменение', mode),
+        opField('revise', 'percent', 'Процент', percent, 'например 10 или -5, сумма округляется до копеек'),
+        opField('revise', 'amount', 'Новая сумма', amount),
+        opField('revise', 'currency_id', 'Валюта новой суммы', currency, 'пусто: валюта текущего оклада'),
+        el('span', { class: 'check' }, subunits, el('label', { for: 'revise-subunits' }, 'Включая вложенные подразделения')));
+      subunits.id = 'revise-subunits';
+      const toggle = () => {
+        const byPercent = mode.value === 'percent';
+        form.querySelector('[data-field="percent"]').hidden = !byPercent;
+        form.querySelector('[data-field="amount"]').hidden = byPercent;
+        form.querySelector('[data-field="currency_id"]').hidden = byPercent;
+      };
+      mode.addEventListener('change', toggle);
+      toggle();
+      const body = () => {
+        const b = { org_unit_id: rec.id, start_date: date.value, include_subunits: subunits.checked };
+        if (mode.value === 'percent') b.percent = Number(percent.value);
+        else {
+          b.amount = Number(amount.value);
+          const cur = currency.querySelector('input').value.trim();
+          if (cur) b.currency_id = Number(cur);
+        }
+        return b;
+      };
+      const describe = (result) => el('div', {},
+        banner(result.validate_only ? 'warn' : 'ok', result.validate_only ? `План: изменится окладов ${result.items.length}, ничего не сохранено.` : `Сохранено: новых окладов ${result.items.length}.`),
+        result.items.length ? table(
+          [{ label: 'Сотрудник' }, { label: 'Было', class: 'num' }, { label: 'Стало', class: 'num' }, { label: 'Период' }, { label: 'Запись' }],
+          result.items.map((item) => el('tr', { class: 'clickable', dataset: { href: recordHref('employees', item.employee_id) } },
+            el('td', {}, employeeLink(item.employee_id)),
+            el('td', { class: 'num' }, item.previous_amount === undefined ? '-' : fmt.money(item.previous_amount)),
+            el('td', { class: 'num' }, fmt.money(item.amount)),
+            el('td', {}, fmt.period(item.start_date, item.end_date)),
+            el('td', {}, item.salary_id ? el('a', { href: recordHref('salaries', item.salary_id), class: 'mono' }, `#${item.salary_id}`) : el('span', { class: 'muted' }, 'после выполнения')))),
+          'Новые оклады сотрудников подразделения') : null,
+        skippedList(result.skipped));
+      form.appendChild(el('div', { class: 'toolbar' },
+        el('button', { type: 'button', id: 'reviseCheck', on: { click: () => runGroupOp(box, form, api.reviseSalaries, body(), true, describe) } }, 'Проверить'),
+        el('button', { type: 'button', class: 'primary', id: 'reviseRun', on: { click: async () => {
+          if (!await confirmDialog(`Назначить новые оклады сотрудникам подразделения ${recordLabel('org_units', rec)} с ${fmt.date(date.value)}? Действующие оклады закроются днём раньше.`, 'Выполнить групповую операцию?')) return;
+          runGroupOp(box, form, api.reviseSalaries, body(), false, describe);
+        } } }, 'Выполнить')));
+      form.appendChild(box);
+      card.appendChild(form);
+    }
+
+    if (canTransfer) {
+      const target = refInput('org_units', 'идентификатор подразделения');
+      const date = el('input', { type: 'date', value: todayIso() });
+      const position = refInput('positions', 'текущая должность');
+      const subunits = el('input', { type: 'checkbox', id: 'transfer-subunits' });
+      const box = el('div', { class: 'preview', 'aria-live': 'polite' });
+      const form = el('form', { class: 'group-op', id: 'transferForm', novalidate: true },
+        el('h4', {}, 'Перевод сотрудников в другое подразделение'),
+        opField('transfer', 'target_org_unit_id', 'Подразделение назначения', target),
+        opField('transfer', 'start_date', 'Дата перевода', date),
+        opField('transfer', 'position_id', 'Должность в новом подразделении', position, 'пусто: должность сохраняется'),
+        el('span', { class: 'check' }, subunits, el('label', { for: 'transfer-subunits' }, 'Включая вложенные подразделения')));
+      const body = () => {
+        const b = { org_unit_id: rec.id, target_org_unit_id: Number(target.querySelector('input').value.trim()) || 0, start_date: date.value, include_subunits: subunits.checked };
+        const pos = position.querySelector('input').value.trim();
+        if (pos) b.position_id = Number(pos);
+        return b;
+      };
+      const describe = (result) => el('div', {},
+        banner(result.validate_only ? 'warn' : 'ok', result.validate_only ? `План: переводятся сотрудников ${result.items.length}, ничего не сохранено.` : `Сохранено: переведено сотрудников ${result.items.length}.`),
+        result.items.length ? table(
+          [{ label: 'Сотрудник' }, { label: 'Из' }, { label: 'В' }, { label: 'Период' }, { label: 'Запись' }],
+          result.items.map((item) => {
+            const from = el('td', {}, `#${item.org_unit_id}`);
+            const to = el('td', {}, `#${item.target_org_unit_id}`);
+            refCell(fieldByName('assignments', 'org_unit_id'), item.org_unit_id).then((node) => replace(from, node));
+            refCell(fieldByName('assignments', 'org_unit_id'), item.target_org_unit_id).then((node) => replace(to, node));
+            return el('tr', { class: 'clickable', dataset: { href: recordHref('employees', item.employee_id) } },
+              el('td', {}, employeeLink(item.employee_id)), from, to,
+              el('td', {}, fmt.period(item.start_date, item.end_date)),
+              el('td', {}, item.assignment_id ? el('a', { href: recordHref('assignments', item.assignment_id), class: 'mono' }, `#${item.assignment_id}`) : el('span', { class: 'muted' }, 'после выполнения')));
+          }),
+          'Переводы сотрудников подразделения') : null,
+        skippedList(result.skipped));
+      form.appendChild(el('div', { class: 'toolbar' },
+        el('button', { type: 'button', id: 'transferCheck', on: { click: () => runGroupOp(box, form, api.transferAssignments, body(), true, describe) } }, 'Проверить'),
+        el('button', { type: 'button', class: 'primary', id: 'transferRun', on: { click: async () => {
+          if (!await confirmDialog(`Перевести сотрудников подразделения ${recordLabel('org_units', rec)} с ${fmt.date(date.value)}? Действующие назначения закроются днём раньше.`, 'Выполнить групповую операцию?')) return;
+          runGroupOp(box, form, api.transferAssignments, body(), false, describe);
+        } } }, 'Выполнить')));
+      form.appendChild(box);
+      card.appendChild(form);
+    }
+    return card;
   }
 
   // ---- S-05: the employee card ----
@@ -716,8 +1059,8 @@
       el('h2', {}, recordLabel('employees', rec), ' ', el('span', { class: 'muted mono small' }, `/v1/employees/${rec.id}`)),
       el('dl', { class: 'meta columns' },
         el('dt', {}, 'Состояние занятости ', el('span', { class: 'mono muted small' }, 'employment_state')), el('dd', {}, badge(rec.employment_state)),
-        el('dt', {}, 'Дата приёма ', el('span', { class: 'mono muted small' }, 'hire_date')), el('dd', {}, rec.hire_date),
-        el('dt', {}, 'Дата увольнения ', el('span', { class: 'mono muted small' }, 'dismissal_date')), el('dd', {}, fmtValue(rec.dismissal_date)),
+        el('dt', {}, 'Дата приёма ', el('span', { class: 'mono muted small' }, 'hire_date')), el('dd', {}, fmtDate(rec.hire_date)),
+        el('dt', {}, 'Дата увольнения ', el('span', { class: 'mono muted small' }, 'dismissal_date')), el('dd', {}, fmtDate(rec.dismissal_date)),
         el('dt', {}, 'Учётная запись ', el('span', { class: 'mono muted small' }, 'account_state')), el('dd', {}, badge(rec.account_state)),
         el('dt', {}, 'Идентификатор учётной записи ', el('span', { class: 'mono muted small' }, 'account_user_id')), el('dd', { class: 'mono' }, fmtValue(rec.account_user_id)),
         el('dt', {}, 'Запись'), el('dd', {}, stateBadge(rec))));
@@ -780,22 +1123,22 @@
       try {
         const page = await api.list('salaries', { filter: `employee_id = ${rec.id} AND start_date <= "${today}" AND (end_date >= "${today}" OR NOT end_date:*)`, pageSize: 1 });
         const salary = page.items[0];
-        if (salary) text = el('span', {}, `${salary.amount} `, await refCell(fieldByName('salaries', 'currency_id'), salary.currency_id), ' ', el('span', { class: 'muted' }, `с ${salary.start_date}`));
+        if (salary) text = el('span', {}, `${fmt.money(salary.amount)} `, await refCell(fieldByName('salaries', 'currency_id'), salary.currency_id), ' ', el('span', { class: 'muted' }, `с ${fmt.date(salary.start_date)}`));
       } catch (error) {
         text = errorBanner(error);
       }
       rows.push(el('dt', {}, 'Оклад'), el('dd', {}, text));
     }
-    return el('div', { class: 'card' }, el('h3', {}, 'Действующие значения'), el('p', { class: 'hint' }, `на ${today}, из назначения и оклада с периодом действия`), el('dl', { class: 'meta' }, rows));
+    return el('div', { class: 'card' }, el('h3', {}, 'Действующие значения'), el('p', { class: 'hint' }, `на ${fmt.date(today)}, из назначения и оклада с периодом действия`), el('dl', { class: 'meta' }, rows));
   }
 
   function periodLabel(row) {
-    return `${row.start_date} - ${row.end_date || 'сейчас'}`;
+    return fmt.period(row.start_date, row.end_date);
   }
 
   async function periodDetails(collection, row) {
     if (collection === 'assignments') return el('span', {}, await refCell(fieldByName('assignments', 'org_unit_id'), row.org_unit_id), ', ', await refCell(fieldByName('assignments', 'position_id'), row.position_id));
-    if (collection === 'salaries') return el('span', {}, `${row.amount} `, await refCell(fieldByName('salaries', 'currency_id'), row.currency_id));
+    if (collection === 'salaries') return el('span', {}, `${fmt.money(row.amount)} `, await refCell(fieldByName('salaries', 'currency_id'), row.currency_id));
     return badge(row.kind);
   }
 
@@ -803,8 +1146,8 @@
     const user = session.user;
     const tabs = DATED_TABS.filter(([collection]) => can(user, collection, 'R'));
     const active = tabs.some(([collection]) => collection === requested) ? requested : tabs[0][0];
-    const nav = el('div', { class: 'tabs', role: 'tablist' }, tabs.map(([collection, label]) => el('a', {
-      role: 'tab', class: 'tab', 'aria-selected': collection === active ? 'true' : 'false', href: recordHref('employees', rec.id, { tab: collection }),
+    const nav = el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Периоды сотрудника' }, tabs.map(([collection, label]) => el('a', {
+      role: 'tab', class: 'tab', id: `tab-${collection}`, 'aria-controls': 'periods-panel', 'aria-selected': collection === active ? 'true' : 'false', href: recordHref('employees', rec.id, { tab: collection }),
     }, label)));
     const card = el('div', { class: 'card' }, el('h3', {}, 'Периоды'), nav);
     let rows;
@@ -843,10 +1186,13 @@
         }, date, el('button', { type: 'submit' }, 'Закрыть датой')));
       }
       cells.push(actionCell);
-      body.push(el('tr', {}, cells));
+      body.push(el('tr', { class: 'clickable', dataset: { href: recordHref(active, row.id, { back: backTo }) } }, cells));
     }
-    card.appendChild(table([{ label: 'Запись' }, { label: 'Период' }, { label: 'Значение' }, { label: '' }],
-      body.length ? body : [el('tr', {}, el('td', { colspan: 4, class: 'muted' }, 'Записей нет.'))]));
+    const title = DATED_TABS.find(([collection]) => collection === active)[1];
+    card.appendChild(el('div', { role: 'tabpanel', id: 'periods-panel', 'aria-labelledby': `tab-${active}` },
+      body.length
+        ? table([{ label: 'Запись' }, { label: 'Период' }, { label: 'Значение' }, { label: '', srLabel: 'Действие' }], body, `${title} сотрудника ${recordLabel('employees', rec)}`)
+        : el('div', { class: 'state', role: 'status' }, el('p', {}, `${title}: записей нет.`))));
     const actions = el('div', { class: 'toolbar' });
     if (can(user, active, 'C') && rec.employment_state === 'EMPLOYED') {
       actions.appendChild(el('a', { class: 'button primary', href: href(`/${active}/new`, { employee_id: rec.id, back: backTo }) }, 'Добавить'));
@@ -872,6 +1218,41 @@
     const user = session.user;
     replace($('#who'), user ? [el('b', {}, user.username), ' ', el('span', { class: 'muted' }, user.roles.filter((r) => r.startsWith('reference-')).join(', ') || 'без ролей сервиса')] : '');
     $('#logout').hidden = !user;
+  }
+
+  // a click anywhere on a row with data-href opens it like its link: the controls inside the row keep their own
+  // clicks, a selected text is not a click, ctrl, meta or the middle button open a new tab; the keyboard path stays
+  // the link in the first cell
+  function rowTarget(event) {
+    const row = event.target.closest('tr[data-href]');
+    if (!row || event.target.closest('a, button, input, select, textarea, label, summary, form')) return null;
+    const selection = window.getSelection ? String(window.getSelection()) : '';
+    if (selection && row.contains(window.getSelection().anchorNode)) return null;
+    return row.dataset.href;
+  }
+
+  function interceptRows() {
+    document.addEventListener('click', (event) => {
+      if (event.button !== 0) return;
+      const target = rowTarget(event);
+      if (!target) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(target, '_blank', 'noopener');
+      else go(target);
+    });
+    document.addEventListener('auxclick', (event) => {
+      if (event.button !== 1) return;
+      const target = rowTarget(event);
+      if (target) window.open(target, '_blank', 'noopener');
+    });
+  }
+
+  // the sticky header of a table sits under the top bar, whose height changes with the width of the window
+  function trackTopbar() {
+    const topbar = $('.topbar');
+    const update = () => document.documentElement.style.setProperty('--topbar-height', `${topbar.offsetHeight}px`);
+    update();
+    if (window.ResizeObserver) new ResizeObserver(update).observe(topbar);
+    else window.addEventListener('resize', update);
   }
 
   function interceptLinks() {
@@ -905,6 +1286,8 @@
     session.user = auth.user();
     showHeader();
     interceptLinks();
+    interceptRows();
+    trackTopbar();
     window.addEventListener('popstate', render);
     render();
   }

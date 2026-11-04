@@ -5,7 +5,7 @@
  *
  * HR profiles of employees. The unit and the position come from the assignment in effect today.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_employee
@@ -13,6 +13,7 @@ package reference_manager_employee
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -36,9 +37,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListEmployees(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListEmployees(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateEmployee(context.Context, Employee) (ImplResponse, error)
-	ExportEmployees(context.Context) (ImplResponse, error)
+	ExportEmployees(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetEmployee(context.Context, int64, bool) (ImplResponse, error)
 	DeleteEmployee(context.Context, int64, bool) (ImplResponse, error)
 	UpdateEmployee(context.Context, int64, Employee, string) (ImplResponse, error)

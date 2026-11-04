@@ -22,7 +22,7 @@ type Service interface {
 	CreateCurrency(ctx context.Context, currency *currencydmn.Currency) (*currencydmn.ExpandedCurrency, error)
 	GetCurrency(ctx context.Context, currencyID int64, allowDeleted bool) (*currencydmn.ExpandedCurrency, error)
 	ListCurrencies(ctx context.Context, request *currencydmn.ListRequest) (*currencydmn.ListPage, error)
-	ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error)
+	ExportCurrencies(ctx context.Context, request *currencydmn.ExportRequest) ([]*currencydmn.ExpandedCurrency, error)
 	UpdateCurrency(ctx context.Context, request *currencydmn.UpdateRequest) (*currencydmn.ExpandedCurrency, error)
 	DeleteCurrency(ctx context.Context, currencyID int64) (*currencydmn.ExpandedCurrency, error)
 	PurgeCurrency(ctx context.Context, currencyID int64) error
@@ -105,9 +105,13 @@ func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params 
 	render.JSON(w, r, listPageToAPI(page))
 }
 
-// ExportCurrencies responds with an Excel file of all active currencies.
-func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request) {
-	currencies, err := h.service.ExportCurrencies(r.Context())
+// ExportCurrencies responds with an Excel file of the active currencies of the selection.
+func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request, params currencyv1.ExportCurrenciesParams) {
+	currencies, err := h.service.ExportCurrencies(r.Context(), &currencydmn.ExportRequest{
+		Filter:   valueOrZero(params.Filter),
+		OrderBy:  valueOrZero(params.OrderBy),
+		ReadTime: valueOrZero(params.ReadTime),
+	})
 	if err != nil {
 		apiErr, status := errorToAPI(err)
 
@@ -287,6 +291,7 @@ func listParamsToModel(p *currencyv1.ListCurrenciesParams) *currencydmn.ListRequ
 		Filter:       valueOrZero(p.Filter),
 		OrderBy:      valueOrZero(p.OrderBy),
 		AllowDeleted: valueOrZero(p.AllowDeleted),
+		ReadTime:     valueOrZero(p.ReadTime),
 	}
 }
 

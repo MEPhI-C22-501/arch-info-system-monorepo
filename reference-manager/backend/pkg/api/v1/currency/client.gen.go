@@ -115,10 +115,10 @@ type ClientInterface interface {
 
 	// ExportCurrencies Export currencies in Excel format
 	//
-	// Generates and returns an Excel file containing the list of currencies.
+	// Generates and returns an Excel file with the active currencies: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrencies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportCurrencies(ctx context.Context, params *ExportCurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteCurrency Delete currency record
 	//
@@ -222,11 +222,11 @@ func (c *Client) CreateCurrency(ctx context.Context, body CreateCurrencyJSONRequ
 
 // ExportCurrencies Export currencies in Excel format
 //
-// Generates and returns an Excel file containing the list of currencies.
+// Generates and returns an Excel file with the active currencies: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *Client) ExportCurrencies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportCurrenciesRequest(c.Server)
+func (c *Client) ExportCurrencies(ctx context.Context, params *ExportCurrenciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportCurrenciesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +431,18 @@ func NewListCurrenciesRequest(server string, params *ListCurrenciesParams) (*htt
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +498,7 @@ func NewCreateCurrencyRequestWithBody(server string, contentType string, body io
 }
 
 // NewExportCurrenciesRequest constructs an http.Request for the ExportCurrencies method
-func NewExportCurrenciesRequest(server string) (*http.Request, error) {
+func NewExportCurrenciesRequest(server string, params *ExportCurrenciesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -502,6 +514,57 @@ func NewExportCurrenciesRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
@@ -956,12 +1019,12 @@ type ClientWithResponsesInterface interface {
 
 	// ExportCurrenciesWithResponse Export currencies in Excel format
 	//
-	// Generates and returns an Excel file containing the list of currencies.
+	// Generates and returns an Excel file with the active currencies: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-	ExportCurrenciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
+	ExportCurrenciesWithResponse(ctx context.Context, params *ExportCurrenciesParams, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error)
 
 	// DeleteCurrencyWithResponse Delete currency record
 	//
@@ -1783,13 +1846,13 @@ func (c *ClientWithResponses) CreateCurrencyWithResponse(ctx context.Context, bo
 
 // ExportCurrenciesWithResponse Export currencies in Excel format
 //
-// Generates and returns an Excel file containing the list of currencies.
+// Generates and returns an Excel file with the active currencies: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/currencies/export (the `ExportCurrencies` operationId).
-func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
-	rsp, err := c.ExportCurrencies(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportCurrenciesWithResponse(ctx context.Context, params *ExportCurrenciesParams, reqEditors ...RequestEditorFn) (*ExportCurrenciesResponse, error) {
+	rsp, err := c.ExportCurrencies(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

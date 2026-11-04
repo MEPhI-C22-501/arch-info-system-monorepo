@@ -35,6 +35,10 @@ type Repository[F any] struct {
 
 	stored  []record.Column[F]
 	columns aipsql.Columns
+	// slice describes the columns of the view to the slice of the records at a moment
+	slice []SliceColumn
+
+	selectColumns string
 
 	insertQuery string
 	updateQuery string
@@ -57,6 +61,7 @@ func NewRepository[F any](db postgresrepo.DB, desc *record.Descriptor[F]) *Repos
 	assignments = append(assignments, "is_deleted = $"+strconv.Itoa(len(stored)+2))
 
 	selected := []string{"id"}
+	slice := make([]SliceColumn, 0, len(desc.Columns))
 	columns := aipsql.Columns{
 		"is_deleted":   "is_deleted",
 		"revision":     "revision",
@@ -67,6 +72,7 @@ func NewRepository[F any](db postgresrepo.DB, desc *record.Descriptor[F]) *Repos
 	}
 	for _, c := range desc.Columns {
 		selected = append(selected, c.Name)
+		slice = append(slice, SliceColumn{Name: c.Name, Stored: c.Stored, Type: c.Type})
 
 		sql := c.SQL
 		if sql == "" {
@@ -81,6 +87,9 @@ func NewRepository[F any](db postgresrepo.DB, desc *record.Descriptor[F]) *Repos
 		desc:    desc,
 		stored:  stored,
 		columns: columns,
+		slice:   slice,
+
+		selectColumns: strings.Join(selected, ", "),
 		insertQuery: "INSERT INTO " + desc.Table + " (" + strings.Join(names, ", ") + ", is_deleted)\n" +
 			"VALUES (" + strings.Join(placeholders, ", ") + ")\nRETURNING id",
 		updateQuery: "UPDATE " + desc.Table + "\nSET " + strings.Join(assignments, ", ") + "\nWHERE id = $1",
@@ -185,6 +194,13 @@ func (r *Repository[F]) buildListQuery(q *record.ListQuery) (string, []any, erro
 		conditions []string
 	)
 
+	// a slice at a moment replaces the view, its placeholder comes first
+	query := r.selectQuery
+	if !q.ReadTime.IsZero() {
+		source := SliceSource(r.desc.Table, r.desc.RevisionTable, r.desc.RevisionColumn, r.slice, args.Add(q.ReadTime))
+		query = "SELECT " + r.selectColumns + "\nFROM (\n" + source + "\n) AS slice"
+	}
+
 	if !q.AllowDeleted {
 		conditions = append(conditions, "is_deleted = FALSE")
 	}
@@ -203,7 +219,7 @@ func (r *Repository[F]) buildListQuery(q *record.ListQuery) (string, []any, erro
 	}
 
 	var b strings.Builder
-	b.WriteString(r.selectQuery)
+	b.WriteString(query)
 	if len(conditions) > 0 {
 		b.WriteString("\nWHERE " + strings.Join(conditions, " AND "))
 	}

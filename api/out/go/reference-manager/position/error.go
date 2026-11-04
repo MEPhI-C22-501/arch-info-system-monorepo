@@ -5,7 +5,7 @@
  *
  * Positions employees are assigned to.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_position

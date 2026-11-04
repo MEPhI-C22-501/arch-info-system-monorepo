@@ -115,10 +115,10 @@ type ClientInterface interface {
 
 	// ExportProjectRoles Export project_roles in Excel format
 	//
-	// Generates and returns an Excel file with all active project_roles in creation order.
+	// Generates and returns an Excel file with the active project_roles: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Corresponds with POST /v1/project_roles/export (the `ExportProjectRoles` operationId).
-	ExportProjectRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExportProjectRoles(ctx context.Context, params *ExportProjectRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteProjectRole Delete a project_role
 	//
@@ -222,11 +222,11 @@ func (c *Client) CreateProjectRole(ctx context.Context, body CreateProjectRoleJS
 
 // ExportProjectRoles Export project_roles in Excel format
 //
-// Generates and returns an Excel file with all active project_roles in creation order.
+// Generates and returns an Excel file with the active project_roles: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Corresponds with POST /v1/project_roles/export (the `ExportProjectRoles` operationId).
-func (c *Client) ExportProjectRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportProjectRolesRequest(c.Server)
+func (c *Client) ExportProjectRoles(ctx context.Context, params *ExportProjectRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportProjectRolesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +431,18 @@ func NewListProjectRolesRequest(server string, params *ListProjectRolesParams) (
 
 		}
 
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -486,7 +498,7 @@ func NewCreateProjectRoleRequestWithBody(server string, contentType string, body
 }
 
 // NewExportProjectRolesRequest constructs an http.Request for the ExportProjectRoles method
-func NewExportProjectRolesRequest(server string) (*http.Request, error) {
+func NewExportProjectRolesRequest(server string, params *ExportProjectRolesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -502,6 +514,57 @@ func NewExportProjectRolesRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Filter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "filter", *params.Filter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.OrderBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order_by", *params.OrderBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReadTime != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readTime", *params.ReadTime, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
@@ -956,12 +1019,12 @@ type ClientWithResponsesInterface interface {
 
 	// ExportProjectRolesWithResponse Export project_roles in Excel format
 	//
-	// Generates and returns an Excel file with all active project_roles in creation order.
+	// Generates and returns an Excel file with the active project_roles: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/project_roles/export (the `ExportProjectRoles` operationId).
-	ExportProjectRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportProjectRolesResponse, error)
+	ExportProjectRolesWithResponse(ctx context.Context, params *ExportProjectRolesParams, reqEditors ...RequestEditorFn) (*ExportProjectRolesResponse, error)
 
 	// DeleteProjectRoleWithResponse Delete a project_role
 	//
@@ -1171,6 +1234,8 @@ type ExportProjectRolesResponse200Headers struct {
 type ExportProjectRolesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -1179,6 +1244,11 @@ type ExportProjectRolesResponse struct {
 	JSON500 *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *ExportProjectRolesResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ExportProjectRolesResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1664,13 +1734,13 @@ func (c *ClientWithResponses) CreateProjectRoleWithResponse(ctx context.Context,
 
 // ExportProjectRolesWithResponse Export project_roles in Excel format
 //
-// Generates and returns an Excel file with all active project_roles in creation order.
+// Generates and returns an Excel file with the active project_roles: all of them in creation order without parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment. Deleted records and revisions are never exported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /v1/project_roles/export (the `ExportProjectRoles` operationId).
-func (c *ClientWithResponses) ExportProjectRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportProjectRolesResponse, error) {
-	rsp, err := c.ExportProjectRoles(ctx, reqEditors...)
+func (c *ClientWithResponses) ExportProjectRolesWithResponse(ctx context.Context, params *ExportProjectRolesParams, reqEditors ...RequestEditorFn) (*ExportProjectRolesResponse, error) {
+	rsp, err := c.ExportProjectRoles(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1896,6 +1966,13 @@ func ParseExportProjectRolesResponse(rsp *http.Response) (*ExportProjectRolesRes
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

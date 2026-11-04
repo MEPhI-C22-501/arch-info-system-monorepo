@@ -114,6 +114,9 @@ type ListPageToken = string
 // OrderBy defines model for OrderBy.
 type OrderBy = string
 
+// ReadTime defines model for ReadTime.
+type ReadTime = time.Time
+
 // RevisionNumber defines model for RevisionNumber.
 type RevisionNumber = int32
 
@@ -155,11 +158,26 @@ type ListGradesParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.
 	AllowDeleted *AllowDeleted `form:"allowDeleted,omitempty" json:"allowDeleted,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
+}
+
+// ExportGradesParams defines parameters for ExportGrades.
+type ExportGradesParams struct {
+	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
+	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
+	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
+
+	// ReadTime A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged record is absent. Without the parameter the current state is returned (FR-RM-61).
+	ReadTime *ReadTime `form:"readTime,omitempty" json:"readTime,omitempty"`
 }
 
 // DeleteGradeParams defines parameters for DeleteGrade.
@@ -191,7 +209,7 @@ type ListGradeRevisionsParams struct {
 	// Filter An AIP-160 expression for filtering results. It supports comparison operators (=, !=, <, >, <=, >=), logical operators (AND, OR, NOT) and containment checks (`name : "team"`). Dates are compared as `YYYY-MM-DD` strings.
 	Filter *Filter `form:"filter,omitempty" json:"filter,omitempty"`
 
-	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `created_at desc, id`).
+	// OrderBy A comma-separated list of sort fields. Ascending order is used by default. To change the direction, use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
 	OrderBy *OrderBy `form:"order_by,omitempty" json:"order_by,omitempty"`
 
 	// AllowDeleted If set to `true`, soft-deleted records are included.

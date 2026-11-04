@@ -163,13 +163,24 @@ func (s *Service[F]) List(ctx context.Context, request *record.ListRequest) (*re
 	return page, nil
 }
 
-// Export returns all active records in creation order, the catalogs are small enough to be exported at once.
-func (s *Service[F]) Export(ctx context.Context) ([]*record.Expanded[F], error) {
+// Export returns the active records, all of them in creation order when the request is empty, otherwise those of
+// the filter in the given order and, with a moment, as they were then; the catalogs are small enough to be exported
+// at once (FR-RM-40, FR-RM-62).
+func (s *Service[F]) Export(ctx context.Context, request *record.ExportRequest) ([]*record.Expanded[F], error) {
 	if _, err := s.authorize(ctx, access.LevelExecute); err != nil {
 		return nil, err
 	}
 
-	records, err := s.records.ListExpanded(ctx, &record.ListQuery{})
+	if request == nil {
+		request = &record.ExportRequest{}
+	}
+
+	query, err := exportQuery(s.fields, request)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := s.records.ListExpanded(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list expanded %s: %w", s.desc.Plural, err)
 	}

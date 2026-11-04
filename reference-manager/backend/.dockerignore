@@ -13,6 +13,9 @@
 !internal/**
 !pkg/
 !pkg/**
+# the demo accounts job of the local stand, built by its own target only
+!tools/demoaccounts/
+!tools/demoaccounts/**
 
 # Exclude generated binaries
 **/bin/

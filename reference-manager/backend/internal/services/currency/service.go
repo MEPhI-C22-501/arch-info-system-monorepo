@@ -133,14 +133,24 @@ func (s *Service) ListCurrencies(ctx context.Context, request *currencydmn.ListR
 	return page, nil
 }
 
-// ExportCurrencies returns all active currencies in creation order.
-func (s *Service) ExportCurrencies(ctx context.Context) ([]*currencydmn.ExpandedCurrency, error) {
+// ExportCurrencies returns the active currencies: all of them in creation order when the request is empty,
+// otherwise those of the filter in the given order and, with a moment, as they were then (FR-RM-62).
+func (s *Service) ExportCurrencies(ctx context.Context, request *currencydmn.ExportRequest) ([]*currencydmn.ExpandedCurrency, error) {
 	if _, err := s.authorize(ctx, access.LevelExecute); err != nil {
 		return nil, err
 	}
 
+	if request == nil {
+		request = &currencydmn.ExportRequest{}
+	}
+
+	query, err := exportQuery(request)
+	if err != nil {
+		return nil, err
+	}
+
 	// The query has no limit: the currency reference is small enough to be exported at once.
-	currencies, err := s.expandedCurrencyRepository.ListExpandedCurrencies(ctx, &currencydmn.ListQuery{})
+	currencies, err := s.expandedCurrencyRepository.ListExpandedCurrencies(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list expanded currencies: %w", err)
 	}

@@ -41,6 +41,7 @@ tasks:
     cmds:
       - task: lint:backend
       - task: lint:docker
+      - task: api:check
 
   lint:backend:
     desc: Run golangci-lint on the backend
@@ -53,6 +54,35 @@ tasks:
     cmds:
       - for: { var: IMAGES }
         cmd: docker run --rm -i ghcr.io/hadolint/hadolint:latest < {{.DOCKERFILES_DIR}}/{{.KEY}}.dockerfile
+
+  # the shared api/ folder of the monorepo keeps copies of the specs of the module and the clients generated from
+  # them for every team, the specs here are the source: api:sync copies them, api:check fails on a stale copy
+  api:sync:
+    desc: Copy the specs of the module into the shared api/ folder, then regenerate its clients there ('task generate' in api/)
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      - |
+        for spec in api/openapi/v1/*/openapi.yaml; do
+          name=$(basename "$(dirname "$spec")")
+          target="../../api/openapi/reference-manager/$name/openapi.yaml"
+          if [ "$name" = currency ]; then target="../../api/openapi/reference-manager/currency/v1/openapi.yaml"; fi
+          mkdir -p "$(dirname "$target")"
+          cp "$spec" "$target"
+        done
+
+  api:check:
+    desc: Fail when the shared api/ folder holds another version of a spec of the module
+    dir: '{{.BACKEND_DIR}}'
+    cmds:
+      - |
+        stale=0
+        for spec in api/openapi/v1/*/openapi.yaml; do
+          name=$(basename "$(dirname "$spec")")
+          target="../../api/openapi/reference-manager/$name/openapi.yaml"
+          if [ "$name" = currency ]; then target="../../api/openapi/reference-manager/currency/v1/openapi.yaml"; fi
+          if ! cmp -s "$spec" "$target"; then echo "stale copy: $target, run 'task api:sync'"; stale=1; fi
+        done
+        exit $stale
 
   tests:
     desc: Run all tests
@@ -77,6 +107,14 @@ tasks:
     desc: Run the unit tests of the admin panel (Node 18+, no dependencies)
     cmds:
       - node --test {{.FRONTEND_DIR}}/admin/tests/*.test.js
+
+  tests:e2e:
+    desc: Run the browser tests of the admin panel against the running environment ('task up' first, not in CI)
+    dir: '{{.FRONTEND_DIR}}/e2e'
+    cmds:
+      - npm ci --no-audit --no-fund
+      # the browser comes from 'npx playwright install chromium' or from E2E_CHROMIUM, a Chromium already on the machine
+      - npx playwright test {{.CLI_ARGS}}
 
   migration:
     desc: Create new migration file
@@ -103,15 +141,24 @@ tasks:
         -t {{.IMAGE_REGISTRY}}/{{.NAME}}:{{.IMAGE_TAG}}
         {{index .IMAGES .NAME}}
 
+  env:
+    desc: Create deployments/.env from deployments/.env.example when it is missing
+    status:
+      - test -f deployments/.env
+    cmds:
+      - cp deployments/.env.example deployments/.env
+
   up:
     desc: Start the local development environment using Docker Compose
+    deps: [ env ]
     cmds:
       - docker compose -f deployments/docker-compose.yaml up -d --build
 
   down:
     desc: Stop the local environment and remove associated volumes
+    deps: [ env ]
     cmds:
-      - docker compose -f deployments/docker-compose.yaml down -v
+      - docker compose -f deployments/docker-compose.yaml --profile swagger down -v
 
   demo:
     desc: Load the demonstration data set and create the Keycloak accounts of its employees (after 'task up')
@@ -121,34 +168,19 @@ tasks:
 
   demo:data:
     desc: Load deployments/seed/demo.sql into the running local database (task up does it too), skipped when employees exist
+    deps: [ env ]
     cmds:
       - docker compose -f deployments/docker-compose.yaml run --rm reference-manager-seed
 
   demo:accounts:
-    desc: Create or repeat the Keycloak accounts of every employee through the API as hr-admin
-    dir: '{{.BACKEND_DIR}}'
+    desc: Create or repeat the Keycloak accounts of every employee through the API as hr-admin (task up does it too)
+    deps: [ env ]
     cmds:
-      - go run ./tools/demoaccounts {{.CLI_ARGS}}
+      - docker compose -f deployments/docker-compose.yaml run --rm reference-manager-demo-accounts {{.CLI_ARGS}}
 
   swagger:
-    desc: Start Swagger UI in Docker for all discovered openapi.yaml specs
-    dir: '{{.BACKEND_DIR}}'
+    desc: Start Swagger UI of all specs on SWAGGER_PORT (8089) next to the running environment, it logs in through the local Keycloak
+    deps: [ env ]
     cmds:
-      - |
-        URLS_JSON="["
-        for file in $(find api/openapi -name "openapi.yaml"); do
-          rel_path=${file#api/openapi/}
-          name=$(dirname "$rel_path")
-          URLS_JSON="${URLS_JSON}{\"url\":\"api/${rel_path}\",\"name\":\"${name}\"},"
-        done
-        URLS_JSON="${URLS_JSON%,}]"
-
-        echo -e "Swagger UI is running at: http://localhost:8080 \n"
-
-        docker run --rm \
-          -p 8080:8080 \
-          -v "$(pwd)/api/openapi:/usr/share/nginx/html/api" \
-          -e URLS_PRE_FILTER="true" \
-          -e URLS="$URLS_JSON" \
-          --name swagger_ui \
-          swaggerapi/swagger-ui
+      - docker compose -f deployments/docker-compose.yaml --profile swagger up -d reference-manager-swagger
+      - 'echo "Swagger UI at http://localhost:${SWAGGER_PORT:-8089}/, Authorize logs in as a user of the local realm"'

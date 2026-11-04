@@ -5,7 +5,7 @@
  *
  * Project roles used by the planning of work.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_project_role
@@ -13,6 +13,7 @@ package reference_manager_project_role
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListProjectRoles(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListProjectRoles(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateProjectRole(context.Context, ProjectRole) (ImplResponse, error)
-	ExportProjectRoles(context.Context) (ImplResponse, error)
+	ExportProjectRoles(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetProjectRole(context.Context, int64, bool) (ImplResponse, error)
 	DeleteProjectRole(context.Context, int64, bool) (ImplResponse, error)
 	UpdateProjectRole(context.Context, int64, ProjectRole, string) (ImplResponse, error)
