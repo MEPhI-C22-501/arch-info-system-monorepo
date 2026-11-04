@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-10-24T23:41:23.074757+00:00",
+  "checked_at_utc": "2026-11-04T09:09:33.462936+00:00",
   "checks": [
     {
       "account": "anonymous",
@@ -89,6 +89,49 @@
       "check": "foreign_origin_denied",
       "http_status": 403,
       "passed": true
+    },
+    {
+      "account": "analyst",
+      "check": "keycloak_login",
+      "passed": true
+    },
+    {
+      "account": "analyst",
+      "check": "plan_fact_data",
+      "planned_hours": "10",
+      "fact_hours": "11.25",
+      "fact_hours_2026_10_01_03": "5.0",
+      "passed": true
+    },
+    {
+      "account": "analyst",
+      "check": "global_hours_without_member_rls",
+      "hours": "11.25",
+      "passed": true
+    },
+    {
+      "account": "analyst",
+      "check": "sql_lab_denied",
+      "http_status": 403,
+      "passed": true
+    },
+    {
+      "account": "analyst",
+      "check": "plan_fact_dashboard",
+      "period_filter": true,
+      "passed": true
+    },
+    {
+      "account": "member1",
+      "check": "plan_fact_denied",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "account": "member2",
+      "check": "plan_fact_denied",
+      "http_status": 200,
+      "passed": true
     }
   ],
   "authorization_code_flow": true,
@@ -96,60 +139,29 @@
   "real_superset": true,
   "passed": true,
   "source_sha256": {
-    "reports/pilots/compose.yaml": "a93ac05d84d235f607724af02599db869543e1b18a80033baf3097c50e723757",
-    "reports/pilots/check_bi.py": "29aec2b4d52e0da28e2bf5d3660041c13cdb2f10c9f28544b25dec2375ce96f7",
-    "reports/pilots/provision.py": "3a51a825e0cde1e5eb2c16c4a047c015fcffcd454f62c9c540b7116452d6e013",
-    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77",
-    "reports/pilots/contracts.py": "05dea325e49d5f12d175cc7d9bc7fdb33f4ac8dbe5b51679f97e199e4dee40be",
-    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
-    "reports/pilots/cube/cube.js": "dc222426ece93bea00a7bc48042a083fffc6b206a5c6f3e7b008791181e190fe",
-    "reports/pilots/cube/dataset.sql": "53cb0e7573dadf5ab88c70ea35afaf9d9cbe1f90b7bbba31011086b4eaeef4fe",
-    "reports/pilots/cube/model/TimeLogs.js": "b96c2a32671aecd36b8df840eeea285071fe37bb73b3533aae5c6ddfbf32c6ca",
-    "reports/pilots/worker.py": "0b128768740685ab0ebfc6d94548d914188002fca55b0154df7808e1f344c651",
-    "reports/pilots/demo.py": "27302d23e8f792349a015c468a72b479ab0e485e867820066f03ac367d952a4d",
-    "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
-    "reports/pilots/superset/setup_bi.py": "f42c758fa241fdff18f47a7ed45388b4884c9a0115d9091b81696c9d3c416c66",
-    "reports/pilots/superset/superset_config.py": "e86db918f2e5310405c579e51b3724ca15fc59d0456d291ec13aaea9bc3d0d86",
-    "reports/pilots/superset/session_policy.py": "a20c28b094b66e310041e6f65945aa40798b6b04ae46553f8faed74b97169fa6",
-    "reports/pilots/superset/check_session.py": "070aba3d1a1df4783179c1f1689d8b898ca7fe0e919061a0b7562e98024ead3d",
-    "reports/pilots/superset/Dockerfile": "37498f06e2bd3e0dfae26770913ac3c5eef6ccd9492fcfc54265fad972719aa1",
-    "reports/pilots/superset/cube_driver/pyproject.toml": "fac97328bedf930622fca205d6139f0a45425fd85fa384855abfb2e3b4352057",
-    "reports/pilots/superset/cube_driver/reports_cube/dialect.py": "c33b77261a7207cfd4259198749bbc4757b0cb4aa2d83b99839f6e58dab38c5a",
-    "reports/pilots/superset/cube_driver/reports_cube/engine.py": "93b3a589750640483c92a9d211ba783016d447c063fba396cc9046f3354a2128"
-  },
-  "benchmark": {
-    "checked_at_utc": "2026-10-24T23:41:26.619916+00:00",
-    "clients": 20,
-    "requests": 100,
-    "accounts": 2,
-    "source_time_logs": 6,
-    "cache": "Cube and Superset metastore cache warm; TTL 60 seconds",
-    "cache_hits": 100,
-    "scope": "Chart data API including RLS; excludes browser rendering and the million-row Cube test",
-    "p95_seconds": 0.1789,
-    "threshold_seconds": 3,
-    "passed": true,
-    "source_sha256": {
-      "reports/pilots/compose.yaml": "a93ac05d84d235f607724af02599db869543e1b18a80033baf3097c50e723757",
-      "reports/pilots/check_bi.py": "29aec2b4d52e0da28e2bf5d3660041c13cdb2f10c9f28544b25dec2375ce96f7",
-      "reports/pilots/provision.py": "3a51a825e0cde1e5eb2c16c4a047c015fcffcd454f62c9c540b7116452d6e013",
-      "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77",
-      "reports/pilots/contracts.py": "05dea325e49d5f12d175cc7d9bc7fdb33f4ac8dbe5b51679f97e199e4dee40be",
-      "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
-      "reports/pilots/cube/cube.js": "dc222426ece93bea00a7bc48042a083fffc6b206a5c6f3e7b008791181e190fe",
-      "reports/pilots/cube/dataset.sql": "53cb0e7573dadf5ab88c70ea35afaf9d9cbe1f90b7bbba31011086b4eaeef4fe",
-      "reports/pilots/cube/model/TimeLogs.js": "b96c2a32671aecd36b8df840eeea285071fe37bb73b3533aae5c6ddfbf32c6ca",
-      "reports/pilots/worker.py": "0b128768740685ab0ebfc6d94548d914188002fca55b0154df7808e1f344c651",
-      "reports/pilots/demo.py": "27302d23e8f792349a015c468a72b479ab0e485e867820066f03ac367d952a4d",
-      "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
-      "reports/pilots/superset/setup_bi.py": "f42c758fa241fdff18f47a7ed45388b4884c9a0115d9091b81696c9d3c416c66",
-      "reports/pilots/superset/superset_config.py": "e86db918f2e5310405c579e51b3724ca15fc59d0456d291ec13aaea9bc3d0d86",
-      "reports/pilots/superset/session_policy.py": "a20c28b094b66e310041e6f65945aa40798b6b04ae46553f8faed74b97169fa6",
-      "reports/pilots/superset/check_session.py": "070aba3d1a1df4783179c1f1689d8b898ca7fe0e919061a0b7562e98024ead3d",
-      "reports/pilots/superset/Dockerfile": "37498f06e2bd3e0dfae26770913ac3c5eef6ccd9492fcfc54265fad972719aa1",
-      "reports/pilots/superset/cube_driver/pyproject.toml": "fac97328bedf930622fca205d6139f0a45425fd85fa384855abfb2e3b4352057",
-      "reports/pilots/superset/cube_driver/reports_cube/dialect.py": "c33b77261a7207cfd4259198749bbc4757b0cb4aa2d83b99839f6e58dab38c5a",
-      "reports/pilots/superset/cube_driver/reports_cube/engine.py": "93b3a589750640483c92a9d211ba783016d447c063fba396cc9046f3354a2128"
-    }
+    "reports\\pilots\\compose.yaml": "435681a6ef6ac981d1f4ae68d76956fe8ec7bb4c220fafdf77fc82caaaf1747d",
+    "reports\\pilots\\check_bi.py": "aae7c85c2759e8f3f99270b9ac1ed3bc6fc101dd12ff2ca67107aa8631bc9f2c",
+    "reports\\pilots\\provision.py": "6811d7887d5a29c179913cfb729710f1dd229216ba302aac54df4e19848f832f",
+    "reports\\pilots\\db.py": "f101b6516d233d26da708224b5bf7edb2d9db7c46c9cd6c69dbe98ba6f0b8b0e",
+    "reports\\pilots\\contracts.py": "c7471614cc2e1d43b14569ca736044a8e88f0a795928fa967c8c624fef7a34df",
+    "reports\\pilots\\etl.py": "4efc71119d326472a29140b96a981db6f10a1b036919dd3026410d1a07cb1d70",
+    "reports\\pilots\\cube\\cube.js": "c9d20bcba08121138907fc2fa41cae7949a11b2a11adc73876a188a8b8d0d701",
+    "reports\\pilots\\cube\\access.js": "4dd7700b9132bc172d0cc75de367f4ad055e68154ffdb9af7aa83443ffa4a6be",
+    "reports\\pilots\\cube\\dataset.sql": "4e83510fc9af4e9c8e9e4a5e6e3dd03483232103f6d98c873a6b8244d7d1c25e",
+    "reports\\pilots\\cube\\plan_by_project.sql": "1c8995f91ed9e40a9cdd15d8d85b9981f6410f9c2a4a50dfbb649af31256be28",
+    "reports\\pilots\\cube\\fact_by_project.sql": "b873a97359e5c9e66db1d8e4a906933427a5ae9bd1f3b47fd98fd3b532be09bb",
+    "reports\\pilots\\cube\\model\\TimeLogs.js": "fee382e8397f54a346197e0a939675f4cf6f7c1e4ffe11606594e5aa190b98ec",
+    "reports\\pilots\\cube\\model\\WorkItems.js": "f334b6d525eb2d0d88ce04937e45d050016b2a69f3972bf5a756e73208dc7ea6",
+    "reports\\pilots\\worker.py": "8e10fa9499a4438736f7846aea066c6c444a0128fdaacff50a08d8e70e86a0dc",
+    "reports\\pilots\\demo.py": "2da48af4e9f459483ab95c7d17e57222ba649592593775f8199781a2b2c2e776",
+    "reports\\pilots\\api.py": "b2016b73cc79da62bdd3b26829297d7639a123ae2f3cd622cbf32f97484bda58",
+    "reports\\pilots\\superset\\setup_bi.py": "3d5a868fa4f277cca5c24db24601d1760bbbdaa9035ee2129eb79d9e510b4a78",
+    "reports\\pilots\\superset\\superset_config.py": "5ce8a42bd98683a51f0eb3c3c855ca3a808303c6c458881709a546b180eeec76",
+    "reports\\pilots\\superset\\session_policy.py": "fd3aa8261d6e3057a40d46b3d55f4619aad02621d1c1e6e0b293da43c13fbe3e",
+    "reports\\pilots\\superset\\check_session.py": "f0c089f2ab0f8f092e9362e12c94483574195ee41273eb092540e5a5b5992a76",
+    "reports\\pilots\\superset\\Dockerfile": "fa561b4f5c3b0ff6321b0ef1dbc239d9776048bf534a53ae5e8e6ccaa1328eb6",
+    "reports\\pilots\\superset\\cube_driver\\pyproject.toml": "ba6a222faec1d469a9ca66b0dd62b08ca9d49ef91182295edd48be08a9c7abae",
+    "reports\\pilots\\superset\\cube_driver\\reports_cube\\dialect.py": "1f10f7f21e782f8bce5212d13569390cdb63496274be8400691c4c5773b0c2d9",
+    "reports\\pilots\\superset\\cube_driver\\reports_cube\\engine.py": "5cdfeb886713a2ddaf890a3f1dc6c73d34c580a033591a5ab4b8df0c539c3a5f"
   }
 }

@@ -86,14 +86,15 @@ def main():
     request(realm+'/clients/'+ui_id, ui_client, 'PUT')
     subjects = {}
     roles = {r['name']: r for r in request(realm+'/clients/'+reports_id+'/roles')}
-    for name in ['member1', 'member2', 'admin', 'noaccess']:
+    for name in ['member1', 'member2', 'admin', 'analyst', 'noaccess']:
         request(realm+'/users', {'username': name, 'enabled': True, 'emailVerified': True,
                                 'firstName': 'Synthetic', 'lastName': name, 'email': name+'@example.invalid'})
         user_id = request(realm+'/users?username='+name+'&exact=true')[0]['id']
         password_key = 'REPORTS_DEMO_ADMIN_PASSWORD' if name == 'admin' else 'REPORTS_DEMO_MEMBER_PASSWORD'
         request(realm+'/users/'+user_id+'/reset-password', {'type': 'password', 'temporary': False, 'value': os.environ[password_key]}, 'PUT')
         if name != 'noaccess':
-            request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles['reports-admin' if name == 'admin' else 'reports-member']])
+            role = {'admin': 'reports-admin', 'analyst': 'reports-analyst'}.get(name, 'reports-member')
+            request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles[role]])
         if name == 'admin':
             request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles['reports-analyst']])
         subjects[name] = user_id

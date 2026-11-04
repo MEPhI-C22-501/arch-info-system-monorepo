@@ -28,9 +28,11 @@ test('money requires cost.read, manager/analyst role and separate currency group
  for(const [roles,scope,dimensions]of [[['reports-analyst'],'',[]],[['reports-analyst'],'cost.read',[]],[['reports-team-lead'],'cost.read',['Forecasts.currency']]])await assert.rejects(run({measures:['Forecasts.budgetAdjustment'],dimensions},claims(roles,'a',scope)),/cost/);
  await run({measures:['Forecasts.budgetAdjustment'],dimensions:['Forecasts.currency']},claims(['reports-analyst'],'a','cost.read'));
 });
-test('BI SQL identity cannot reach new models; mixed cubes are rejected',async()=>{
+test('BI SQL identity reads only hours and the plan side; mixed cubes are rejected',async()=>{
  assert.deepEqual(await run(query(),claims(['reports-bi-service'])),query());
- await assert.rejects(run({measures:['Forecasts.budgetAdjustment']},claims(['reports-bi-service'])),/scope/);
+ const plan={measures:['WorkItems.plannedHours','WorkItems.remainingHours'],dimensions:['WorkItems.projectId']};
+ assert.deepEqual(await run(plan,claims(['reports-bi-service'])),plan);
+ for(const measure of ['Forecasts.budgetAdjustment','Resources.hours','Defects.opened','PlanFact.hours'])await assert.rejects(run({measures:[measure]},claims(['reports-bi-service'])),/scope/);
  await assert.rejects(run({measures:['TimeLogs.hours','WorkItems.plannedHours']},claims(['reports-analyst'])),/scope/);
 });
 test('rollup leaf measures are never queryable directly',async()=>{

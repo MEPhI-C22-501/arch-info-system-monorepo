@@ -76,5 +76,79 @@ with app.app_context():
         'CHART-1': {'id': 'CHART-1', 'type': 'CHART', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-1'],
                     'meta': {'chartId': chart.id, 'height': 60, 'width': 12, 'sliceName': chart.slice_name}},
     })
+
+    # R-06 plan-fact for analysts. Their access is global, so they are not in Gamma and the
+    # member RLS above does not apply; members get neither R-06 dataset, so the dashboard
+    # is not listed for them. Plan side is the WorkItems rollup, fact side the TimeLogs one (ADR-018).
+    sm.copy_role('Gamma', 'ReportsAnalyst', merge=True)
+    analyst = sm.find_role('ReportsAnalyst')
+
+    def virtual_dataset(name, sql_file, metrics, time_column=None):
+        table = db.session.query(SqlaTable).filter_by(table_name=name, database_id=database.id).one_or_none()
+        if table is None:
+            table = SqlaTable(table_name=name, database=database, owners=[admin]); db.session.add(table)
+        table.sql = Path(__file__).with_name(sql_file).read_text()
+        table.fetch_metadata()
+        table.main_dttm_col = time_column
+        for metric_name, verbose_name, expression in metrics:
+            if not any(m.metric_name == metric_name for m in table.metrics):
+                table.metrics.append(SqlMetric(metric_name=metric_name, verbose_name=verbose_name, expression=expression))
+        db.session.flush()
+        sm.add_permission_role(analyst, sm.add_permission_view_menu('datasource_access', table.perm))
+        return table
+
+    def table_chart(name, table, params):
+        # Read the id first: the permission commit expired the dataset, and loading it later
+        # would autoflush a new chart that has no datasource yet.
+        table_id = table.id
+        found = db.session.query(Slice).filter_by(slice_name=name).one_or_none()
+        if found is None:
+            found = Slice(slice_name=name, owners=[admin], datasource_id=table_id, datasource_type='table', viz_type='table')
+            db.session.add(found)
+        found.datasource_id, found.datasource_type, found.viz_type = table_id, 'table', 'table'
+        found.params = json.dumps(dict(params, viz_type='table', datasource=f'{table_id}__table', query_mode='aggregate', row_limit=1000))
+        return found
+
+    plan = virtual_dataset('reports_plan_by_project', 'plan_by_project.sql',
+                           [('planned_hours', 'План, ч', 'SUM(planned_hours)'), ('remaining_hours', 'Остаток, ч', 'SUM(remaining_hours)'),
+                            ('tasks', 'Задач', 'SUM(tasks)')])
+    fact = virtual_dataset('reports_fact_by_project', 'fact_by_project.sql',
+                           [('fact_hours', 'Факт за период, ч', 'SUM(hours)')], time_column='logged_date')
+    plan_chart = table_chart('R-06 План и остаток по проектам', plan,
+                             {'groupby': ['project_id'], 'metrics': ['planned_hours', 'remaining_hours', 'tasks']})
+    fact_chart = table_chart('R-06 Факт за период по проектам', fact,
+                             {'groupby': ['project_id'], 'metrics': ['fact_hours'], 'granularity_sqla': 'logged_date', 'time_range': 'No filter',
+                              'adhoc_filters': [{'clause': 'WHERE', 'expressionType': 'SIMPLE', 'subject': 'logged_date',
+                                                 'operator': 'TEMPORAL_RANGE', 'comparator': 'No filter'}]})
+    db.session.flush()
+    plan_fact = db.session.query(Dashboard).filter_by(slug='reports-r06').one_or_none()
+    if plan_fact is None:
+        plan_fact = Dashboard(dashboard_title='R-06 План-факт', slug='reports-r06', owners=[admin]); db.session.add(plan_fact)
+    plan_fact.published = True
+    plan_fact.slices = [plan_chart, fact_chart]
+    note = ('План и остаток — по текущему составу задач проекта, факт — часы за период из фильтра «Период». '
+            'Точный R-06 с планом задач на конец периода и областью руководителя проекта — в Reports UI.')
+    plan_fact.position_json = json.dumps({
+        'DASHBOARD_VERSION_KEY': 'v2',
+        'ROOT_ID': {'id': 'ROOT_ID', 'type': 'ROOT', 'children': ['GRID_ID']},
+        'GRID_ID': {'id': 'GRID_ID', 'type': 'GRID', 'children': ['ROW-1', 'ROW-2'], 'parents': ['ROOT_ID']},
+        'ROW-1': {'id': 'ROW-1', 'type': 'ROW', 'children': ['MARKDOWN-1'], 'parents': ['ROOT_ID', 'GRID_ID'], 'meta': {'background': 'BACKGROUND_TRANSPARENT'}},
+        'MARKDOWN-1': {'id': 'MARKDOWN-1', 'type': 'MARKDOWN', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-1'],
+                       'meta': {'code': note, 'height': 15, 'width': 12}},
+        'ROW-2': {'id': 'ROW-2', 'type': 'ROW', 'children': ['CHART-1', 'CHART-2'], 'parents': ['ROOT_ID', 'GRID_ID'], 'meta': {'background': 'BACKGROUND_TRANSPARENT'}},
+        'CHART-1': {'id': 'CHART-1', 'type': 'CHART', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-2'],
+                    'meta': {'chartId': plan_chart.id, 'height': 50, 'width': 6, 'sliceName': plan_chart.slice_name}},
+        'CHART-2': {'id': 'CHART-2', 'type': 'CHART', 'children': [], 'parents': ['ROOT_ID', 'GRID_ID', 'ROW-2'],
+                    'meta': {'chartId': fact_chart.id, 'height': 50, 'width': 6, 'sliceName': fact_chart.slice_name}},
+    })
+    plan_fact.json_metadata = json.dumps({
+        'native_filter_configuration': [{
+            'id': 'NATIVE_FILTER-period', 'name': 'Период', 'filterType': 'filter_time', 'type': 'NATIVE_FILTER',
+            'targets': [{}], 'controlValues': {}, 'cascadeParentIds': [], 'description': '',
+            'defaultDataMask': {'filterState': {'value': 'No filter'}, 'extraFormData': {}},
+            'scope': {'rootPath': ['ROOT_ID'], 'excluded': [plan_chart.id]},
+        }],
+        'refresh_frequency': 0, 'color_scheme': '', 'label_colors': {}, 'shared_label_colors': [],
+    })
     db.session.commit()
-    print('R-01 dashboard and member RLS configured')
+    print('R-01 and R-06 dashboards, member RLS and analyst role configured')

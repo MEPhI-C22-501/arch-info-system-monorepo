@@ -34,7 +34,8 @@ async function rewrite(query, { securityContext: c }, resolve=lookup) {
     if(!Array.isArray(window)||window.length!==2||!window.every(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(d))||Date.parse(window[1].slice(0,10))-Date.parse(window[0].slice(0,10))!==27*86400000)throw Error('Velocity requires an explicit four week scope');
   }
   if(roles.includes('reports-bi-service')) {
-    if(cube!=='TimeLogs')throw Error('Reports SQL scope denied');
+    // Superset applies end-user access: TimeLogs with member RLS, WorkItems only to analysts (R-06).
+    if(!['TimeLogs','WorkItems'].includes(cube))throw Error('Reports SQL scope denied');
     return query;
   }
   if(typeof c.sub!=='string'||!c.sub.length||c.sub.length>128)throw Error('Reports scope is missing');
