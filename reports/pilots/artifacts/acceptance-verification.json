@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "checked_at_utc": "2026-11-04T14:48:27.671877+00:00",
+  "checked_at_utc": "2026-11-04T15:06:49.285699+00:00",
   "backend": "PostgreSQL",
   "seed": "reports-acceptance-v1",
   "dataset": {

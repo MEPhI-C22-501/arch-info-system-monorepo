@@ -16,5 +16,6 @@ export function abilities(session: Session) {
     reports: business,
     subscriptions: hasAny(session, ROLES.projectManager, ROLES.teamLead, ROLES.qaLead, ROLES.analyst),
     audit: hasAny(session, ROLES.admin),
+    explore: hasAny(session, ROLES.analyst),
   };
 }

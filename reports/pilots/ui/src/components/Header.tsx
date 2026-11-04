@@ -17,6 +17,7 @@ export function Header({ unread }: { unread: number }) {
       </button>
       <nav id="main-nav" aria-label="Основная навигация" className={open ? 'nav nav-open' : 'nav'}>
         {can.reports && <NavLink to="/" end onClick={close}>Каталог</NavLink>}
+        {can.reports && <NavLink to="/dashboards" onClick={close}>Дашборды</NavLink>}
         {can.reports && <NavLink to="/exports" onClick={close}>Выгрузки</NavLink>}
         {can.subscriptions && <NavLink to="/subscriptions" onClick={close}>Подписки</NavLink>}
         <NavLink to="/freshness" onClick={close}>Актуальность</NavLink>

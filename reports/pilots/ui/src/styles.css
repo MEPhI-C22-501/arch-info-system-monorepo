@@ -32,6 +32,8 @@ a { color: var(--accent); }
 
 button { font: inherit; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); cursor: pointer; min-height: 40px; }
 button.secondary { background: var(--surface); color: var(--accent); }
+a.button { display: inline-block; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); text-decoration: none; }
+a.button.secondary { background: var(--surface); color: var(--accent); }
 button.danger { background: var(--surface); color: var(--danger); border-color: var(--danger); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); }
@@ -74,6 +76,12 @@ main.login { max-width: 560px; text-align: center; margin-top: 15vh; }
 .parameters details { display: grid; gap: 12px; }
 .parameters summary { cursor: pointer; font-weight: 500; }
 .report-result { min-width: 0; }
+.dashboard-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 12px 0; }
+.dashboard-filters label { display: grid; gap: 4px; min-width: 180px; }
+.tile-delta, .tile-note { margin: 4px 0 0; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+.board { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.board li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; justify-content: space-between; gap: 8px; }
+ul.button-row { list-style: none; padding: 0; }
 .link-button { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
 .options { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; margin: 0; display: grid; gap: 6px; min-width: 0; }
 .options legend { font-weight: 500; padding: 0 4px; }

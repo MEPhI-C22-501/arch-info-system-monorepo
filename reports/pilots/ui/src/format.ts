@@ -105,6 +105,13 @@ export function today(): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow' }).format(new Date());
 }
 
+/** The date n days before today in Moscow: dashboards default to the last 30 days. */
+export function daysAgo(n: number): string {
+  const day = new Date(today() + 'T00:00:00Z');
+  day.setUTCDate(day.getUTCDate() - n);
+  return day.toISOString().slice(0, 10);
+}
+
 /** Monday of the current week in Moscow: the default period (110, section 1). */
 export function weekStart(): string {
   const day = new Date(today() + 'T00:00:00Z');
