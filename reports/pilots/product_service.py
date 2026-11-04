@@ -48,8 +48,8 @@ class Service:
         return Engine(self.db).query(rid,self.claims,payload)
 
     def export(self,key):
-        row=self.owned('export_job',identity(key),'id,report_id,format,status,created_at,expires_at,row_count,error')
-        return dict(zip(['exportId','reportId','format','status','createdAt','expiresAt','rowCount','error'],row))
+        row=self.owned('export_job',identity(key),'id,report_id,format,status,created_at,expires_at,row_count,error,query')
+        return dict(zip(['exportId','reportId','format','status','createdAt','expiresAt','rowCount','error'],row),query=json.loads(row[8]))
 
     def create_export(self,rid,query,fmt,owner=None,ceiling=None,kind=None,subscription=None):
         if fmt not in {'csv','xlsx'}: raise Problem(422,'INVALID_PARAMETER')
@@ -135,6 +135,12 @@ class Service:
             if len(parts)==2 and method=='GET':
                 if not (self.roles & ACCESS[n] or AD in self.roles): raise Problem(403,'FORBIDDEN')
                 return 200,definition(rid),{}
+            if len(parts)==3 and method=='POST' and parts[2]=='options':
+                # Filter values: what the user's scope holds for the period, with readable names.
+                if not isinstance(body,dict) or set(body)-{'params','slice'} or not isinstance(body.get('slice'),list) or len(body['slice'])!=1: raise Problem(422,'INVALID_PARAMETER')
+                result=self.query(rid,{'params':body.get('params'),'slice':body['slice']});s=body['slice'][0]
+                values={(r[s]['id'],r[s]['label']) for r in result['rows'] if r[s]['id'] is not None}
+                return 200,{'items':[{'id':i,'label':l} for i,l in sorted(values,key=lambda v:(v[1].lower(),str(v[0])))]},{}
             if len(parts)==3 and method=='POST' and parts[2] in {'query','drilldown','print'}:
                 if not isinstance(body,dict): raise Problem(422,'INVALID_PARAMETER')
                 if parts[2]=='drilldown' and 'path' not in body: raise Problem(422,'INVALID_PARAMETER')

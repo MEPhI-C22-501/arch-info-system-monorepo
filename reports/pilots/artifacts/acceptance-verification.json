@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "checked_at_utc": "2026-10-24T23:40:52.379534+00:00",
+  "checked_at_utc": "2026-11-04T14:48:27.671877+00:00",
   "backend": "PostgreSQL",
   "seed": "reports-acceptance-v1",
   "dataset": {
@@ -30,11 +30,11 @@
   },
   "real_sources_verified": false,
   "source_sha256": {
-    "reports/pilots/acceptance_data.py": "d70c40bbe4a2bcd5d70f1c2ff6173439600bf109322c3ab699f91edea5995da9",
-    "reports/pilots/tests/test_acceptance.py": "1ea2377413d390deac5caa3ca664c97b68709918d75c4556b1998aba38205ced",
-    "reports/pilots/api.py": "7fa32ea4e8f5b23b192b11d609a647b4991f67c9a99c502833a578d1462f2b70",
-    "reports/pilots/etl.py": "b0b9f587907a636fda95668bc4a1ef3e524498b703f50a3b93b60ea31775c44e",
-    "reports/pilots/adapters.py": "3fb4be608e81bce429cf191b50eb6023482bb84580a432e5e881a8d805872829",
-    "reports/pilots/db.py": "0b0e86af23a466968f56af470f2b85c0a726bb2a75520112d25d3d339d896c77"
+    "reports/pilots/acceptance_data.py": "735a8af3a49e0f70ddd471d1a8102c963d19e14d58a569fd0e7cbbc0c9afe0bd",
+    "reports/pilots/tests/test_acceptance.py": "abf70801658d39ff61c95c0d6a54c2bf1865a08176a1bbaa58460a055bd803cb",
+    "reports/pilots/api.py": "b2016b73cc79da62bdd3b26829297d7639a123ae2f3cd622cbf32f97484bda58",
+    "reports/pilots/etl.py": "4efc71119d326472a29140b96a981db6f10a1b036919dd3026410d1a07cb1d70",
+    "reports/pilots/adapters.py": "3133b6b4ad59dd5e6e41672ab37e914f8ae48636834135ce7f365ae5bdd61cdb",
+    "reports/pilots/db.py": "f101b6516d233d26da708224b5bf7edb2d9db7c46c9cd6c69dbe98ba6f0b8b0e"
   }
 }

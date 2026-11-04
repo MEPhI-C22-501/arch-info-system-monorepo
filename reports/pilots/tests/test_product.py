@@ -82,6 +82,22 @@ class Product(unittest.TestCase):
         self.assertEqual(self.query('R-01',c=self.member)['totals']['M-01'],3.75)
         other=claims(MEMBER_2,[MB]);self.assertEqual(self.query('R-03',c=other)['rows'],[])
 
+    def test_dimensions_carry_source_names_and_options_stay_in_scope(self):
+        label=lambda rid,s:[r[s]['label'] for r in self.query(rid,dict(QUERY,slice=[s]))['rows']]
+        self.assertEqual(label('R-01','project'),['Демо-проект «Отчётность»'])
+        self.assertEqual(sorted(label('R-01','employee')),['Иванова Анна','Петров Игорь'])
+        self.assertEqual(label('R-03','iteration'),['Synthetic iteration'])
+        self.assertIn('Synthetic task, 2026-10-01',label('R-01','record'))
+        options=lambda c,s:Service(self.db,c).route('POST','reports/R-01/options',{'params':QUERY['params'],'slice':[s]})[1]['items']
+        self.assertEqual([o['label'] for o in options(self.admin,'employee')],['Иванова Анна','Петров Игорь'])
+        self.assertEqual(options(self.member,'employee'),[{'id':MEMBER_1,'label':'Иванова Анна'}])
+        for body in [{'params':QUERY['params'],'slice':['project','employee']},{'params':QUERY['params'],'slice':['project'],'path':[]}]:
+            with self.assertRaises(Problem): self.service.route('POST','reports/R-01/options',body)
+        with self.assertRaises(Problem) as denied: Service(self.db,self.member).route('POST','reports/R-02/options',{'params':QUERY['params'],'slice':['project']})
+        self.assertEqual(denied.exception.status,403)
+        with self.db.transaction(): _,job,_=self.service.route('POST','exports',{'reportId':'R-01','query':QUERY,'format':'csv'})
+        self.assertEqual(self.service.route('GET','exports/'+job['exportId'])[1]['query'],QUERY)
+
     def test_project_scope_mapping_and_drilldown_never_expand_access(self):
         project=self.data['tracker']['work-items'][0]['projectId']
         c=claims(ADMIN,[PM])

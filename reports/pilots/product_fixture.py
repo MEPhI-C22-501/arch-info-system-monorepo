@@ -33,7 +33,10 @@ def business_fixture(subjects):
                     'severity':'MAJOR','authorId':subjects['member1'],
                     'history':[{'field':'status','newValue':'CLOSED','occurredAt':'2026-10-03T00:00:00Z'},
                                {'field':'status','newValue':'REOPENED','occurredAt':finish}]}]}
-    reference={name:[{'id':1,'name':'Synthetic','is_deleted':False}] for name in ['employees','org_units','positions','project_roles','grades']}
+    reference={name:[{'id':1,'name':title,'is_deleted':False}] for name,title in
+               [('org_units','Отдел разработки'),('positions','Инженер'),('project_roles','Разработчик'),('grades','Middle')]}
+    reference['employees']=[{'id':1,'family_name':'Иванова','given_name':'Анна','org_unit_id':1,'is_deleted':False},
+                            {'id':2,'family_name':'Петров','given_name':'Игорь','org_unit_id':1,'is_deleted':False}]
     links=[('planning-project',planning_project,project),('planning-employee','employees/1',subjects['member1']),
-           ('hr-employee','1',subjects['member1']),('tracker-status-category',working,'WORKING')]
+           ('hr-employee','1',subjects['member1']),('hr-employee','2',subjects['member2']),('tracker-status-category',working,'WORKING')]
     return {'tracker':tracker,'planning':planning,'qa':qa,'reference':reference,'links':links}

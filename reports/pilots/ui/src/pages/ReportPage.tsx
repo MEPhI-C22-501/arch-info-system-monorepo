@@ -1,24 +1,25 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, api, errorMessage } from '../api';
 import { BarChart } from '../components/BarChart';
+import { DrillPanel } from '../components/DrillPanel';
+import { OptionPicker } from '../components/OptionPicker';
 import { ResultTable, Totals } from '../components/ResultTable';
 import { Empty, Failure, Loading, Notice } from '../components/State';
-import { dateTime, formatCell, label, noteText, sourceName, staleSources, today, weekStart } from '../format';
+import { nextSlice, readDrill, writeDrill, type DrillStep } from '../drill';
+import { SLICE_TITLES, dateTime, describeQuery, formatCell, label, noteText, sourceName, staleSources, today, weekStart } from '../format';
 import { abilities, useSession } from '../session';
-import type { ReportDefinition, ReportQuery, ReportResult, SavedView } from '../types';
+import type { DimensionValue, ReportDefinition, ReportQuery, ReportResult, SavedView } from '../types';
 import { useLoad } from '../useLoad';
 
-const SLICE_TITLES: Record<string, string> = {
-  project: 'Проект', unit: 'Подразделение', role: 'Проектная роль', employee: 'Сотрудник', iteration: 'Итерация',
-  epic: 'Эпик', week: 'Неделя', month: 'Месяц', record: 'Запись', grade: 'Грейд', status: 'Статус', type: 'Вид задачи', severity: 'Серьёзность',
-};
+// Filters chosen by name; a report offers those of its slices.
+const FILTERS = [['projectIds', 'project', 'Проекты'], ['iterationIds', 'iteration', 'Итерации'], ['employeeIds', 'employee', 'Сотрудники']] as const;
 
 const list = (value: string | null) => (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 /** Query from the address bar: the link with parameters can be shared; access is checked again on open (110, section 5). */
 export function queryFromSearch(search: URLSearchParams, definition: ReportDefinition): ReportQuery {
-  const params: ReportQuery['params'] & { iterationIds?: string[] } = {
+  const params: ReportQuery['params'] = {
     periodFrom: search.get('from') ?? weekStart(), periodTo: search.get('to') ?? today(),
   };
   for (const [key, name] of [['projectIds', 'projects'], ['iterationIds', 'iterations'], ['employeeIds', 'employees']] as const) {
@@ -30,7 +31,7 @@ export function queryFromSearch(search: URLSearchParams, definition: ReportDefin
 }
 
 function searchFromQuery(query: ReportQuery): URLSearchParams {
-  const params = query.params as ReportQuery['params'] & { iterationIds?: string[] };
+  const params = query.params;
   const search = new URLSearchParams({ from: params.periodFrom, to: params.periodTo, slice: query.slice[0] });
   if (params.projectIds?.length) search.set('projects', params.projectIds.join(','));
   if (params.iterationIds?.length) search.set('iterations', params.iterationIds.join(','));
@@ -61,6 +62,13 @@ export function ReportPage() {
   }, [definition.data, search, setSearch, reportId, token]);
 
   const query = useMemo(() => (definition.data && search.get('from') ? queryFromSearch(search, definition.data) : null), [definition.data, search]);
+  const drill = useMemo(() => readDrill(search.get('drill')), [search]);
+  // Each level is a history entry, so the browser's Back returns to the previous level (110, section 1).
+  const setDrill = useCallback((path: DrillStep[]) => setSearch((current) => {
+    const next = new URLSearchParams(current);
+    if (path.length) next.set('drill', writeDrill(path)); else next.delete('drill');
+    return next;
+  }), [setSearch]);
   const result = useLoad<ReportResult | null>(
     () => (query ? api<ReportResult>(token, `reports/${reportId}/query`, 'POST', query) : Promise.resolve(null)),
     [token, reportId, JSON.stringify(query)],
@@ -85,30 +93,29 @@ export function ReportPage() {
         <section className="report-result" aria-labelledby="result-title" aria-busy={result.loading}>
           <h2 id="result-title">Результат</h2>
           {query && <Actions report={report} query={query} onSubscribe={() => navigate('/subscriptions', { state: { reportId, query } })} />}
-          {query && <ResultView result={result} report={report} query={query} />}
+          {query && <ResultView result={result} report={report} query={query} onDrill={(step) => setDrill([step])} />}
         </section>
       </div>
+      {query && drill.length > 0 && drill[0].slice === query.slice[0] && <DrillPanel report={report} query={query} path={drill} onPath={setDrill} />}
     </>
   );
 }
 
 function Parameters({ report, query, onApply }: { report: ReportDefinition; query: ReportQuery; onApply: (query: ReportQuery) => void }) {
-  const params = query.params as ReportQuery['params'] & { iterationIds?: string[] };
+  const params = query.params;
   const [from, setFrom] = useState(params.periodFrom);
   const [to, setTo] = useState(params.periodTo);
   const [slice, setSlice] = useState(query.slice[0]);
-  const [projects, setProjects] = useState((params.projectIds ?? []).join(', '));
-  const [iterations, setIterations] = useState((params.iterationIds ?? []).join(', '));
-  const [employees, setEmployees] = useState((params.employeeIds ?? []).join(', '));
+  const [filters, setFilters] = useState<Record<string, string[]>>(
+    Object.fromEntries(FILTERS.map(([key]) => [key, params[key] ?? []])),
+  );
   const [compare, setCompare] = useState(Boolean(query.compareWithPrevious));
   const invalidPeriod = from > to;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (invalidPeriod) return;
-    const next: ReportQuery['params'] & { iterationIds?: string[] } = { periodFrom: from, periodTo: to };
-    if (list(projects).length) next.projectIds = list(projects);
-    if (list(iterations).length) next.iterationIds = list(iterations);
-    if (list(employees).length) next.employeeIds = list(employees);
+    const next: ReportQuery['params'] = { periodFrom: from, periodTo: to };
+    for (const [key] of FILTERS) if (filters[key].length) next[key] = filters[key];
     onApply({ params: next, slice: [slice], compareWithPrevious: compare });
   };
   return (
@@ -122,11 +129,12 @@ function Parameters({ report, query, onApply }: { report: ReportDefinition; quer
         </select>
       </label>
       <label className="checkbox"><input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />Сравнить с предыдущим периодом</label>
-      <details>
+      <details open={FILTERS.some(([key]) => filters[key].length > 0)}>
         <summary>Фильтры</summary>
-        <label>Проекты (ID через запятую)<input value={projects} onChange={(e) => setProjects(e.target.value)} /></label>
-        <label>Итерации (ID через запятую)<input value={iterations} onChange={(e) => setIterations(e.target.value)} /></label>
-        <label>Сотрудники (ID через запятую)<input value={employees} onChange={(e) => setEmployees(e.target.value)} /></label>
+        {FILTERS.filter(([, slice]) => report.slices.includes(slice)).map(([key, slice, title]) => (
+          <OptionPicker key={key} reportId={report.reportId} slice={slice} title={title} periodFrom={from} periodTo={to}
+            selected={filters[key]} onChange={(ids) => setFilters({ ...filters, [key]: ids })} />
+        ))}
       </details>
       <button type="submit">Сформировать</button>
     </form>
@@ -199,15 +207,10 @@ function ExportButtons({ report, query }: { report: ReportDefinition; query: Rep
   );
 }
 
-/** The current parameters in words, for the empty result (SCR-02). */
-export function describeQuery(query: ReportQuery): string {
-  const params = query.params as ReportQuery['params'] & { iterationIds?: string[] };
-  const filters = [['проекты', params.projectIds], ['итерации', params.iterationIds], ['сотрудники', params.employeeIds]] as const;
-  return [`период ${params.periodFrom} — ${params.periodTo}`, `разрез «${SLICE_TITLES[query.slice[0]] ?? query.slice[0]}»`,
-    ...filters.filter(([, ids]) => ids?.length).map(([name, ids]) => `${name}: ${ids!.join(', ')}`)].join(', ');
-}
 
-function ResultView({ result, report, query }: { result: ReturnType<typeof useLoad<ReportResult | null>>; report: ReportDefinition; query: ReportQuery }) {
+function ResultView({ result, report, query, onDrill }: {
+  result: ReturnType<typeof useLoad<ReportResult | null>>; report: ReportDefinition; query: ReportQuery; onDrill: (step: DrillStep) => void;
+}) {
   const [view, setView] = useState<'table' | 'chart'>('table');
   if (result.loading) return <Loading label="Формируем отчёт…" />;
   if (result.error) {
@@ -237,7 +240,10 @@ function ResultView({ result, report, query }: { result: ReturnType<typeof useLo
             <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>Таблица</button>
             <button type="button" aria-pressed={view === 'chart'} onClick={() => setView('chart')}>График</button>
           </div>
-          {view === 'table' ? <ResultTable result={data} caption={`${report.reportId}: ${report.name}`} /> : <BarChart result={data} />}
+          {view === 'table' ? (
+            <ResultTable result={data} caption={`${report.reportId}: ${report.name}`}
+              onDrill={nextSlice(report.slices, query.slice) ? (row) => onDrill({ slice: query.slice[0], id: (row[query.slice[0]] as DimensionValue).id }) : undefined} />
+          ) : <BarChart result={data} />}
         </>
       )}
       {data.comparison && (

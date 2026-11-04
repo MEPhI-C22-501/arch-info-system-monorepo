@@ -37,7 +37,7 @@
 | T-31 | Частично | Наблюдаемые SCD2 реализованы; типизированная звезда и dimension keys отдельно. |
 | T-32 | Локально проверено | Staging, атомарность merge, неуспешная партия не сдвигает checkpoint. |
 | T-33 | Частично | Cube M-01 и предагрегация проверены; R-02…R-11 используют локальный Python engine по ADR-016. |
-| T-34 | Частично | Drilldown по объявленным разрезам с повторным scope; детализация всех будущих OLAP-мер отдельно. |
+| T-34 | Частично | Drilldown по объявленным разрезам с повторным scope; в UI — панель SCR-03 с уровнями и хлебными крошками (`ui/src/test/drill.test.tsx`); детализация всех будущих OLAP-мер отдельно. |
 | T-35 | Локально проверено | Reports UI R-01…R-11 и Superset R-01; приёмка общего стенда отдельно. |
 
 Проверки: [бизнес-формулы/доступ/файлы/подписки/аудит](../pilots/tests/test_product.py), [HTTP API](../pilots/tests/test_product_http.py), [живой PKCE/worker](../pilots/artifacts/product-verification.json), [общий прогон](../pilots/artifacts/verification.json).

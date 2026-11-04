@@ -98,6 +98,38 @@ paths:
           $ref: '#/components/responses/Unprocessable'
         '503':
           $ref: '#/components/responses/SourceNotLoaded'
+  /reports/{reportId}/options:
+    post:
+      tags: [reports]
+      operationId: listFilterOptions
+      summary: Значения разреза для фильтра — то, что есть в области пользователя за период, с названиями
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptionsQuery'
+      responses:
+        '200':
+          description: Значения, по названию
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DimensionOption'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
   /reports/{reportId}/drilldown:
     post:
       tags: [reports]
@@ -977,6 +1009,28 @@ components:
         viewId:
           type: string
           format: uuid
+    OptionsQuery:
+      type: object
+      required: [params, slice]
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+          description: Период и уже выбранные фильтры, как в ReportQuery
+        slice:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+    DimensionOption:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
     DrilldownQuery:
       allOf:
         - $ref: '#/components/schemas/ReportQuery'
@@ -1120,6 +1174,8 @@ components:
         error:
           type: string
           nullable: true
+        query:
+          $ref: '#/components/schemas/ReportQuery'
     SubscriptionInput:
       type: object
       required: [reportId, query, schedule, format, recipients]

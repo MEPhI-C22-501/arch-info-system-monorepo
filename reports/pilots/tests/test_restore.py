@@ -57,16 +57,19 @@ class Restore(unittest.TestCase):
             target = Database(make_conninfo(**dict(params, dbname=names[1])))
             try:
                 target.initialize()  # An upgrade/start after restore is idempotent.
+                # Two versions of the task (plannedHours changed), the project, iteration and status.
+                DIMENSIONS = 5
                 self.assertEqual(target.execute('SELECT SUM(hours_cents) FROM dwh.fact_time_log').fetchone()[0], 1125)
-                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.dimension_version').fetchone()[0], 4)
-                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.source_snapshot').fetchone()[0], 10)
+                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.dimension_version').fetchone()[0], DIMENSIONS)
+                # Every fixture record: task, project, six time logs, iteration, history, status.
+                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.source_snapshot').fetchone()[0], 11)
                 self.assertEqual(target.execute("SELECT value FROM etl.checkpoint WHERE source='tracker'").fetchone()[0], checkpoint)
                 claims = {'sub': MEMBER_1, 'resource_access': {'reports': {'roles': ['reports-member']}}}
                 self.assertEqual(sum(row['hours'] for row in report(target, claims)['data']), 3.75)
                 # Replaying the restored batch must not double the hours/history.
                 load(target, 'tracker', lambda: tracker_extract(Tracker(changed)))
                 self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.fact_time_log').fetchone()[0], 6)
-                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.dimension_version').fetchone()[0], 4)
+                self.assertEqual(target.execute('SELECT COUNT(*) FROM dwh.dimension_version').fetchone()[0], DIMENSIONS)
                 damaged = utility('pg_restore', names[1], ['--dbname='+names[1], '--exit-on-error'], b'not a PostgreSQL archive')
                 self.assertNotEqual(damaged.returncode, 0)
             finally: target.close()

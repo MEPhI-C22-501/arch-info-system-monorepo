@@ -79,7 +79,8 @@ class History(unittest.TestCase):
 
     def test_all_five_tracker_resources_and_nonpaged_status_contract(self):
         result = load(self.db, 'tracker', lambda: tracker_extract(Tracker()))
-        self.assertEqual(result['rows'], 10)
+        # Task and project work items, six time logs, iteration, history, status.
+        self.assertEqual(result['rows'], 11)
         resources = {row[0] for row in self.db.execute('SELECT DISTINCT entity FROM dwh.source_record')}
         self.assertEqual(resources, {'work-items', 'time-logs', 'iterations', 'history', 'statuses'})
         for resource, field in [('history', 'occurredAt'), ('iterations', 'state'), ('statuses', 'category')]:

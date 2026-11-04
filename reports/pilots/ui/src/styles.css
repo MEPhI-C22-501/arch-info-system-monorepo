@@ -74,6 +74,14 @@ main.login { max-width: 560px; text-align: center; margin-top: 15vh; }
 .parameters details { display: grid; gap: 12px; }
 .parameters summary { cursor: pointer; font-weight: 500; }
 .report-result { min-width: 0; }
+.link-button { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
+.options { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; margin: 0; display: grid; gap: 6px; min-width: 0; }
+.options legend { font-weight: 500; padding: 0 4px; }
+.options-list { list-style: none; padding: 0; margin: 0; max-height: 220px; overflow-y: auto; display: grid; gap: 2px; }
+.drill { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); overflow-y: auto; z-index: 20;
+  background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgb(0 0 0 / 15%); padding: 16px 20px; }
+.drill-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.drill-head h2 { margin: 0; }
 .actions { display: grid; gap: 12px; margin-bottom: 16px; }
 .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
