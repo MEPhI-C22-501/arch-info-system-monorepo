@@ -5,7 +5,7 @@
  *
  * Monthly salaries of employees with the period they are in effect. Periods of one employee do not overlap. Readable by the HR roles only.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_salary

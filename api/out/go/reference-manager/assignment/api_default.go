@@ -5,7 +5,7 @@
  *
  * Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_assignment
@@ -15,6 +15,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -88,6 +89,12 @@ func (c *DefaultAPIController) Routes() Routes {
 			"/v1/assignments/{assignmentID}",
 			c.UpdateAssignment,
 		},
+		"TransferAssignments": Route{
+			"TransferAssignments",
+			strings.ToUpper("Post"),
+			"/v1/assignments/transfer",
+			c.TransferAssignments,
+		},
 		"ListAssignmentRevisions": Route{
 			"ListAssignmentRevisions",
 			strings.ToUpper("Get"),
@@ -141,6 +148,12 @@ func (c *DefaultAPIController) OrderedRoutes() []Route {
 			strings.ToUpper("Patch"),
 			"/v1/assignments/{assignmentID}",
 			c.UpdateAssignment,
+		},
+		Route{
+			"TransferAssignments",
+			strings.ToUpper("Post"),
+			"/v1/assignments/transfer",
+			c.TransferAssignments,
 		},
 		Route{
 			"ListAssignmentRevisions",
@@ -219,7 +232,18 @@ func (c *DefaultAPIController) ListAssignments(w http.ResponseWriter, r *http.Re
 		var param bool = false
 		allowDeletedParam = param
 	}
-	result, err := c.service.ListAssignments(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam)
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ListAssignments(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
@@ -263,7 +287,37 @@ func (c *DefaultAPIController) CreateAssignment(w http.ResponseWriter, r *http.R
 
 // ExportAssignments - Export assignments in Excel format
 func (c *DefaultAPIController) ExportAssignments(w http.ResponseWriter, r *http.Request) {
-	result, err := c.service.ExportAssignments(r.Context())
+	query, err := parseQuery(r.URL.RawQuery)
+	if err != nil {
+		c.errorHandler(w, r, &ParsingError{Err: err}, nil)
+		return
+	}
+	var filterParam string
+	if query.Has("filter") {
+		param := query.Get("filter")
+
+		filterParam = param
+	} else {
+	}
+	var orderByParam string
+	if query.Has("order_by") {
+		param := query.Get("order_by")
+
+		orderByParam = param
+	} else {
+	}
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ExportAssignments(r.Context(), filterParam, orderByParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
@@ -401,6 +455,38 @@ func (c *DefaultAPIController) UpdateAssignment(w http.ResponseWriter, r *http.R
 	} else {
 	}
 	result, err := c.service.UpdateAssignment(r.Context(), assignmentIDParam, assignmentParam, updateMaskParam)
+	// If an error occurred, encode the error with the status code
+	if err != nil {
+		c.errorHandler(w, r, err, &result)
+		return
+	}
+	// If no error, encode the body and the result code
+	_ = EncodeJSONResponse(result.Body, &result.Code, w)
+}
+
+// TransferAssignments - Transfer the employees of an org unit to another unit
+func (c *DefaultAPIController) TransferAssignments(w http.ResponseWriter, r *http.Request) {
+	var assignmentTransferParam AssignmentTransfer
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	if err := d.Decode(&assignmentTransferParam); err != nil {
+		var requiredErr *RequiredError
+		if errors.As(err, &requiredErr) {
+			c.errorHandler(w, r, err, nil)
+			return
+		}
+		c.errorHandler(w, r, &ParsingError{Err: err}, nil)
+		return
+	}
+	if err := AssertAssignmentTransferRequired(assignmentTransferParam); err != nil {
+		c.errorHandler(w, r, err, nil)
+		return
+	}
+	if err := AssertAssignmentTransferConstraints(assignmentTransferParam); err != nil {
+		c.errorHandler(w, r, err, nil)
+		return
+	}
+	result, err := c.service.TransferAssignments(r.Context(), assignmentTransferParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)

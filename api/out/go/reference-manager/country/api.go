@@ -5,7 +5,7 @@
  *
  * Countries according to ISO 3166-1 with a reference to the main currency.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_country
@@ -13,6 +13,7 @@ package reference_manager_country
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListCountries(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListCountries(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateCountry(context.Context, Country) (ImplResponse, error)
-	ExportCountries(context.Context) (ImplResponse, error)
+	ExportCountries(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetCountry(context.Context, int64, bool) (ImplResponse, error)
 	DeleteCountry(context.Context, int64, bool) (ImplResponse, error)
 	UpdateCountry(context.Context, int64, Country, string) (ImplResponse, error)

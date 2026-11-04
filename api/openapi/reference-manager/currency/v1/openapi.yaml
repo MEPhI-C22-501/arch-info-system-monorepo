@@ -3,7 +3,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Currency API
   description: API endpoints for currency lifecycle management according to ISO 4217.
-  version: 1.0.0
+  version: 1.1.0
 
 security:
   - KeycloakOAuth2: []
@@ -64,6 +64,7 @@ paths:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/OrderBy'
         - $ref: '#/components/parameters/AllowDeleted'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpandedCurrencies'
@@ -90,13 +91,20 @@ paths:
     post:
       operationId: exportCurrencies
       summary: Export currencies in Excel format
-      description: Generates and returns an Excel file containing the list of currencies
+      description: >
+        Generates and returns an Excel file with the active currencies: all of them in creation order without
+        parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment.
+        Deleted records and revisions are never exported.
       x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExcelFile'
         '400':
-          description: Bad Request. Invalid input data, validation errors, or malformed request body.
+          description: Bad Request. Invalid filter, ordering or moment.
           $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
@@ -326,11 +334,11 @@ components:
         The URLs below point to the local environment.
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/auth
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          authorizationUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
         clientCredentials:
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
 
   schemas:
@@ -647,10 +655,24 @@ components:
       required: false
       description: >
         A comma-separated list of sort fields. Ascending order (asc) is used by default. To change the direction,
-        use the `desc` suffix (e.g., `author.name desc, title`).
+        use the `desc` suffix (e.g., `updated_at desc, code`). The identifier is not a sort field.
       schema:
         type: string
-        example: 'author.name desc, title asc'
+        example: 'updated_at desc, code'
+
+    ReadTime:
+      name: readTime
+      in: query
+      required: false
+      description: >
+        A moment in RFC 3339 format. The currencies are returned as they were at that moment, rebuilt from their
+        revisions: a currency created later is absent, changes after the moment are not applied, the lifecycle
+        fields are those of the moment. A purged currency is absent. Without the parameter the current state is
+        returned (FR-RM-61).
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-01T00:00:00Z'
 
     RevisionNumber:
       name: revisionNumber

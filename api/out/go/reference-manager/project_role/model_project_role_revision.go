@@ -5,7 +5,7 @@
  *
  * Project roles used by the planning of work.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_project_role

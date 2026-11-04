@@ -5,7 +5,7 @@
  *
  * API endpoints for currency lifecycle management according to ISO 4217.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package currency_v1

@@ -5,7 +5,7 @@
  *
  * Organizational units: departments and teams with their hierarchy.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_org_unit
@@ -13,6 +13,7 @@ package reference_manager_org_unit
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListOrgUnits(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListOrgUnits(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateOrgUnit(context.Context, OrgUnit) (ImplResponse, error)
-	ExportOrgUnits(context.Context) (ImplResponse, error)
+	ExportOrgUnits(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetOrgUnit(context.Context, int64, bool) (ImplResponse, error)
 	DeleteOrgUnit(context.Context, int64, bool) (ImplResponse, error)
 	UpdateOrgUnit(context.Context, int64, OrgUnit, string) (ImplResponse, error)

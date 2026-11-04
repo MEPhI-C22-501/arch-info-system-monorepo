@@ -5,7 +5,7 @@
  *
  * Absences of employees: vacations, sick leaves and other periods. Readable by the HR roles only.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_absence
@@ -13,6 +13,7 @@ package reference_manager_absence
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -34,9 +35,9 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListAbsences(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListAbsences(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateAbsence(context.Context, Absence) (ImplResponse, error)
-	ExportAbsences(context.Context) (ImplResponse, error)
+	ExportAbsences(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetAbsence(context.Context, int64, bool) (ImplResponse, error)
 	DeleteAbsence(context.Context, int64, bool) (ImplResponse, error)
 	UpdateAbsence(context.Context, int64, Absence, string) (ImplResponse, error)

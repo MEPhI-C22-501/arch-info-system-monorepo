@@ -5,7 +5,7 @@
  *
  * Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_assignment
@@ -13,6 +13,7 @@ package reference_manager_assignment
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
@@ -25,6 +26,7 @@ type DefaultAPIRouter interface {
 	GetAssignment(http.ResponseWriter, *http.Request)
 	DeleteAssignment(http.ResponseWriter, *http.Request)
 	UpdateAssignment(http.ResponseWriter, *http.Request)
+	TransferAssignments(http.ResponseWriter, *http.Request)
 	ListAssignmentRevisions(http.ResponseWriter, *http.Request)
 	GetAssignmentRevision(http.ResponseWriter, *http.Request)
 }
@@ -34,12 +36,13 @@ type DefaultAPIRouter interface {
 // while the service implementation can be ignored with the .openapi-generator-ignore file
 // and updated with the logic required for the API.
 type DefaultAPIServicer interface {
-	ListAssignments(context.Context, int32, string, string, string, bool) (ImplResponse, error)
+	ListAssignments(context.Context, int32, string, string, string, bool, time.Time) (ImplResponse, error)
 	CreateAssignment(context.Context, Assignment) (ImplResponse, error)
-	ExportAssignments(context.Context) (ImplResponse, error)
+	ExportAssignments(context.Context, string, string, time.Time) (ImplResponse, error)
 	GetAssignment(context.Context, int64, bool) (ImplResponse, error)
 	DeleteAssignment(context.Context, int64, bool) (ImplResponse, error)
 	UpdateAssignment(context.Context, int64, Assignment, string) (ImplResponse, error)
+	TransferAssignments(context.Context, AssignmentTransfer) (ImplResponse, error)
 	ListAssignmentRevisions(context.Context, int64, int32, string, string, string, bool) (ImplResponse, error)
 	GetAssignmentRevision(context.Context, int64, int32, bool) (ImplResponse, error)
 }

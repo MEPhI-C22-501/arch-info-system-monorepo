@@ -5,7 +5,7 @@
  *
  * Organizational units: departments and teams with their hierarchy.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_org_unit

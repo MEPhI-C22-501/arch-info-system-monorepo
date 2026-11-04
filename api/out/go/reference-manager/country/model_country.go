@@ -5,7 +5,7 @@
  *
  * Countries according to ISO 3166-1 with a reference to the main currency.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_country

@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Assignment API
   description: "Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap."
-  version: 1.0.0
+  version: 1.1.0
 
 security:
   - KeycloakOAuth2: []
@@ -52,11 +52,12 @@ paths:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/OrderBy'
         - $ref: '#/components/parameters/AllowDeleted'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpandedAssignments'
         '400':
-          description: Bad Request. Invalid filter, ordering or page token.
+          description: Bad Request. Invalid filter, ordering, page token or moment.
           $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
@@ -72,11 +73,21 @@ paths:
     post:
       operationId: exportAssignments
       summary: Export assignments in Excel format
-      description: Generates and returns an Excel file with all active assignments in creation order.
+      description: >
+        Generates and returns an Excel file with the active assignments: all of them in creation order without
+        parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment.
+        Deleted records and revisions are never exported.
       x-required-roles: [reference-reader, reference-hr-reader, reference-admin, reference-hr-admin]
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExcelFile'
+        '400':
+          description: Bad Request. Invalid filter, ordering or moment.
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
           $ref: '#/components/responses/Error'
@@ -185,6 +196,44 @@ paths:
           description: Internal Server Error.
           $ref: '#/components/responses/Error'
 
+  /v1/assignments/transfer:
+    post:
+      operationId: transferAssignments
+      summary: Transfer the employees of an org unit to another unit
+      description: "Ends the assignment in effect on start_date of every employee of the unit the day before and opens an assignment in the target unit from start_date with the same end. The whole transfer is applied or rejected, validate_only returns the plan (FR-RM-64)."
+      x-required-roles: [reference-hr-admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentTransfer'
+      responses:
+        '200':
+          description: The result of the operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentTransferResult'
+        '400':
+          description: Bad Request. Invalid input data or the operation is not allowed in the current state.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client lacks the role required for the operation.
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Not Found. A record the request refers to does not exist or is deleted.
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Conflict. A record was modified concurrently.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error.
+          $ref: '#/components/responses/Error'
+
   /v1/assignments/{assignmentID}/revisions:
     get:
       operationId: listAssignmentRevisions
@@ -259,11 +308,11 @@ components:
         The URLs below point to the local environment.
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/auth
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          authorizationUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
         clientCredentials:
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
 
   schemas:
@@ -461,6 +510,134 @@ components:
           readOnly: true
           example: "2026-10-05T07:54:00Z"
 
+    AssignmentTransfer:
+      type: object
+      description: A transfer of the employees of an org unit to another unit from one date.
+      required:
+        - org_unit_id
+        - target_org_unit_id
+        - start_date
+      properties:
+        org_unit_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Identifier of the unit the employees leave.
+          example: 3
+        target_org_unit_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Identifier of the unit the employees move to.
+          example: 4
+        include_subunits:
+          type: boolean
+          default: false
+          description: Also the employees of the units below the unit.
+        start_date:
+          type: string
+          format: date
+          description: First day in the target unit, the assignments in effect end the day before.
+          example: "2027-01-01"
+        position_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Position in the target unit, the current position of each employee when empty.
+          example: 2
+        validate_only:
+          type: boolean
+          default: false
+          description: Return the plan and change nothing (AIP-163).
+
+    AssignmentTransferResult:
+      type: object
+      description: The moves in the order of the employee identifiers.
+      required:
+        - validate_only
+        - items
+        - skipped
+      properties:
+        validate_only:
+          type: boolean
+          description: True when nothing was changed and the items are the plan.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignmentTransferItem'
+        skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedEmployee'
+    AssignmentTransferItem:
+      type: object
+      description: The move of one employee.
+      required:
+        - employee_id
+        - closed_assignment_id
+        - org_unit_id
+        - target_org_unit_id
+        - position_id
+        - start_date
+      properties:
+        employee_id:
+          type: integer
+          format: int64
+          description: Identifier of the employee.
+          example: 7
+        closed_assignment_id:
+          type: integer
+          format: int64
+          description: The assignment that ends the day before start_date.
+          example: 9
+        org_unit_id:
+          type: integer
+          format: int64
+          description: The unit of the closed assignment.
+          example: 3
+        assignment_id:
+          type: integer
+          format: int64
+          description: The created assignment, empty in a validation.
+          example: 21
+        target_org_unit_id:
+          type: integer
+          format: int64
+          description: The unit of the new assignment.
+          example: 4
+        position_id:
+          type: integer
+          format: int64
+          description: The position of the new assignment.
+          example: 2
+        start_date:
+          type: string
+          format: date
+          description: First day of the new assignment.
+          example: "2027-01-01"
+        end_date:
+          type: string
+          format: date
+          description: Last day of the new assignment, the end of the closed one, empty while it is in effect.
+          example: "2027-12-31"
+
+    SkippedEmployee:
+      type: object
+      description: An employee of the unit the operation leaves as is.
+      required:
+        - employee_id
+        - reason
+      properties:
+        employee_id:
+          type: integer
+          format: int64
+          description: Identifier of the employee.
+          example: 7
+        reason:
+          type: string
+          description: Why the employee is left as is.
+          example: the employee has no salary in effect on start_date
+
   parameters:
     AssignmentID:
       name: assignmentID
@@ -543,10 +720,24 @@ components:
       required: false
       description: >
         A comma-separated list of sort fields. Ascending order is used by default. To change the direction,
-        use the `desc` suffix (e.g., `created_at desc, id`).
+        use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
       schema:
         type: string
         example: 'created_at desc'
+
+    ReadTime:
+      name: readTime
+      in: query
+      required: false
+      description: >
+        A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their
+        revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields
+        are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged
+        record is absent. Without the parameter the current state is returned (FR-RM-61).
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-01T00:00:00Z'
 
     RevisionNumber:
       name: revisionNumber

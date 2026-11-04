@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Salary API
   description: "Monthly salaries of employees with the period they are in effect. Periods of one employee do not overlap. Readable by the HR roles only."
-  version: 1.0.0
+  version: 1.1.0
 
 security:
   - KeycloakOAuth2: []
@@ -52,11 +52,12 @@ paths:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/OrderBy'
         - $ref: '#/components/parameters/AllowDeleted'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExpandedSalaries'
         '400':
-          description: Bad Request. Invalid filter, ordering or page token.
+          description: Bad Request. Invalid filter, ordering, page token or moment.
           $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
@@ -72,11 +73,21 @@ paths:
     post:
       operationId: exportSalaries
       summary: Export salaries in Excel format
-      description: Generates and returns an Excel file with all active salaries in creation order.
+      description: >
+        Generates and returns an Excel file with the active salaries: all of them in creation order without
+        parameters, otherwise those of the filter in the given order and, with readTime, as they were at that moment.
+        Deleted records and revisions are never exported.
       x-required-roles: [reference-hr-reader, reference-hr-admin]
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/ReadTime'
       responses:
         '200':
           $ref: '#/components/responses/SuccessWithExcelFile'
+        '400':
+          description: Bad Request. Invalid filter, ordering or moment.
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized. Missing, invalid, or expired authentication credentials.
           $ref: '#/components/responses/Error'
@@ -185,6 +196,44 @@ paths:
           description: Internal Server Error.
           $ref: '#/components/responses/Error'
 
+  /v1/salaries/revise:
+    post:
+      operationId: reviseSalaries
+      summary: Revise the salaries of the employees of an org unit
+      description: "Ends the salary in effect on start_date of every employee of the unit the day before and opens a salary from start_date with the amount changed by percent or set to amount and the same end. The whole revision is applied or rejected, validate_only returns the plan (FR-RM-63)."
+      x-required-roles: [reference-hr-admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupSalaryChange'
+      responses:
+        '200':
+          description: The result of the operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupSalaryChangeResult'
+        '400':
+          description: Bad Request. Invalid input data or the operation is not allowed in the current state.
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized. Missing, invalid, or expired authentication credentials.
+          $ref: '#/components/responses/Error'
+        '403':
+          description: Forbidden. The client lacks the role required for the operation.
+          $ref: '#/components/responses/Error'
+        '404':
+          description: Not Found. A record the request refers to does not exist or is deleted.
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Conflict. A record was modified concurrently.
+          $ref: '#/components/responses/Error'
+        '500':
+          description: Internal Server Error.
+          $ref: '#/components/responses/Error'
+
   /v1/salaries/{salaryID}/revisions:
     get:
       operationId: listSalaryRevisions
@@ -259,11 +308,11 @@ components:
         The URLs below point to the local environment.
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/auth
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          authorizationUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
         clientCredentials:
-          tokenUrl: http://localhost:8180/realms/arch-info-system/protocol/openid-connect/token
+          tokenUrl: http://localhost:8183/realms/arch-info-system/protocol/openid-connect/token
           scopes: {}
 
   schemas:
@@ -461,6 +510,138 @@ components:
           readOnly: true
           example: "2026-10-05T07:54:00Z"
 
+    GroupSalaryChange:
+      type: object
+      description: A revision of the salaries of the employees of an org unit from one date. Exactly one of percent and amount.
+      required:
+        - org_unit_id
+        - start_date
+      properties:
+        org_unit_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Identifier of the unit whose employees get the new salaries.
+          example: 2
+        include_subunits:
+          type: boolean
+          default: false
+          description: Also the employees of the units below the unit.
+        start_date:
+          type: string
+          format: date
+          description: First day of the new salaries, the salaries in effect end the day before.
+          example: "2027-01-01"
+        percent:
+          type: number
+          format: double
+          minimum: -99.99
+          maximum: 1000
+          description: Change of the current amount in percent, the new amount is rounded to two decimals.
+          example: 10
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          description: The same new amount for every employee.
+          example: 150000.00
+        currency_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Currency of the new amount, the currency of the current salary when empty. Allowed with amount only.
+          example: 1
+        validate_only:
+          type: boolean
+          default: false
+          description: Return the plan and change nothing (AIP-163).
+
+    GroupSalaryChangeResult:
+      type: object
+      description: The changes of the salaries in the order of the employee identifiers.
+      required:
+        - validate_only
+        - items
+        - skipped
+      properties:
+        validate_only:
+          type: boolean
+          description: True when nothing was changed and the items are the plan.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupSalaryChangeItem'
+        skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedEmployee'
+    GroupSalaryChangeItem:
+      type: object
+      description: The change of the salary of one employee.
+      required:
+        - employee_id
+        - amount
+        - currency_id
+        - start_date
+      properties:
+        employee_id:
+          type: integer
+          format: int64
+          description: Identifier of the employee.
+          example: 7
+        closed_salary_id:
+          type: integer
+          format: int64
+          description: The salary that ends the day before start_date, empty for a first salary.
+          example: 12
+        previous_amount:
+          type: number
+          format: double
+          description: The amount of the closed salary.
+          example: 150000.00
+        salary_id:
+          type: integer
+          format: int64
+          description: The created salary, empty in a validation.
+          example: 31
+        amount:
+          type: number
+          format: double
+          description: The new amount.
+          example: 165000.00
+        currency_id:
+          type: integer
+          format: int64
+          description: Currency of the new amount.
+          example: 1
+        start_date:
+          type: string
+          format: date
+          description: First day of the new salary.
+          example: "2027-01-01"
+        end_date:
+          type: string
+          format: date
+          description: Last day of the new salary, the end of the closed one, empty while it is in effect.
+          example: "2027-12-31"
+
+    SkippedEmployee:
+      type: object
+      description: An employee of the unit the operation leaves as is.
+      required:
+        - employee_id
+        - reason
+      properties:
+        employee_id:
+          type: integer
+          format: int64
+          description: Identifier of the employee.
+          example: 7
+        reason:
+          type: string
+          description: Why the employee is left as is.
+          example: the employee has no salary in effect on start_date
+
   parameters:
     SalaryID:
       name: salaryID
@@ -543,10 +724,24 @@ components:
       required: false
       description: >
         A comma-separated list of sort fields. Ascending order is used by default. To change the direction,
-        use the `desc` suffix (e.g., `created_at desc, id`).
+        use the `desc` suffix (e.g., `updated_at desc, created_at`). The identifier is not a sort field.
       schema:
         type: string
         example: 'created_at desc'
+
+    ReadTime:
+      name: readTime
+      in: query
+      required: false
+      description: >
+        A moment in RFC 3339 format. The records are returned as they were at that moment, rebuilt from their
+        revisions: a record created later is absent, changes after the moment are not applied, the lifecycle fields
+        are those of the moment. Fields the storage computes from other catalogs are empty in a slice. A purged
+        record is absent. Without the parameter the current state is returned (FR-RM-61).
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-01T00:00:00Z'
 
     RevisionNumber:
       name: revisionNumber

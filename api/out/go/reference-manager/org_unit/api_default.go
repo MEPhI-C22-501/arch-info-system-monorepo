@@ -5,7 +5,7 @@
  *
  * Organizational units: departments and teams with their hierarchy.
  *
- * API version: 1.0.0
+ * API version: 1.1.0
  */
 
 package reference_manager_org_unit
@@ -15,6 +15,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -219,7 +220,18 @@ func (c *DefaultAPIController) ListOrgUnits(w http.ResponseWriter, r *http.Reque
 		var param bool = false
 		allowDeletedParam = param
 	}
-	result, err := c.service.ListOrgUnits(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam)
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ListOrgUnits(r.Context(), pageSizeParam, pageTokenParam, filterParam, orderByParam, allowDeletedParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
@@ -263,7 +275,37 @@ func (c *DefaultAPIController) CreateOrgUnit(w http.ResponseWriter, r *http.Requ
 
 // ExportOrgUnits - Export org_units in Excel format
 func (c *DefaultAPIController) ExportOrgUnits(w http.ResponseWriter, r *http.Request) {
-	result, err := c.service.ExportOrgUnits(r.Context())
+	query, err := parseQuery(r.URL.RawQuery)
+	if err != nil {
+		c.errorHandler(w, r, &ParsingError{Err: err}, nil)
+		return
+	}
+	var filterParam string
+	if query.Has("filter") {
+		param := query.Get("filter")
+
+		filterParam = param
+	} else {
+	}
+	var orderByParam string
+	if query.Has("order_by") {
+		param := query.Get("order_by")
+
+		orderByParam = param
+	} else {
+	}
+	var readTimeParam time.Time
+	if query.Has("readTime") {
+		param, err := parseTime(query.Get("readTime"))
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "readTime", Err: err}, nil)
+			return
+		}
+
+		readTimeParam = param
+	} else {
+	}
+	result, err := c.service.ExportOrgUnits(r.Context(), filterParam, orderByParam, readTimeParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)
