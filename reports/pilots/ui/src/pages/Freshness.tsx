@@ -20,6 +20,8 @@ export function Freshness() {
   const checks = useLoad(() => (can.etlJournal ? api<Page<Reconciliation>>(session.token, 'etl/reconciliations?pageSize=100') : Promise.resolve(null)), [session.token, can.etlJournal]);
   const requests = useLoad(() => (can.etlJournal ? api<{ items: LoadRequest[] }>(session.token, 'etl/loads') : Promise.resolve(null)), [session.token, can.etlJournal]);
   const [message, setMessage] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
+  // Requests sent from this page: when one is done, say what changed.
+  const [sent, setSent] = useState<LoadRequest[]>([]);
 
   // While a request waits, the page follows it: the request, the stream and the journal refresh every 5 s.
   const waiting = (requests.data?.items ?? []).some((r) => r.status === 'PENDING');
@@ -28,15 +30,27 @@ export function Freshness() {
     const timer = setTimeout(() => { requests.reload(); streams.reload(); latest.reload(); checks.reload(); }, 5000);
     return () => clearTimeout(timer);
   }, [waiting, requests, streams, latest, checks]);
+  useEffect(() => {
+    const done = sent.filter((s) => requests.data?.items.some((r) => r.source === s.source && r.requestedAt === s.requestedAt && r.status === 'COMPLETED'));
+    if (!done.length) return;
+    setSent(sent.filter((s) => !done.includes(s)));
+    const texts = done.map((s) => {
+      const batch = latest.data?.items.find((b) => b.source === s.source && b.status === 'LOADED');
+      return `Данные «${sourceName(s.source)}» обновлены из источника` +
+        (batch ? `: пакет ${dateTime(batch.finishedAt ?? batch.startedAt)}, записей ${formatCell(batch.rows)}.` : '.');
+    });
+    setMessage({ tone: 'success', text: texts.join(' ') });
+  }, [requests.data, latest.data, sent]);
 
   const load = async (source: string) => {
     setMessage(null);
     try {
-      await api(session.token, 'etl/loads', 'POST', { source });
-      setMessage({ tone: 'success', text: `Заявка на загрузку «${sourceName(source)}» принята. Её выполнит ближайший цикл загрузки этого источника.` });
+      const request = await api<LoadRequest>(session.token, 'etl/loads', 'POST', { source });
+      setSent([...sent, request]);
+      setMessage({ tone: 'success', text: `Заявка принята: данные «${sourceName(source)}» перечитает ближайший цикл загрузки этого источника. Страница покажет, когда они обновятся.` });
       requests.reload();
     } catch (e) {
-      setMessage({ tone: 'warning', text: e instanceof ApiError && e.status === 409 ? `Заявка на загрузку «${sourceName(source)}» уже ждёт выполнения.` : errorMessage(e) });
+      setMessage({ tone: 'warning', text: e instanceof ApiError && e.status === 409 ? `Обновление «${sourceName(source)}» уже ждёт выполнения.` : errorMessage(e) });
     }
   };
   const first = <T extends { source: string }>(items: T[] | undefined, source: string) => items?.find((i) => i.source === source);
@@ -79,7 +93,7 @@ export function Freshness() {
                     {can.etlLoad && (
                       <td>
                         <button type="button" className="secondary" disabled={pending} onClick={() => load(s.source)}
-                          aria-label={`Загрузить сейчас: ${sourceName(s.source)}`}>{pending ? 'Ждёт загрузки…' : 'Загрузить сейчас'}</button>
+                          aria-label={`Обновить из источника: ${sourceName(s.source)}`}>{pending ? 'Обновляется…' : 'Обновить из источника'}</button>
                       </td>
                     )}
                   </tr>
@@ -88,6 +102,9 @@ export function Freshness() {
             </tbody>
           </table>
         </div>
+      )}
+      {can.etlLoad && (
+        <p className="muted">«Обновить из источника» перечитывает данные системы-источника в хранилище Reports, не дожидаясь расписания: появится новый пакет в журнале, обновятся «Данные на» и отчёты. Файл при этом не скачивается — выгрузки отчётов на экране «Выгрузки».</p>
       )}
       {can.etlJournal && (
         <>
@@ -106,12 +123,12 @@ function LoadRequests({ requests }: { requests: ReturnType<typeof useLoad<{ item
   if (!items.length) return null;
   return (
     <>
-      <h2>Заявки на загрузку</h2>
+      <h2>Заявки на обновление из источника</h2>
       <ul className="list">
         {items.map((r) => (
           <li key={r.source + r.requestedAt}>
             <span>{sourceName(r.source)} · {REASONS[r.reason] ?? r.reason} · {dateTime(r.requestedAt)}</span>
-            <span className={r.status === 'PENDING' ? 'status status-queued' : 'status status-completed'}>{r.status === 'PENDING' ? 'Ждёт загрузки' : 'Выполнена'}</span>
+            <span className={r.status === 'PENDING' ? 'status status-queued' : 'status status-completed'}>{r.status === 'PENDING' ? 'Ждёт загрузки' : 'Данные обновлены'}</span>
           </li>
         ))}
       </ul>

@@ -35,7 +35,7 @@ describe('SCR-10 freshness and ETL journal', () => {
     expect(await within(table).findByText(/Загружен, 04\.11\.2026/)).toBeInTheDocument();
     expect(within(table).getByText(/Отклонён, 04\.11\.2026/)).toBeInTheDocument();
     expect(within(table).getByText(/Совпадает, 04\.11\.2026/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Загрузить сейчас/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Обновить из источника/ })).not.toBeInTheDocument();
     const journalTable = await screen.findByRole('table', { name: /Пакеты загрузки/ });
     expect(within(journalTable).getByText('SOURCE_LOAD_IN_PROGRESS')).toBeInTheDocument();
     expect(within(journalTable).getByText('13')).toBeInTheDocument();
@@ -44,19 +44,28 @@ describe('SCR-10 freshness and ETL journal', () => {
   it('lets the administrator queue a load and says when one already waits', async () => {
     const fetch = mockApi({ ...journal(), 'POST etl/loads': [202, { source: 'qa-system', requestedAt: '2026-11-04T09:10:00Z', reason: 'MANUAL_LOAD', status: 'PENDING' }] });
     renderAt(<Freshness />, ['reports-admin']);
-    await userEvent.click(await screen.findByRole('button', { name: 'Загрузить сейчас: Тестирование' }));
-    expect(await screen.findByText(/Заявка на загрузку «Тестирование» принята/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Обновить из источника: Тестирование' }));
+    expect(await screen.findByText(/Заявка принята: данные «Тестирование» перечитает ближайший цикл/)).toBeInTheDocument();
     const post = fetch.mock.calls.find(([url, init]) => String(url).endsWith('/etl/loads') && init?.method === 'POST')!;
     expect(JSON.parse(String(post[1]?.body))).toEqual({ source: 'qa-system' });
     mockApi({ ...journal(), 'POST etl/loads': [409, { code: 'LOAD_ALREADY_REQUESTED' }] });
-    await userEvent.click(screen.getByRole('button', { name: 'Загрузить сейчас: Трекер задач' }));
-    expect(await screen.findByText('Заявка на загрузку «Трекер задач» уже ждёт выполнения.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Обновить из источника: Трекер задач' }));
+    expect(await screen.findByText('Обновление «Трекер задач» уже ждёт выполнения.')).toBeInTheDocument();
   });
   it('shows a waiting request and disables the button of that source', async () => {
     mockApi(journal([{ source: 'qa-system', requestedAt: '2026-11-04T09:10:00Z', reason: 'MANUAL_LOAD', status: 'PENDING' }]));
     renderAt(<Freshness />, ['reports-admin']);
-    expect(await screen.findByRole('button', { name: 'Загрузить сейчас: Тестирование' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Обновить из источника: Тестирование' })).toBeDisabled();
     expect(screen.getByText(/Тестирование · вручную/)).toBeInTheDocument();
     expect(screen.getByText('Ждёт загрузки', { selector: '.list span' })).toBeInTheDocument();
+  });
+  it('says what changed when the sent request is done', async () => {
+    const request = { source: 'task-tracker', requestedAt: '2026-11-04T09:10:00Z', reason: 'MANUAL_LOAD', status: 'PENDING' };
+    // The list reloaded after the POST already reports the request done.
+    mockApi({ ...journal([{ ...request, status: 'COMPLETED' }]), 'POST etl/loads': [202, request] });
+    renderAt(<Freshness />, ['reports-admin']);
+    expect(await screen.findByText(/Файл при этом не скачивается/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Обновить из источника: Трекер задач' }));
+    expect(await screen.findByText(/Данные «Трекер задач» обновлены из источника: пакет 04\.11\.2026, 12:00 МСК, записей 13\./)).toBeInTheDocument();
   });
 });
