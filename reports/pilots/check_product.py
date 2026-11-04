@@ -9,6 +9,7 @@ import hashlib
 import http.cookiejar
 import io
 import json
+import re
 import secrets
 import sys
 import time
@@ -142,9 +143,16 @@ def main():
         expect(403,call(tokens['member1'],'audit'));events=expect(200,call(tokens['admin'],'audit'))
         if events['total']<11: raise CheckFailure('Audit events missing')
         checks.append('admin_only_audit')
-        req=urllib.request.Request('http://localhost:8081/ui/')
-        with urllib.request.urlopen(req) as response:
+        # A deep link gets the SPA page; the page loads only its own hashed bundle, with no inline code.
+        with urllib.request.urlopen('http://localhost:8081/ui/reports/R-01?from=2026-10-01') as response:
             if "script-src 'self'" not in response.headers.get('Content-Security-Policy',''): raise CheckFailure('UI CSP missing')
+            page=response.read().decode()
+        scripts=re.findall(r'<script\b[^>]*>',page)
+        bundle=re.fullmatch(r'<script type="module" crossorigin src="(/ui/assets/[A-Za-z0-9_.-]+\.js)">',scripts[0]) if len(scripts)==1 else None
+        if not bundle or 'style=' in page: raise CheckFailure('UI page has inline code')
+        with urllib.request.urlopen('http://localhost:8081'+bundle.group(1)) as response:
+            if not response.headers.get('Content-Type','').startswith('text/javascript'): raise CheckFailure('UI bundle MIME')
+            if "script-src 'self'" not in response.headers.get('Content-Security-Policy',''): raise CheckFailure('UI bundle CSP missing')
         checks.append('ui_static_csp')
     finally:
         kc(member_path,member_role,'POST')
@@ -153,11 +161,11 @@ def main():
         finally:
             if view: expect(204,call(tokens['admin'],'views/'+view,'DELETE'))
     root=directory.parents[1]
-    files=['api.py','product_http.py','product_store.py','report_engine.py','product_service.py','product_jobs.py','delivery.py','product_ui.py','product_demo.py','product_fixture.py','provision.py','compose.yaml','check_product.py','ui/index.html','ui/app.js','ui/styles.css']
+    files=['api.py','product_http.py','product_store.py','report_engine.py','product_service.py','product_jobs.py','delivery.py','product_ui.py','product_demo.py','product_fixture.py','provision.py','compose.yaml','check_product.py','ui/index.html','ui/package.json','ui/package-lock.json','ui/vite.config.ts','ui/tsconfig.json']+sorted(p.relative_to(directory).as_posix() for p in (directory/'ui/src').rglob('*') if p.is_file())
     result={'passed':True,'checked_at_utc':datetime.now(timezone.utc).isoformat(),'checks':checks,
             'real_keycloak':True,'real_reports_app_database_role':True,'real_worker':True,'browser_rendering_verified':False,
             'test_subscription_completed':True,'member_role_restored':True,'source_integrations':'synthetic local sources',
-            'source_sha256':{str((directory/name).relative_to(root)):hashlib.sha256((directory/name).read_bytes()).hexdigest() for name in files}}
+            'source_sha256':{(directory/name).relative_to(root).as_posix():hashlib.sha256((directory/name).read_bytes()).hexdigest() for name in files}}
     if args.record: artifact.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(result));return 0
 

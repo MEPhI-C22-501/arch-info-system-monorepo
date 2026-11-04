@@ -6,7 +6,7 @@
 
 | ID | Локальный результат | Доказательство / остаток |
 | --- | --- | --- |
-| S-01 XSS UI | DOM textContent, без innerHTML/eval; CSP, экранированная печать | test_product.py, product_ui.py, браузерный R-06; полного pentest нет |
+| S-01 XSS UI | React выводит строки как текст; без innerHTML, dangerouslySetInnerHTML и eval; CSP без inline script и style, экранированная печать | test_product.py, product_ui.py, check_product.py; полного pentest нет |
 | S-02 XSS Superset | HTML_SANITIZATION и ESCAPE_MARKDOWN_HTML включены | check_session.py; R-01 показывает проверенные идентификаторы, отдельный браузерный payload-тест Superset не заявляется |
 | S-03 CSV injection | Опасные префиксы после пробелов/BOM экранируются; XLSX inline strings, без формул и ссылок | XML ZIP разбирается тестом; опасные строки остаются текстом |
 | S-04 CSRF/CORS | Reports API только Bearer, cookie не авторизует; CORS не разрешён. Superset отклоняет чужой Origin даже с действующим CSRF | test_http_boundary.py, check_bi.py, check_session.py |

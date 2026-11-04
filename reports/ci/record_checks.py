@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -24,11 +25,13 @@ def main():
     path.write_text(json.dumps({'state': 'running'}))
     test = ['reports/pilots/check_postgres.py', '--record'] if args.native_postgres else ['-m', 'unittest', 'discover', '-s', 'reports/pilots/tests', '-v']
     node = os.getenv('NODE', 'node')
+    npm = os.getenv('NPM') or shutil.which('npm') or 'npm'
     commands = [
         ('contracts-and-links', [sys.executable, 'reports/ci/validate.py']),
         ('python-tests', [sys.executable, *test]),
         ('cube-scope-tests', [node, '--test', 'reports/pilots/tests/cube-auth.test.cjs']),
-        ('ui-javascript-syntax', [node, '--check', 'reports/pilots/ui/app.js']),
+        ('ui-tests', [npm, '--prefix', 'reports/pilots/ui', 'test']),
+        ('ui-build', [npm, '--prefix', 'reports/pilots/ui', 'run', 'build']),
         ('mermaid-grammar', [node, 'reports/ci/check_diagrams.mjs', '--record']),
         ('diff-check', ['git', 'diff', '--check', '--', 'reports']),
     ]
@@ -54,7 +57,7 @@ def main():
     hashes = {}
     for source in REPORTS.rglob('*'):
         relative = source.relative_to(ROOT)
-        if source.is_file() and not {'artifacts', '.venv', 'node_modules', '__pycache__'}.intersection(relative.parts):
+        if source.is_file() and not {'artifacts', '.venv', 'node_modules', 'dist', '__pycache__'}.intersection(relative.parts):
             hashes[str(relative)] = hashlib.sha256(source.read_bytes()).hexdigest()
     contracts = ['task-tracker/docs/block-g-api-and-events/openapi.yaml',
                  'qa/api/openapi/v1/openapi.yaml', 'planning-system/docs/contracts/openapi.json',

@@ -76,7 +76,8 @@ def main():
              'reports/pilots/superset/Dockerfile', 'reports/pilots/superset/cube_driver/pyproject.toml',
              'reports/pilots/superset/cube_driver/reports_cube/dialect.py',
              'reports/pilots/superset/cube_driver/reports_cube/engine.py']
-    names += ['reports/pilots/'+name for name in ['product_store.py','report_engine.py','product_service.py','product_http.py','product_jobs.py','product_ui.py','product_fixture.py','product_demo.py','delivery.py','check_product.py','ui/index.html','ui/app.js','ui/styles.css']]
+    names += ['reports/pilots/'+name for name in ['product_store.py','report_engine.py','product_service.py','product_http.py','product_jobs.py','product_ui.py','product_fixture.py','product_demo.py','delivery.py','check_product.py','ui/index.html','ui/package.json','ui/package-lock.json','ui/vite.config.ts','ui/tsconfig.json']]
+    names += sorted(p.relative_to(root).as_posix() for p in (directory/'ui/src').rglob('*') if p.is_file())
     names += ['reports/pilots/'+name for name in ['star.py','ops.py','events.py','event_runner.py','event_outbox.py','maintenance.py','check_events.py','requirements.txt','cube/access.js']]
     names += [str(p.relative_to(root)) for p in (directory/'cube/model').glob('*.js')]
     result = {'fresh_product_verified': True, 'fresh_kafka_verified':True, 'checked_at_utc': datetime.now(timezone.utc).isoformat(), 'passed': True,
