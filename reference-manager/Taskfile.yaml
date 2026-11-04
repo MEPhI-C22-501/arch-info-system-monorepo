@@ -183,4 +183,4 @@ tasks:
     deps: [ env ]
     cmds:
       - docker compose -f deployments/docker-compose.yaml --profile swagger up -d reference-manager-swagger
-      - echo "Swagger UI: http://localhost:${SWAGGER_PORT:-8089}/, Authorize logs in as a user of the local realm"
+      - 'echo "Swagger UI at http://localhost:${SWAGGER_PORT:-8089}/, Authorize logs in as a user of the local realm"'
