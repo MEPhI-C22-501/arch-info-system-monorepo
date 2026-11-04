@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Notice } from '../components/State';
 import { formatCell } from '../format';
 import type { Cell, DimensionValue, ReportQuery, ReportResult } from '../types';
-import { Bars, Block, Choice, FreshnessLine, PeriodFields, Tile, num, useDashboardParams, useReport } from './common';
+import { Block, Choice, FreshnessLine, GroupedBars, PeriodFields, Stacked, Tile, num, useDashboardParams, useReport } from './common';
 
 type Defects = { opened?: number; closed?: number; remaining?: number } | null;
 
@@ -47,20 +47,25 @@ export function QualityDashboard() {
                     <Tile title="Плотность дефектов" value={r.totals['M-16'] === null ? 'не утверждена' : formatCell(r.totals['M-16'])}
                       note={r.totals['M-16'] === null ? `Методика Q-REP-12 не согласована; кандидат: ${formatCell(r.totals.candidateDefectDensity)}` : undefined}
                       delta={delta(r, 'M-16')} />
-                    <Tile title="Reopened rate, %" value={formatCell(r.totals['M-17'])} delta={delta(r, 'M-17')} />
+                    <Tile title="Reopened rate, %" value={r.totals['M-17'] === null ? '—' : formatCell(r.totals['M-17'])} delta={delta(r, 'M-17')}
+                      note={r.totals['M-17'] === null ? 'нет закрытых дефектов за период' : 'переоткрытые / закрытые'} />
                   </>
                 )}</Block>
               </dl>
               <h2>Результаты кейсов</h2>
-              <Bars title="Результаты тест-кейсов" points={[['Успешно', 'passed'], ['С ошибкой', 'failed'], ['Заблокировано', 'blocked'], ['Пропущено', 'skipped']]
-                .map(([name, key]) => ({ label: name, value: num(data.totals[key]) }))} />
+              <Stacked title="Результаты тест-кейсов" parts={([['Успешно', 'passed'], ['С ошибкой', 'failed'], ['Заблокировано', 'blocked'], ['Пропущено', 'skipped']] as const)
+                .map(([name, key]) => ({ label: name, value: num(data.totals[key]), tone: key }))} />
             </>
           )}</Block>
           <h2>Динамика дефектов</h2>
           {iteration && <p className="muted">С фильтром по итерации учитываются только дефекты, связанные с итерацией через тест-план.</p>}
           <Block report={flow}>{(data) => (
-            <Bars title="Остаток дефектов по ISO-неделям"
-              points={data.rows.map((r) => ({ label: `${(r.week as DimensionValue).label}: +${formatCell((r['M-12'] as Defects)?.opened ?? 0)} / −${formatCell((r['M-12'] as Defects)?.closed ?? 0)}`, value: (r['M-12'] as Defects)?.remaining ?? null }))} />
+            <GroupedBars title="Дефекты по ISO-неделям"
+              series={[{ key: 'opened', label: 'Создано', tone: 'opened' }, { key: 'closed', label: 'Закрыто', tone: 'closed' }, { key: 'remaining', label: 'Открыто на конец недели', tone: 'remaining' }]}
+              rows={data.rows.map((r) => {
+                const m = r['M-12'] as Defects;
+                return { label: (r.week as DimensionValue).label, values: { opened: m?.opened ?? null, closed: m?.closed ?? null, remaining: m?.remaining ?? null } };
+              })} />
           )}</Block>
           <h2>Серьёзность × статус</h2>
           <Block report={matrix}>{(data) => <Matrix data={data} />}</Block>
@@ -70,16 +75,17 @@ export function QualityDashboard() {
   );
 }
 
+/** Open defects at the end of the period by severity and current status; statuses without open defects are left out. */
 function Matrix({ data }: { data: ReportResult }) {
   const cell = (r: Record<string, Cell>, key: string) => (r[key] as DimensionValue).label;
+  const count = (s: string, t: string) => (data.rows.find((r) => cell(r, 'severity') === s && cell(r, 'status') === t)?.['M-12'] as Defects)?.remaining ?? 0;
   const severities = [...new Set(data.rows.map((r) => cell(r, 'severity')))];
-  const statuses = [...new Set(data.rows.map((r) => cell(r, 'status')))];
-  if (!data.rows.length) return <p className="muted">Дефектов за период нет.</p>;
-  const count = (s: string, t: string) => (data.rows.find((r) => cell(r, 'severity') === s && cell(r, 'status') === t)?.['M-12'] as Defects)?.opened ?? 0;
+  const statuses = [...new Set(data.rows.map((r) => cell(r, 'status')))].filter((t) => severities.some((s) => count(s, t) > 0));
+  if (!statuses.length) return <p className="muted">Открытых дефектов на конец периода нет.</p>;
   return (
     <div className="table-scroll" tabIndex={0}>
       <table>
-        <caption>Дефекты, созданные за период: серьёзность × текущий статус</caption>
+        <caption>Открытые на конец периода дефекты: серьёзность × текущий статус</caption>
         <thead><tr><th scope="col">Серьёзность</th>{statuses.map((t) => <th key={t} scope="col" className="num">{t}</th>)}</tr></thead>
         <tbody>{severities.map((s) => <tr key={s}><th scope="row">{s}</th>{statuses.map((t) => <td key={t} className="num">{count(s, t)}</td>)}</tr>)}</tbody>
       </table>

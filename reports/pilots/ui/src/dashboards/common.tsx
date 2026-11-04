@@ -100,6 +100,82 @@ export function Progress({ title, value, max, unit }: { title: string; value: nu
   );
 }
 
+export type Tone = 'passed' | 'failed' | 'blocked' | 'skipped' | 'opened' | 'closed' | 'remaining';
+
+function Swatch({ tone }: { tone: Tone }) {
+  return <svg className="swatch" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" className={'tone-' + tone} /></svg>;
+}
+
+/** One bar = the whole (100 %), split into shares; the legend repeats every count and share, so colour is not the only sign. */
+export function Stacked({ title, parts }: { title: string; parts: { label: string; value: number | null; tone: Tone }[] }) {
+  const id = useId();
+  const total = parts.reduce((s, p) => s + (p.value ?? 0), 0);
+  if (!total) return <p className="muted">{title}: данных нет.</p>;
+  const width = 600;
+  let x = 0;
+  const share = (v: number | null) => formatCell(Math.round(((v ?? 0) / total) * 1000) / 10);
+  return (
+    <figure className="chart chart-compact">
+      <figcaption id={id} className="progress-text">{title}: всего {formatCell(total)}</figcaption>
+      <svg viewBox={`0 0 ${width} 24`} role="img" aria-labelledby={id}>
+        {parts.map((p) => {
+          const w = ((p.value ?? 0) / total) * width;
+          const rect = <rect key={p.label} x={x} y="2" width={w} height="20" className={'tone-' + p.tone} />;
+          x += w;
+          return rect;
+        })}
+      </svg>
+      <ul className="legend">
+        {parts.map((p) => <li key={p.label}><Swatch tone={p.tone} />{p.label} — {formatCell(p.value ?? 0)} ({share(p.value)} %)</li>)}
+      </ul>
+    </figure>
+  );
+}
+
+/** Several measures per row on one scale (the largest value of the chart), with a legend and the same numbers as a table. */
+export function GroupedBars({ title, series, rows }: {
+  title: string; series: { key: string; label: string; tone: Tone }[]; rows: { label: string; values: Record<string, number | null> }[];
+}) {
+  const id = useId();
+  if (!rows.length) return <p className="muted">{title}: данных нет.</p>;
+  const max = Math.max(1, ...rows.flatMap((r) => series.map((s) => Math.abs(r.values[s.key] ?? 0))));
+  const bar = 12;
+  const group = series.length * (bar + 4) + 14;
+  return (
+    <figure className="chart chart-compact">
+      <ul className="legend">{series.map((s) => <li key={s.key}><Swatch tone={s.tone} />{s.label}</li>)}</ul>
+      <p className="muted chart-note">Длина полос — относительно наибольшего значения на графике ({formatCell(max)}).</p>
+      <svg viewBox={`0 0 640 ${rows.length * group}`} role="img" aria-labelledby={id}>
+        <title id={id}>{title}</title>
+        {rows.map((r, i) => (
+          <g key={r.label}>
+            <text x="0" y={i * group + 14} className="chart-label">{r.label}</text>
+            {series.map((s, j) => {
+              const y = i * group + 4 + j * (bar + 4);
+              const v = r.values[s.key];
+              return (
+                <g key={s.key}>
+                  <rect x="160" y={y} width={(Math.abs(v ?? 0) / max) * 400} height={bar} className={'tone-' + s.tone} />
+                  <text x="630" y={y + 10} textAnchor="end" className="chart-value">{v === null ? '—' : formatCell(v)}</text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
+      </svg>
+      <figcaption>
+        <details>
+          <summary>{title} — таблицей</summary>
+          <table>
+            <thead><tr><th scope="col">Неделя</th>{series.map((s) => <th key={s.key} scope="col" className="num">{s.label}</th>)}</tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.label}><th scope="row">{r.label}</th>{series.map((s) => <td key={s.key} className="num">{r.values[s.key] === null ? '—' : formatCell(r.values[s.key])}</td>)}</tr>)}</tbody>
+          </table>
+        </details>
+      </figcaption>
+    </figure>
+  );
+}
+
 /** Single choice of a slice value from POST options (names within the user's scope). */
 export function Choice({ reportId, slice, label, from, to, value, onChange, optional }: {
   reportId: string; slice: string; label: string; from: string; to: string; value: string; onChange: (id: string) => void; optional?: boolean;

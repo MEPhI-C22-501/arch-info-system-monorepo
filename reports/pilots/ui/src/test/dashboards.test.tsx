@@ -96,13 +96,22 @@ describe('SCR-06 quality', () => {
         { comparison: { periodFrom: '2026-09-01', periodTo: '2026-09-30', totals: { 'M-14': 60, 'M-15': 90 }, delta: null } })],
       'reports/R-09/query': [200, report('R-09', [{}], { 'M-16': null, 'M-17': 25, candidateDefectDensity: 10 })],
       'reports/R-05/query': [200, report('R-05', [{ week: { id: '2026-W40', label: '2026-W40' }, 'M-12': { opened: 2, closed: 1, remaining: 1 } }], {})],
-      'reports/R-08/query': [200, report('R-08', [{ severity: { id: 'MAJOR', label: 'MAJOR' }, status: { id: 'OPEN', label: 'OPEN' }, 'M-12': { opened: 3 } }], {})],
+      'reports/R-08/query': [200, report('R-08', [
+        { severity: { id: 'MAJOR', label: 'MAJOR' }, status: { id: 'OPEN', label: 'OPEN' }, 'M-12': { opened: 0, closed: 0, remaining: 3 } },
+        { severity: { id: 'MAJOR', label: 'MAJOR' }, status: { id: 'CLOSED', label: 'CLOSED' }, 'M-12': { opened: 1, closed: 1, remaining: 0 } },
+      ], {})],
     });
     renderAt(<QualityDashboard />, ['reports-qa-lead'], '/' + period + '&project=x-1&iteration=x-1');
     expect(await screen.findByText('+20 к прошлому периоду')).toBeInTheDocument();
     expect(screen.getByText(/Методика Q-REP-12 не согласована; кандидат: 10/)).toBeInTheDocument();
-    const matrix = await screen.findByRole('table', { name: /серьёзность × текущий статус/ });
+    const matrix = await screen.findByRole('table', { name: /Открытые на конец периода дефекты/ });
     expect(within(matrix).getByRole('cell', { name: '3' })).toBeInTheDocument();
+    expect(within(matrix).queryByRole('columnheader', { name: 'CLOSED' })).not.toBeInTheDocument();
+    expect(screen.getByText('Результаты тест-кейсов: всего 5')).toBeInTheDocument();
+    expect(screen.getByText('Успешно — 4 (80 %)')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Дефекты по ISO-неделям' })).toBeInTheDocument();
+    expect(screen.getByText('Открыто на конец недели', { selector: '.legend li' })).toBeInTheDocument();
+    expect(screen.getByText('переоткрытые / закрытые')).toBeInTheDocument();
     expect(posted(fetch, 'R-07/query')[0]).toMatchObject({ compareWithPrevious: true, params: { projectIds: ['x-1'], iterationIds: ['x-1'] } });
   });
 });
