@@ -132,8 +132,11 @@ def register(app):
             if cached:return cached
             v=version(c,req.path_params['versionId'],a,['R-04']);p=project(c,v['projectId'],a,['R-04'])
             if v['status']!='DRAFT':fail(409,'Подтверждается только черновик')
+            previous=copy.deepcopy(v['allocations'])
             for x in v['allocations']:
                 if x['employeeId'] in a.employees and x['status']!='CANCELLED':x['status']='CONFIRMED'
+            from .reference_manager import validate_new_allocations
+            validate_new_allocations(c,v['allocations'],previous)
             check_resources(v,*resource_inputs(c,v))
             v['contentRevision']+=1;changed(c,'plan',v,req,a)
             return complete({'revision':v['revision'],'contentRevision':v['contentRevision'],'status':v['status']},p['portfolioId'],p['id'])

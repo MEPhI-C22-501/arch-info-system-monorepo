@@ -792,7 +792,82 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "employees",
+                    "hrCache"
+                  ],
+                  "properties": {
+                    "employees": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "eligibleForAssignment"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "eligibleForAssignment": {
+                            "type": "boolean",
+                            "description": "Текущее кадровое состояние допускает назначение; hrCache.required дополнительно требует CURRENT."
+                          }
+                        }
+                      }
+                    },
+                    "hrCache": {
+                      "type": "object",
+                      "required": [
+                        "source",
+                        "quality",
+                        "required",
+                        "readTime",
+                        "fetchedAt"
+                      ],
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "ReferenceManager",
+                            "local-fixture"
+                          ]
+                        },
+                        "quality": {
+                          "type": "string",
+                          "enum": [
+                            "CURRENT",
+                            "STALE",
+                            "UNAVAILABLE",
+                            "DEMO"
+                          ]
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "description": "Новые и изменённые назначения требуют CURRENT при HR_MODE=real."
+                        },
+                        "readTime": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "fetchedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -1741,7 +1816,7 @@
           "employeeId": {
             "type": "string",
             "minLength": 1,
-            "description": "HR resource name",
+            "description": "Ключ PS employees/{numeric HR id}; demo-* только учебные данные",
             "examples": [
               "employees/demo-1"
             ]
@@ -4411,7 +4486,7 @@
                   "employeeId": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "HR resource name",
+                    "description": "Ключ PS employees/{numeric HR id}; demo-* только учебные данные",
                     "examples": [
                       "employees/demo-1"
                     ]

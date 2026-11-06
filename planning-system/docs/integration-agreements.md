@@ -1,25 +1,28 @@
 # Реестр межкомандного принятия
 
-Обновлено 29.10.2026 по [замечаниям PR #154](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/154).
-База сверки: main `338cf0f8eb724992ed29db6a84a7b92f9eeaaae0`.
+Обновлено 07.11.2026 по [замечаниям PR #154](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/154).
+База сверки: main `1a346249a166ee9a13a87c5476d19d73b3bb624b`.
 Запросы #142, #143, #145, #146, #147 опубликованы 18.10.2026 пользователем
-pachecou; обсуждения повторно прочитаны 29.10.2026. Запрос и ответ не равны
+pachecou; обсуждения повторно прочитаны 07.11.2026. Учтены ответы Reports от 25/29.10
+и Reference Manager от 04.11; в #142/#145/#146 ответов второй стороны нет. Запрос и ответ не равны
 приёмке интеграции. Реальные credentials передаются вне GitHub.
 
-| Связь / вопрос | Запрос / дата | Подтверждённое состояние на 29.10 | Статус / условие закрытия |
+| Связь / вопрос | Запрос / дата | Подтверждённое состояние на 07.11 | Статус / условие закрытия |
 | --- | --- | --- | --- |
 | INT-01, Infra access | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142), 18.10 | PR #128 уже влит в main; ответа о выдаче клиентов/JWKS/audience нет | pending: параметры и общий вход T-INT-01 |
-| INT-02, D-02/03 | [#143](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143), 18.10 | HR API RM описан; комментариев с принятием rename/норм/fixture нет | pending: ответ RM и T-INT-02 |
+| INT-02, D-02/03 | [#143](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143), 18.10 | pErfEcto2 / RM ответил 04.11: numeric id, revision/is_deleted, pageToken, rename, employment/account state, demo fixture и planning-service; календарь/нормы ведёт PS | agreed по контракту: следующий шаг PS — HR-чтение и T-INT-02 на стенде RM; общий клиент Infra ещё не выдан |
 | INT-03, D-01/07 | [#145](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/145), 18.10 | Mapping PUT/facts/events предложен; ответ TT отсутствует | pending: подпись mapping и T-INT-03 |
 | INT-04, D-04 | Решение PS от 29.10: вопрос владельцу общего проекта; отдельное обращение не отправлено | Поставщик уведомлений не назначен, у Reports тот же Q-REP-13 | pending: назначение поставщика и принятие схем/receipt |
-| INT-05/08, D-05 | [#147](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147), 18.10 | DarkMast001 / Reports ответил 25.10: schemaVersion 1.0.0, TTL 24 ч, 02:00 Europe/Moscow, собственный локальный ETL-прогон | Частично согласовано: ответ PS ниже; T-INT-08 и доступы общего стенда ещё открыты |
+| INT-05/08, D-05 | [#147](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147), 18.10 | DarkMast001 / Reports принял 25.10 schemaVersion 1.0.0 / TTL 24 ч / 02:00 Europe/Moscow; 29.10 приняты все четыре уточнения PS | agreed по контракту: общий T-INT-08, клиент S-06 и CronJob Infra ещё открыты |
 | INT-06, S3 | [#142](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/142), 18.10 | Infra уже содержит arch-dev-planning-system; выдача credentials/ACL и smoke не подтверждены | pending: выдача и T-INT-06 |
 | INT-07, D-09 | [#146](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/146), 18.10 | release-context 1.1.0 реализован и покрыт API-тестами PS; ответа QA нет | pending: источник итераций, принятие QA и T-INT-07 |
 
-Следующая контрольная точка — 02.11.2026: владельцы adapters PS вместе с
-соответствующими командами фиксируют ответы и результаты T-INT либо причину
-переноса. Дата является планом PS, не обязательством соседей. Существующие
-обращения не дублируются; неподтверждённые строки не переводятся в tested.
+Контрольная дата 02.11.2026 прошла; опубликованного протокола общего T-INT-08
+в #147 на 07.11 нет. Новый слот назначается после выдачи S-06 и адреса стенда,
+а T-INT-02 — после запуска HR-reader против стенда RM. Остальные владельцы
+фиксируют ответ или причину задержки в существующих задачах. Новая дата без
+согласия второй стороны не назначается. Существующие обращения не дублируются;
+контракт agreed не переводится в tested без фактического прогона.
 
 ## Task Tracker D-01
 
@@ -45,18 +48,48 @@ pachecou; обсуждения повторно прочитаны 29.10.2026. �
 | snapshot/cursor PS | facts page/pageSize <=500 | Страницы TT не общий snapshot; нужны watermark/повторная сверка |
 | Task* envelope PS | task-tracker.events.v1, aggregateId/eventId | Сопоставить фактические eventType/payload/версии; не объявлять совместимость автоматически |
 
-Итерации TT читаются по /reports/iterations; их version и привязка к RELEASE
-согласуются с QA. Без датированного mapping событие адаптера не считается
-испытанной интеграцией.
+Пути PUT /planning/projects/{externalId}, facts и /reports/iterations выше
+взяты из документированного предложения TT. В runtime текущей ветки main
+обработчиков приёма плана и facts в backend нет; спецификация не доказывает их реализацию. До ответа #145 и проверки
+реального обработчика нельзя включать adapter, объявлять чтение итераций
+работающим или выдавать mock receipt за квитанцию TT. Источник итераций и
+привязка к RELEASE согласуются с QA. Датированное принятие mapping и успешный
+T-INT-03 являются отдельными условиями.
 
 ## Reference Manager D-02/D-03
 
-Принять чтение employees/assignments/positions/org_units/absences и классификаторов
-по [RM 130](../../reference-manager/documents/130.api-contracts.md), page_token,
-state/etag. Ответить: сохраняются ли resource name и account_user_id при rename;
-какие состояния запрещают новые назначения; кто подтверждает нормы/TZ.
-PS сохраняет прежние значения в baseline, обновляет только текущий кэш. Оклад
-не становится почасовой ставкой без методики D-07.
+Основание — [ответ pErfEcto2 от 04.11.2026](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/143#issuecomment-6632199921),
+[RM 130](../../reference-manager/documents/130.api-contracts.md), ADR-022.
+Приняты поля и правила поставщика, вместо прежнего предложения PS с
+resource name/state/etag:
+
+- Коллекции employees, org_units, positions, assignments, salaries, absences,
+  project_roles, grades, currencies по `/v1/`; `pageSize` не более 100,
+  `pageToken`, `allowDeleted`, `filter`, `order_by`. Ответ содержит массив
+  по имени коллекции и необязательный `nextPageToken`.
+- Стабильный внешний ключ сотрудника — числовой `id`; `personnel_number` является
+  отдельным атрибутом. Изменения определяются по `revision`/`updated_at`,
+  удаления — по `is_deleted`; `state`/`etag` отсутствуют. В ответе от 04.11 объявлен переход 1.0.0 → 1.1.0;
+  в текущем main уже есть readTime 1.1.0. Клиент PS использует его для единого среза.
+- Rename сохраняет `id`, `username` и `account_user_id`. Увольнение означает
+  `employment_state=DISMISSED`, `account_state=DISABLED` и закрытие периодов,
+  а не удаление. Для новых назначений нужен неудалённый EMPLOYED сотрудник;
+  отключённая учётная запись не становится допустимым назначением автоматически.
+- Календарь, нормы и почасовые ставки ведёт PS. Месячный оклад не пересчитывается
+  без принятой методики D-07. Событий RM нет: повторное чтение не реже раза в час.
+  Даты — YYYY-MM-DD, timestamps — RFC 3339 UTC.
+- Fixture RM — [demo.sql](../../reference-manager/deployments/seed/demo.sql),
+  сотрудники 1…8 и связанные справочники. Локальный адрес стенда модуля —
+  `http://localhost:8083/v1/`, клиент `planning-service`, роль
+  `reference-hr-reader`; секрет передаётся вне Git. На общем стенде клиента
+  выдаёт Infra, запрос RM [#163](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/163).
+
+Следующий T-INT-02 ведёт PS: прочитать все страницы, сопоставить HR id и
+account_user_id, повторить rename/увольнение/удаление и недоступность источника,
+проверить запрет новых назначений и сохранность утверждённого baseline.
+Контрактный ответ RM закрывает вопрос о формате, но запуск на модульном и общем
+стендах ещё требует самостоятельного протокола. Внесение текущего кэша не должно
+переписывать employee IDs и значения в исторических планах.
 
 ## QA D-09
 
@@ -79,8 +112,10 @@ PlanActivated/RemainingForecastChanged/BudgetAdjustmentChanged; пока соб�
 
 ### Ответ Planning System по оставшимся пунктам
 
-Зафиксирован в этой редакции 29.10.2026; публикация PR является предложением
-принять уточнения, не подменяет ответ второй стороны.
+PS сформулировал уточнения 29.10.2026; [Reports принял все четыре пункта
+в тот же день](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/147#issuecomment-6505753939)
+(DarkMast001, база main e4ee17e, потребитель 81417e5). Это датированное
+принятие контракта, отдельное от приёмки общего стенда.
 
 1. Партия S-06 — полный срез **экспортируемых данных** указанного портфеля,
    разрешённого portfolio_ids. project_ids токена её не сужает. Черновики и
@@ -104,12 +139,14 @@ PlanActivated/RemainingForecastChanged/BudgetAdjustmentChanged; пока соб�
 [162](162.integration-spec.md). Регрессия проверяет полный срез нескольких
 проектов, неизменяемость старой партии, архивирование и повтор POST/страниц.
 
-T-INT-08 ведёт Reports; PS предоставляет стенд, fixture и S-06. До 02.11.2026
-планируется общий прогон: не менее трёх страниц pageSize=2, counts, повтор POST
+T-INT-08 ведёт Reports; PS предоставляет стенд, fixture и S-06. Согласованный
+срок до 02.11.2026 прошёл без опубликованного протокола общего прогона в #147.
+Для нового слота сохраняются критерии: не менее трёх страниц pageSize=2, counts, повтор POST
 и страницы, EXPIRED, два токена с cost.read и без, перепланирование без двойного
-учёта. Локальный прогон Reports от 25.10 — доказательство потребителя; новый
-общий прогон в этой доработке не объявляется выполненным. Выдача S-06/Infra и
-методика стоимости D-07 остаются открытыми.
+учёта. Локальный прогон Reports от 25.10 — доказательство потребителя; текущая
+локальная проверка API/ETL не подменяет общий прогон с OIDC и CronJob. Выдача
+S-06 и CronJob Infra запрошены Reports в [#158](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/158);
+методика стоимости D-07 остаётся открытой.
 
 ## Infra
 
@@ -118,6 +155,14 @@ T-INT-08 ведёт Reports; PS предоставляет стенд, fixture �
 S3 bucket/ACL, broker/topics/DLQ, schedule/TZ, эталонные fixture IDs и адрес/протокол
 коллектора. Секреты передаются вне Git; в ответе фиксируются только факт выдачи
 и несекретные идентификаторы. Запрос не равен выданным доступам.
+
+В общем realm уже описаны клиенты planning-system/planning-service, но это
+не означает готовность claims для PS: требуются бизнес-роли R-01…R-06 и
+portfolio_ids/project_ids/employee_ids, сервису Reports — audience PS и
+reports.read/reports.export, QA — qa.read. Локальный realm /planning из
+compose.oidc.yaml изолирован и не подтверждает общий вход. Root Compose
+также не запускает все приложения одной командой; это совместная поставка
+Infra и команд модулей.
 
 ## Форма ответа и фактической приёмки
 

@@ -1,5 +1,26 @@
 # Фактическая локальная проверка безопасности
 
+Текущая проверка: 07.11.2026, база main
+`1a346249a166ee9a13a87c5476d19d73b3bb624b`. Доказательства этой редакции —
+[review-tests.xml](../artifacts/review-tests.xml) и
+[review-verification.json](../artifacts/review-verification.json).
+
+| Кейс текущей редакции | Проверено | Граница |
+| --- | --- | --- |
+| Настоящий JWT | Keycloak 26.7.4: planner 200, без роли 403, demo token 401, тот же JWT после exp 401 | Локальный realm /planning, native Java 25 и SQLite PS; общий realm Infra не принят |
+| Authorization Code + PKCE | Браузер перенаправлен в Keycloak с S256, после входа вернулся в workspace PS, переключение роли скрыто | Проверено через браузер Codex; полный check-app.mjs не выполнен из-за запрета запуска Chromium в окружении |
+| Кадровые права | Rename не меняет ID/baseline; увольнение, удаление, блокировка и отсутствующий/просроченный real-кэш запрещают новые назначения | HTTP-fixtures RM; приёмка живого HR API ещё открыта |
+| Консистентность ETL | Настоящий consumer Reports: cost.read, повторы, отказ второй страницы, отсутствие частичного checkpoint, EXPIRED, архив и перепланирование | Синтетические scopes, in-process HTTP и SQLite DWH |
+| Защита API | Набор серверных регрессий JWT/RBAC/IDOR/origin/upload/idempotency пройден | Общие S3/Kafka/Ingress не проверялись |
+
+Docker Desktop не удалось запустить: отсутствует исполняемый файл приложения.
+Compose config валиден. Новый PostgreSQL-кластер не стартовал: окружение
+отклонило создание shared memory; PostgreSQL-only trigger пропущен.
+Restore/minikube/нагрузочные проверки текущей редакции не выполнялись.
+Исторические PostgreSQL/browser/restore artifacts ниже не считаются новым прогоном.
+
+## Исторический протокол от 18.10.2026
+
 Обновлено 18.10.2026. Область: модуль Planning System текущей рабочей ветки на базе
 main f5eb235, синтетический stand/тестовая БД. Это локальная регрессия, не полный
 пентест общего стенда. Версии входов фиксирует document-audit.json; результаты
