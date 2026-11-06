@@ -14,6 +14,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from . import storage as db
 from .auth import actor
 from .domain import fail, validate_draft
+from .reference_manager import cache_status, hr_required, validate_new_allocations
 
 PROJECT_STATUSES = {'DRAFT', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED'}
 ALLOCATION_STATUSES = {'PROPOSED', 'CONFIRMED', 'CANCELLED'}
@@ -83,9 +84,12 @@ def employee_options(c, a, portfolio):
     identifiers = {r['data']['employeeId'] for r in db.all_rows(c, 'availability', portfolio)}
     if 'R-04' in a.roles and not a.roles & {'R-01','R-02','R-03'}:identifiers &= a.employees
     # Names may come from a local HR cache; availability IDs are the fallback.
-    names = {r['id']:r['data'].get('displayName',r['id']) for r in db.all_rows(c, 'employee', portfolio)}
-    local_names = {'employees/demo-1':'Демо-сотрудник 1', 'employees/demo-2':'Демо-сотрудник 2'}
-    return [{'id':identifier, 'name':names.get(identifier, local_names.get(identifier, identifier))}
+    people = {r['id']:r['data'] for r in db.all_rows(c, 'employee')}
+    names = {identifier: person.get('displayName',identifier) for identifier,person in people.items()}
+    required = hr_required()
+    local_names = {} if required else {'employees/demo-1':'Демо-сотрудник 1', 'employees/demo-2':'Демо-сотрудник 2'}
+    return [{'id':identifier, 'name':names.get(identifier, local_names.get(identifier, identifier)),
+             'eligibleForAssignment':people.get(identifier,{}).get('eligibleForAssignment',not required)}
             for identifier in sorted(identifiers)]
 
 
@@ -238,8 +242,10 @@ def register(app, command_tx):
             if cached:return cached
             v=get(c,'plan',req.path_params['versionId'],a);p=get(c,'project',v['projectId'],a)
             if v['status']!='DRAFT' or p['status']=='ARCHIVED':fail(409,'Сроки изменяются только в черновике действующего проекта')
+            previous=copy.deepcopy(v['allocations'])
             try:v,moved=reschedule(v,b['itemId'],b['start'],b['finish'])
             except (OverflowError,ValueError):fail(422,'Сроки вышли за допустимые границы')
+            validate_new_allocations(c,v['allocations'],previous)
             v['contentRevision']+=1;changed(c,'plan',v,req,a)
             return complete({'revision':v['revision'],'changedItemIds':moved},p['portfolioId'],p['id'])
 
@@ -292,7 +298,7 @@ def register(app, command_tx):
             employees=employee_options(c,a,p['portfolioId'])
             ids={x['id'] for x in employees}
             items={x['id']:x for x in v['items']} if v else {}
-            return {'employees':employees,'versionId':v['id'] if v else None,'revision':v['revision'] if v else None,
+            return {'employees':employees,'hrCache':cache_status(c),'versionId':v['id'] if v else None,'revision':v['revision'] if v else None,
                     'planStatus':v['status'] if v else None,
                     'demands':[dict(d,workName=items[d['planItemId']]['name']) for d in v['demands']] if v else [],
                     'availability':[{'data':r['data'],'revision':r['revision']} for r in db.all_rows(c,'availability',p['portfolioId']) if r['data']['employeeId'] in ids]}
@@ -326,6 +332,7 @@ def register(app, command_tx):
             if b.get('status')!='CANCELLED' and any(x['id']!=req.path_params.get('assignmentId') and x['demandId']==b['demandId'] and x['employeeId']==b['employeeId'] and x['date']==b['date'] and x['status']!='CANCELLED' for x in v['allocations']):
                 fail(409,'На эту работу и дату сотрудник уже назначен')
             allocation={'id':previous['id'] if editing else db.uid(),**b,'status':b.get('status','PROPOSED')}
+            validate_new_allocations(c,[allocation],[previous] if previous else [])
             v=copy.deepcopy(v)
             if editing:v['allocations']=[allocation if x['id']==allocation['id'] else x for x in v['allocations']]
             else:v['allocations'].append(allocation)

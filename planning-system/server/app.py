@@ -22,6 +22,7 @@ from . import storage as db
 from .auth import actor, DEMO_PORTFOLIO, DEMO_PROJECT
 from .domain import fail, validate_draft, check_resources, forecast, hours
 from .oidc import endpoint
+from .reference_manager import hr_required
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = json.loads((ROOT/'docs/contracts/openapi.json').read_text())
@@ -29,6 +30,7 @@ CURSOR_KEY = os.environ.get('CURSOR_SECRET','development-only-cursor-key').encod
 
 @asynccontextmanager
 async def lifespan(app):
+    hr_required()
     if os.environ.get('AUTH_MODE','oidc')=='demo' and os.environ.get('APP_ENV')!='development':
         raise RuntimeError('Demo auth requires development')
     if os.environ.get('APP_ENV')!='development' and len(CURSOR_KEY)<32:
@@ -253,6 +255,8 @@ def dispatch(c,op,req,a,b):
             allowed(a,['R-02','R-03'])
             if v['status']!='DRAFT':fail(409,'Baseline неизменна; создайте сценарий')
             validate_draft(b)
+            from .reference_manager import validate_new_allocations
+            validate_new_allocations(c,b['allocations'],v['allocations'])
             if 'R-03' in a.roles and b['allocations']!=v['allocations']:fail(403,'Изменение назначений недоступно R-03')
             old={x['id']:x for x in v['allocations']}
             for x in b['allocations']:
@@ -263,6 +267,8 @@ def dispatch(c,op,req,a,b):
         if op=='submitReview':
             allowed(a,['R-02','R-03'])
             if v['status']!='DRAFT' or not v['items']:fail(409,'Нужен непустой черновик')
+            from .reference_manager import validate_new_allocations
+            validate_new_allocations(c,v['allocations'])
             validate_draft(v);check_resources(v,*resource_inputs(c,v))
             reviewers=b['reviewers']
             if not reviewers or not any(x['role']=='FINAL_APPROVER' for x in reviewers):fail(422,'Нужен финальный согласующий')
@@ -285,6 +291,8 @@ def dispatch(c,op,req,a,b):
         if op=='activatePlan':
             allowed(a,['R-01'])
             if v['status']!='APPROVED':fail(409,'Нужна утверждённая версия')
+            from .reference_manager import validate_new_allocations
+            validate_new_allocations(c,v['allocations'])
             if v.get('resourceSnapshot')!=resource_snapshot(c,v):fail(409,'Ресурсные входы изменились после согласования')
             if b['projectRevision']!=p['revision']:fail(412,'Редакция проекта изменилась')
             check_resources(v,*resource_inputs(c,v))

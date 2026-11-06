@@ -68,6 +68,70 @@ scripts/check-prototype.mjs; его результат не подменяет b
 
 ## Общий стенд: OIDC и реальные adapters
 
+### Reference Manager: чтение и текущий кадровый кэш
+
+Клиент [reference_manager.py](server/reference_manager.py) соответствует ответу
+RM от 04.11 в #143 и текущему API 1.1.0. Читает employees, assignments,
+positions, org_units, absences с общим readTime, pageSize/pageToken и
+allowDeleted=true. Внешний ключ — numeric id; внутренний ключ PS — employees/{id},
+account_user_id сохраняется отдельно как Keycloak subject. Зарплаты не запрашиваются.
+
+Настройте RM_BASE_URL (HTTPS, заканчивается /v1) и RM_TOKEN либо
+RM_TOKEN_URL/RM_CLIENT_ID/RM_CLIENT_SECRET для client_credentials. Клиент —
+planning-service, роль RM — reference-hr-reader. Значения выдаются вне Git.
+Для отдельного локального стенда RM разрешены APP_ENV=development,
+RM_LOCAL_HTTP=true и http://localhost:8083/v1. В staging HTTP запрещён.
+
+Проверка источника без записи в БД PS:
+
+```sh
+python planning-system/scripts/check-reference-manager.py
+```
+
+Отчёт artifacts/reference-manager-report.json содержит counts/readTime/SHA-256,
+без токенов, ФИО и содержимого справочников. Отказ источника даёт ненулевой код
+завершения и passed=false. Проверка локальных HTTP-fixtures не считается живым RM.
+
+Для обновления кэша задайте DATABASE_URL именно нужного экземпляра PS и добавьте
+`--sync` к проверке либо выполните из planning-system:
+
+```sh
+python -m server.manage sync-hr
+```
+
+Сначала читаются и проверяются все пять коллекций, затем единой транзакцией
+обновляется текущий кэш. При отказе страницы, конфликте/откате revision или
+неоднозначном account_user_id прежний кэш сохраняется. Rename меняет отображаемое
+имя; увольнение/удаление/исчезновение запрещает новые назначения. Исторические
+планы, baseline и собственная доступность PS не переписываются. HR-периоды и
+отсутствия сохраняются как входы; часы и нормы автоматически из них не выводятся.
+
+В development задайте HR_MODE=real в API PS. Вне development это режим по
+умолчанию; demo и неизвестный HR_MODE блокируют запуск. Без кэша, среза не
+старше часа и допустимого сотрудника новые/изменённые назначения, их
+подтверждение, перенос дат, отправка на согласование и активация отклоняются.
+Отмена и неизменённые исторические строки доступны. Экран назначений показывает
+состояние/время кэша и недоступных для назначения сотрудников. Запуск sync-hr —
+однократный; для реального стенда Infra настраивает повтор не реже раза в час,
+с новым service token. В локальной демонстрации без HR_MODE=real остаётся
+явный учебный набор. Календарь и ставки ведёт PS, методика D-07 открыта.
+
+### Локальная проверка ETL с кодом Reports
+
+```sh
+python -m pytest planning-system/tests/test_export_integration.py -q
+```
+
+Используется настоящий Client/adapter/planning_extract/load из Reports и API PS.
+HTTP-транспорт направляет запросы в FastAPI TestClient; авторизация синтетическая,
+DWH — изолированная SQLite. Fixture содержит ACTIVE/SUPERSEDED, две недели
+demand, разные статусы allocation/availability, PARTIAL и явно синтетический
+COMPLETE forecast. Проверяются 24 строки/12 страниц по 2, counts, повтор
+POST/страниц, cost.read/null, перепланирование без удвоения, архивирование с
+историей, EXPIRED без продвижения checkpoint и отказ второй страницы с повтором.
+Это воспроизводимая локальная регрессия, общий T-INT-08 с OIDC/S-06/CronJob
+и PostgreSQL DWH принимается отдельно вместе с Reports.
+
 ### Локальная демонстрация OIDC по замечанию 1.1 PR #154
 
 Запуск с `compose.oidc.yaml` описан в README. Keycloak 26.7.4 импортирует

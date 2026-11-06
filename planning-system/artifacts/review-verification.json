@@ -1,0 +1,116 @@
+{
+  "verifiedAt": "2026-11-06T22:19:26.515742+00:00",
+  "baseMain": "1a346249a166ee9a13a87c5476d19d73b3bb624b",
+  "reviewPullRequest": "https://github.com/MEPhI-C22-501/arch-info-system-monorepo/pull/154",
+  "reviewCommit": "f4bdfe3130215a94c0f2577bb5c78382d800596d",
+  "workingTreeInputs": true,
+  "runtime": {
+    "python": "3.14.3",
+    "database": "isolated SQLite",
+    "node": "25.6.1",
+    "keycloak": "26.7.4",
+    "java": "25"
+  },
+  "tests": {
+    "passed": 97,
+    "skipped": 1,
+    "failed": 0,
+    "newHRcases": 33,
+    "newReportsETLcases": 5,
+    "junit": "review-tests.xml",
+    "skipReason": "PostgreSQL-only baseline trigger; isolated native PostgreSQL could not create shared memory"
+  },
+  "checks": {
+    "ruff": "passed",
+    "pythonSyntax": "passed",
+    "javascriptSyntax": "passed",
+    "documents": "passed",
+    "traceability": "passed",
+    "composeOIDCConfig": "passed",
+    "generatedContracts": "passed"
+  },
+  "oidc": {
+    "mode": "real local Keycloak; native JVM, SQLite PS; not shared Infra realm",
+    "checks": [
+      "planner:200",
+      "no-role:403",
+      "demo-token:401",
+      "expired-authentic-JWT:401"
+    ],
+    "passed": true,
+    "realmSha256": "beda0b698f9af54156c4a0bca000bfa8eeaba8ab8d5e22ef4e640f82a0c3c572"
+  },
+  "browser": {
+    "method": "Codex in-app browser UI",
+    "checks": [
+      "Keycloak redirect with PKCE S256",
+      "planner login and workspace return",
+      "demo role selector hidden",
+      "HR fixture label",
+      "real HR missing cache warning",
+      "assignment button and employee choices disabled without HR cache"
+    ],
+    "passed": true,
+    "fullPlaywrightSuite": "not run: Chromium launch denied by environment"
+  },
+  "reportsETL": {
+    "consumer": "actual Reports Client/planning/planning_extract/load",
+    "transport": "in-process ASGI",
+    "authorization": "synthetic S-06 with/without cost.read",
+    "warehouse": "isolated SQLite",
+    "fixtureRows": 24,
+    "pageSize": 2,
+    "pages": 12,
+    "checks": [
+      "counts",
+      "idempotent POST and pages",
+      "no duplicate current hours after replanning",
+      "archived data removed with historical snapshots retained",
+      "BATCH_EXPIRED does not advance checkpoint",
+      "second page 503 leaves no partial DWH/checkpoint; same batch recovers"
+    ]
+  },
+  "referenceManager": {
+    "contractVersion": "1.1.0",
+    "collections": [
+      "employees",
+      "assignments",
+      "positions",
+      "org_units",
+      "absences"
+    ],
+    "networkTests": "HTTP fixtures only; live RM not run",
+    "hourlyRefresh": "one-shot sync-hr; Infra scheduling remains required"
+  },
+  "notRun": [
+    "shared T-INT-01/02/03/06/07/08",
+    "native PostgreSQL trigger",
+    "Docker runtime",
+    "full Playwright E2E",
+    "current restore",
+    "current minikube",
+    "load tests"
+  ],
+  "limitations": [
+    "Docker Desktop executable missing",
+    "PostgreSQL shared-memory creation denied",
+    "Playwright Chromium launch denied",
+    "TT planning/facts runtime not implemented in base main",
+    "shared service clients, claims, S3 ACL and CronJob not accepted"
+  ],
+  "externalState": {
+    "issuesRead": [
+      "142",
+      "143",
+      "145",
+      "146",
+      "147"
+    ],
+    "reportsContract": "agreed 2026-10-29",
+    "referenceManagerContract": "agreed 2026-11-04",
+    "messagesSent": false,
+    "branchPushed": false,
+    "pullRequestCreated": false,
+    "publicationBlocker": "Automatic approval review rejected accessing stored GitHub credentials for API authentication without explicit authorization"
+  }
+}

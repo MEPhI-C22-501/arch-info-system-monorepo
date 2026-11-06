@@ -1080,7 +1080,7 @@
           "employeeId": {
             "type": "string",
             "minLength": 1,
-            "description": "HR resource name",
+            "description": "Ключ PS employees/{numeric HR id}; demo-* только учебные данные",
             "examples": [
               "employees/demo-1"
             ]
@@ -3750,7 +3750,7 @@
                   "employeeId": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "HR resource name",
+                    "description": "Ключ PS employees/{numeric HR id}; demo-* только учебные данные",
                     "examples": [
                       "employees/demo-1"
                     ]
