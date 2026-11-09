@@ -1,0 +1,47 @@
+# Одноразовая настройка realm Keycloak из существующих файлов.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-keycloak-bootstrap
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 360
+  template:
+    metadata:
+      labels:
+        app: demo-keycloak-bootstrap
+        arch-demo: 'true'
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: demo-keycloak-bootstrap
+        image: arch-info-demo:local
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - /bootstrap/keycloak_converge.py
+        envFrom:
+        - secretRef:
+            name: arch-infra-secrets
+        env:
+        - name: KEYCLOAK_INTERNAL_URL
+          value: http://keycloak:8080
+        - name: KEYCLOAK_DESIRED
+          value: /bootstrap/desired.json
+        volumeMounts:
+        - name: bootstrap
+          mountPath: /bootstrap
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 192Mi
+      volumes:
+      - name: bootstrap
+        configMap:
+          name: demo-keycloak

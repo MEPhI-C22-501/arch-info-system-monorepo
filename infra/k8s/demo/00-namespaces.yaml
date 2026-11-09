@@ -1,0 +1,42 @@
+# Namespaces общего стенда и пяти команд.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-infra
+  labels:
+    arch-demo: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-task-tracker
+  labels:
+    arch-demo: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-planning-system
+  labels:
+    arch-demo: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-reference-manager
+  labels:
+    arch-demo: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-reports
+  labels:
+    arch-demo: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arch-qa
+  labels:
+    arch-demo: 'true'

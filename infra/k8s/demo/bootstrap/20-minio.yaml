@@ -1,0 +1,48 @@
+# Одноразовое создание бакетов, пользователей и политик MinIO.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-minio-bootstrap
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 360
+  template:
+    metadata:
+      labels:
+        app: demo-minio-bootstrap
+        arch-demo: 'true'
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: demo-minio-bootstrap
+        image: arch-info-minio:RELEASE.2025-10-15T17-29-55Z
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - /scripts/minio-converge.sh
+        envFrom:
+        - secretRef:
+            name: arch-infra-secrets
+        env: []
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: policies
+          mountPath: /policies
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 192Mi
+      volumes:
+      - name: scripts
+        configMap:
+          name: demo-minio
+      - name: policies
+        configMap:
+          name: demo-minio-policies
