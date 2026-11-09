@@ -54,5 +54,6 @@ export const date = (value: unknown): string => value ? new Intl.DateTimeFormat(
 export const dateTime = (value: unknown): string => value ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(new Date(String(value))) : '—';
 export const hours = (value: unknown): string => `${Number(value ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ч`;
 export const typeName = (type: string): string => ({ PROJECT: 'Проект', EPIC: 'Эпик', TASK: 'Задача', BUG: 'Ошибка', SUBTASK: 'Подзадача' }[type] || type);
+export const iterationStateName = (state: string): string => ({ PLANNED: 'Запланирована', ACTIVE: 'Активна', COMPLETED: 'Завершена' }[state] || state);
 
 export const overdue = (item: Item, statuses: Status[]): boolean => Boolean(item.dueDate && item.dueDate < new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()) && statuses.find(s => s.id === item.statusId)?.category === 'OPEN');

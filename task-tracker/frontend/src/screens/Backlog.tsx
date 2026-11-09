@@ -104,6 +104,6 @@ export function Backlog({ context, revision, open, refresh }:
     </div>
     {page && <p className="list-foot">Всего элементов: {page.total}</p>}
     {creating && <CreateItem context={context} close={() => setCreating(false)} created={id => { setCreating(false); refresh(); open(id); }} />}
-    <div className="actions"><button disabled={pageNumber===1} onClick={()=>{setPageNumber(p=>p-1);setSelected([]);}}>Назад</button><span>Страница {pageNumber} из {page?.totalPages || 1}</span><button disabled={!page || pageNumber>=page.totalPages} onClick={()=>{setPageNumber(p=>p+1);setSelected([]);}}>Далее</button></div>
+    <div className="actions"><button className="button secondary" disabled={pageNumber===1} onClick={()=>{setPageNumber(p=>p-1);setSelected([]);}}>Назад</button><span>Страница {pageNumber} из {page?.totalPages || 1}</span><button className="button secondary" disabled={!page || pageNumber>=page.totalPages} onClick={()=>{setPageNumber(p=>p+1);setSelected([]);}}>Далее</button></div>
   </section>;
 }
