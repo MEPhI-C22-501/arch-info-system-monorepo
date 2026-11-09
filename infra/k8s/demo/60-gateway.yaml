@@ -1,0 +1,59 @@
+# Стартовая страница и HTTP-прокси к frontend пяти команд.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-gateway
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-gateway
+  template:
+    metadata:
+      labels:
+        app: demo-gateway
+        arch-demo: 'true'
+    spec:
+      containers:
+      - name: demo-gateway
+        image: arch-info-demo:local
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ROLE
+          value: gateway
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 192Mi
+        readinessProbe:
+          httpGet:
+            path: /livez
+            port: 8080
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 8080
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-gateway
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  selector:
+    app: demo-gateway
+  ports:
+  - port: 8080
+    targetPort: 8080

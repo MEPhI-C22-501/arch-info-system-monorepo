@@ -1,0 +1,4 @@
+boto3==1.40.44
+confluent-kafka==2.12.0
+psycopg[binary]==3.2.10
+PyJWT[crypto]==2.10.1

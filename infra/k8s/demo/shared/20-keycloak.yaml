@@ -1,0 +1,93 @@
+# Общие сервисы: keycloak. Секреты создаются скриптом вне Git.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        arch-demo: 'true'
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:26.7.4
+        args:
+        - start-dev
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: management
+          containerPort: 9000
+        env:
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: arch-infra-secrets
+              key: KC_BOOTSTRAP_ADMIN_USERNAME
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: arch-infra-secrets
+              key: KC_BOOTSTRAP_ADMIN_PASSWORD
+        - name: KC_DB
+          value: postgres
+        - name: KC_DB_URL
+          value: jdbc:postgresql://keycloak-db:5432/keycloak
+        - name: KC_DB_USERNAME
+          value: keycloak
+        - name: KC_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: arch-infra-secrets
+              key: KC_DB_PASSWORD
+        - name: KC_HOSTNAME_STRICT
+          value: 'false'
+        - name: KC_HEALTH_ENABLED
+          value: 'true'
+        - name: KC_HOSTNAME
+          value: http://localhost:18081
+        - name: JAVA_OPTS_KC_HEAP
+          value: -Xms128m -Xmx384m
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: management
+        resources:
+          requests:
+            cpu: 50m
+            memory: 96Mi
+          limits:
+            cpu: '1'
+            memory: 768Mi
+        startupProbe:
+          httpGet:
+            path: /health/ready
+            port: management
+          failureThreshold: 90
+          periodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels:
+    arch-demo: 'true'
+  namespace: arch-infra
+spec:
+  selector:
+    app: keycloak
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
