@@ -64,7 +64,7 @@ class Acceptance(unittest.TestCase):
         self.db = Database(self.dsn); self.db.initialize()
         with self.db.transaction():
             for subject in (MEMBER_1, MEMBER_2):
-                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (subject, subject))
+                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (subject, subject))
 
     def tearDown(self):
         self.db.close(); self.directory.cleanup()
@@ -166,7 +166,7 @@ class PostgreSQLAcceptance(Acceptance):
         self.db = Database(self.dsn); self.db.initialize()
         with self.db.transaction():
             for subject in (MEMBER_1, MEMBER_2):
-                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (subject, subject))
+                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (subject, subject))
 
     def tearDown(self):
         from psycopg import sql

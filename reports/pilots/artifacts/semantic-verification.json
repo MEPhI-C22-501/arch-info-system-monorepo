@@ -99,7 +99,7 @@
   "source_integrations_verified": false,
   "source_sha256": {
     "reports/pilots/check_semantics.py": "f7942504851eacb8952ae5047a93df579d2cae9bfb87ba2ff7a6cfc3da8ec493",
-    "reports/pilots/star.py": "f3a3c30e3cfe734db80843d75dbf1f6d50a4df74802aa1c95b38f016ac82c4ec",
+    "reports/pilots/star.py": "cb2c49da6596de0884eb7d391c9d1d14f3e25cd560286cf08150c2aa2eaefc73",
     "reports/pilots/cube/access.js": "4dd7700b9132bc172d0cc75de367f4ad055e68154ffdb9af7aa83443ffa4a6be",
     "reports/pilots/cube/cube.js": "c9d20bcba08121138907fc2fa41cae7949a11b2a11adc73876a188a8b8d0d701",
     "reports/pilots/cube/model/DefectFlow.js": "1faa900e04992fd12d2a7c9f1faa8e70a1225876e42a922d1881d1c6c1e062a6",

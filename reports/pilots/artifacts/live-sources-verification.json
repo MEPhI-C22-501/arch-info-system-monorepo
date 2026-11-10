@@ -1,67 +1,11 @@
 {
-  "checked_at_utc": "2026-11-04T09:55:24.447242+00:00",
+  "checked_at_utc": "2026-11-10T08:54:39.483394+00:00",
   "sources": [
     "planning",
     "tracker"
   ],
-  "passed": false,
+  "passed": true,
   "checks": [
-    {
-      "source": "tracker",
-      "check": "no_token_denied",
-      "http_status": 401,
-      "passed": true
-    },
-    {
-      "source": "tracker",
-      "check": "live_api_matches_owner_contract",
-      "passed": false,
-      "rejected": "tracker load 1 rejected: INVALID_PAGE_METADATA",
-      "findings": [
-        {
-          "resource": "work-items",
-          "page_fields_missing": [
-            "total"
-          ]
-        },
-        {
-          "resource": "work-items",
-          "schema": "ReportWorkItem",
-          "item_errors": [
-            "item: 'children' is a required property",
-            "item: 'description' is a required property",
-            "item: 'statusId' is a required property",
-            "item: 'title' is a required property",
-            "item: 'version' is a required property"
-          ]
-        },
-        {
-          "resource": "time-logs",
-          "page_fields_missing": [
-            "total"
-          ]
-        },
-        {
-          "resource": "time-logs",
-          "schema": "TimeLog",
-          "item_errors": [
-            "loggedDate: '2026-11-04T00:00:00.000Z' is not a 'date'"
-          ]
-        },
-        {
-          "resource": "iterations",
-          "page_fields_missing": [
-            "total"
-          ]
-        },
-        {
-          "resource": "history",
-          "page_fields_missing": [
-            "total"
-          ]
-        }
-      ]
-    },
     {
       "source": "planning",
       "check": "no_token_denied",
@@ -94,6 +38,29 @@
       ],
       "same_batch_replayed": true,
       "passed": true
+    },
+    {
+      "source": "tracker",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "tracker",
+      "check": "live_etl_twice_without_double_count",
+      "records": {
+        "iterations": 1,
+        "statuses": 5,
+        "time-logs": 1,
+        "work-items": 4
+      },
+      "rows_per_load": [
+        11,
+        11
+      ],
+      "time_log_hours": 2.0,
+      "r01_hours_current_month": 2.0,
+      "passed": true
     }
   ],
   "services": {
@@ -112,8 +79,8 @@
   "source_sha256": {
     "reports/pilots/check_live_sources.py": "4ca7861a9e52c7ccadca2207c9a89e0a6b6600187f62d1190eae9b08060ecfae",
     "reports/pilots/adapters.py": "3133b6b4ad59dd5e6e41672ab37e914f8ae48636834135ce7f365ae5bdd61cdb",
-    "reports/pilots/etl.py": "4efc71119d326472a29140b96a981db6f10a1b036919dd3026410d1a07cb1d70",
+    "reports/pilots/etl.py": "cf3b97ca15f7d56c940f2047b7f3b91245fad828b4deb48dd25f68c433902b97",
     "reports/pilots/contracts.py": "c7471614cc2e1d43b14569ca736044a8e88f0a795928fa967c8c624fef7a34df",
-    "reports/pilots/star.py": "f3a3c30e3cfe734db80843d75dbf1f6d50a4df74802aa1c95b38f016ac82c4ec"
+    "reports/pilots/star.py": "cb2c49da6596de0884eb7d391c9d1d14f3e25cd560286cf08150c2aa2eaefc73"
   }
 }

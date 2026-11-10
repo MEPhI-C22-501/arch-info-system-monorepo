@@ -101,7 +101,8 @@ def main():
             request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles['reports-analyst']])
         subjects[name] = user_id
     # The synthetic Tracker fixture deliberately uses these returned IDs.
-    # Never derive real identity bindings from HR names or coincident IDs.
+    # Never derive identity bindings from HR names. Tracker ids are Keycloak subs by the tracker's
+    # contract (ADR-021) and the ETL binds them too; the demo binds its two members up front.
     with psycopg.connect(os.environ['REPORTS_DATABASE_URL']) as connection:
         for name in ['member1', 'member2']:
             subject = subjects[name]

@@ -94,6 +94,14 @@ def prune_planning(db, scope, entities):
     return len(stale)
 
 
+def bind_tracker_users(db, user_ids):
+    """Task Tracker stores the Keycloak sub as TimeLog.userId and assigneeId (#159, 10.11.2026; ADR-021):
+    bind each such id to the same subject. An existing binding — the subject to another tracker id, or this
+    id to another subject — is never replaced, so an explicit mapping keeps winning."""
+    for user in sorted({u for u in user_ids if isinstance(u, str) and 0 < len(u) <= 128}):
+        db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (user, user))
+
+
 def load(db, source, extract, scope=None):
     batch_id, started = str(uuid.uuid4()), now()
     with db.transaction():
@@ -160,6 +168,9 @@ def load(db, source, extract, scope=None):
                         logged_date=excluded.logged_date,hours_cents=excluded.hours_cents""", row)
             if source == 'planning' and scope:
                 prune_planning(db, scope, entities)
+            if source == 'tracker':
+                bind_tracker_users(db, [r.get('userId') for r in entities.get('time-logs', [])] +
+                                   [r.get('assigneeId') for r in entities.get('work-items', [])])
             from star import refresh
             refresh(db,data_as_of,batch_id)
             from maintenance import reconcile

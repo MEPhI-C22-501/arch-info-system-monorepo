@@ -29,7 +29,7 @@ class HttpBoundary(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, source_server(dataset(), public) as (base, _, _):
             dsn = 'sqlite:'+str(Path(directory)/'http.sqlite')
             db = Database(dsn); db.initialize()
-            with db.transaction(): db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (MEMBER_1, MEMBER_1))
+            with db.transaction(): db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (MEMBER_1, MEMBER_1))
             load(db, 'tracker', lambda: tracker_extract(Client(base+'/tracker', allow_http=True, interval=0)))
             # Defense at the response boundary even if untrusted text has
             # reached storage. JSON transport is not a browser-rendering test.
