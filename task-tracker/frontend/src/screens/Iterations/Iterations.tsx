@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type React from 'react';
-import { date, hours, json, request, typeName } from '../../api';
+import { date, hours, iterationStateName, json, request, typeName } from '../../api';
 import type { Iteration } from '../../api';
 import { can, selectName } from '../../context';
 import type { Context } from '../../context';
@@ -54,13 +54,13 @@ export function Iterations({ context, revision, open, refresh }:
     <div className="iteration-layout">
       <div className="panel iteration-list"><h3>Итерации</h3>
         {list?.length ? list.map(row => <button key={row.id} className={`iteration-link ${effectiveSelected === row.id ? 'active' : ''}`} onClick={() => setSelected(row.id)}>
-          <strong>{row.name}</strong><small>{date(row.startDate)} — {date(row.endDate)}</small><Badge tone={row.state === 'COMPLETED' ? 'green' : ''}>{row.state}</Badge>
+          <strong>{row.name}</strong><small>{date(row.startDate)} — {date(row.endDate)}</small><Badge tone={row.state === 'COMPLETED' ? 'green' : ''}>{iterationStateName(row.state)}</Badge>
         </button>) : <Empty text="Итераций пока нет" />}
       </div>
       <div className="iteration-detail">{iteration ? <>
         <div className="panel iteration-hero">
           <div className="section-heading">
-            <div><span className="eyebrow">{iteration.state}</span><h2>{iteration.name}</h2>{iteration.state==='COMPLETED' && <button onClick={()=>void navigate(`/iterations/${iteration.id}/plan-fact`)}>План-факт</button>}<p>{date(iteration.startDate)} — {date(iteration.endDate)}</p></div>
+            <div><span className="eyebrow">{iterationStateName(iteration.state)}</span><h2>{iteration.name}</h2>{iteration.state==='COMPLETED' && <button className="button secondary" onClick={()=>void navigate(`/iterations/${iteration.id}/plan-fact`)}>План-факт</button>}<p>{date(iteration.startDate)} — {date(iteration.endDate)}</p></div>
             {can(context, 'iteration.write') && <div className="actions">
               {iteration.state === 'PLANNED' && <button className="button primary" onClick={() => void action(`/iterations/${iteration.id}/activate`, { method: 'POST' })}>Запустить</button>}
               {iteration.state === 'ACTIVE' && <button className="button primary" onClick={() => void action(`/iterations/${iteration.id}/complete`, { method: 'POST' })}>Завершить</button>}

@@ -4,14 +4,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ru.mephi.arch.tasktracker.application.workitem.CreateWorkItem;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.*;
 
 @RestController @RequestMapping("/api/v1")
 public class IntegrationController {
-    private final JdbcTemplate db;private final AccessService access;private final WorkItemService items;private final ChangeRecorder changes;
-    public IntegrationController(JdbcTemplate db,AccessService access,WorkItemService items,ChangeRecorder changes){this.db=db;this.access=access;this.items=items;this.changes=changes;}
+    private final JdbcTemplate db;private final AccessService access;private final WorkItemService items;private final ChangeRecorder changes;private final CreateWorkItem create;
+    public IntegrationController(JdbcTemplate db,AccessService access,WorkItemService items,ChangeRecorder changes,CreateWorkItem create){this.db=db;this.access=access;this.items=items;this.changes=changes;this.create=create;}
     @PostMapping("/bugs") @Transactional public ResponseEntity<?> bug(@RequestBody Map<String,Object> body){
         access.testing();String source=Values.str(body,"externalSource",true),external=Values.str(body,"externalDefectId",true);
         String title=Values.str(body,"title",true),description=Values.str(body,"description",true),severity=Values.str(body,"severity",true).toLowerCase(Locale.ROOT);
@@ -26,7 +27,7 @@ public class IntegrationController {
         Map<String,Object> request=new LinkedHashMap<>();request.put("type","BUG");request.put("title",title);request.put("description",description);
         request.put("priorityId",priority);request.put("externalSource",source);request.put("externalDefectId",external);request.put("severity",severity);
         request.put("environment",Objects.toString(body.getOrDefault("environment",body.get("build")),""));request.put("testRunUrl",body.get("testRunUrl"));request.put("testCaseUrl",body.get("testCaseUrl"));
-        var created=items.createAs(request,access.subject(),source);UUID id=(UUID)created.get("id");
+        var created=create.execute(request,access.subject(),source);UUID id=(UUID)created.get("id");
         return ResponseEntity.created(URI.create("/api/v1/work-items/"+id)).body(Map.of("id",id,"status","created","workItemUrl","/work-items/"+id));
     }
     private boolean blank(Object value){return value==null||value.toString().isBlank();}
@@ -43,7 +44,7 @@ public class IntegrationController {
             if(filters.get("status")!=null&&!filters.get("status").equals(status.get("name"))&&!filters.get("status").equals(item.get("statusId").toString()))continue;
             LocalDate changed=((java.sql.Timestamp)raw.get("updated_at")).toLocalDateTime().toLocalDate();
             if(from!=null&&changed.isBefore(from)||to!=null&&changed.isAfter(to))continue;
-            Map<String,Object> row=new LinkedHashMap<>();for(String key:List.of("id","type","assigneeId","dueDate","plannedHours","actualHours","remainingHours","iterationId","parentId","priorityId","severity"))row.put(key,item.get(key));
+            Map<String,Object> row=new LinkedHashMap<>();for(String key:List.of("id","type","title","description","statusId","version","assigneeId","dueDate","plannedHours","actualHours","remainingHours","iterationId","parentId","priorityId","severity","children"))row.put(key,item.get(key));
             row.put("projectId",project);row.put("iterationId",iteration);row.put("status",status.get("name"));row.put("updatedAt",item.get("updatedAt"));output.add(row);
         }
         return slice(output,page,size);
@@ -64,7 +65,7 @@ public class IntegrationController {
     @GetMapping("/reports/time-logs") public Object reportTimeLogs(@RequestParam Map<String,String> filters){
         access.reports();int page=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
         LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
-        StringBuilder sql=new StringBuilder("SELECT t.id,t.work_item_id AS \"workItemId\",t.external_user_id AS \"userId\",t.logged_date AS \"loggedDate\",t.hours FROM time_log_entry t WHERE 1=1");List<Object> args=new ArrayList<>();
+        StringBuilder sql=new StringBuilder("SELECT t.id,t.work_item_id AS \"workItemId\",t.external_user_id AS \"userId\",t.logged_date::text AS \"loggedDate\",t.hours FROM time_log_entry t WHERE 1=1");List<Object> args=new ArrayList<>();
         if(from!=null){sql.append(" AND t.logged_date>=?");args.add(java.sql.Date.valueOf(from));}if(to!=null){sql.append(" AND t.logged_date<=?");args.add(java.sql.Date.valueOf(to));}
         if(filters.get("assigneeId")!=null){sql.append(" AND t.external_user_id=?");args.add(filters.get("assigneeId"));}
         var rows=db.queryForList(sql+" ORDER BY t.logged_date,t.id",args.toArray());List<Map<String,Object>> output=new ArrayList<>();
@@ -90,8 +91,8 @@ public class IntegrationController {
             try { entry.put(key,new com.fasterxml.jackson.databind.ObjectMapper().readValue(entry.get(key).toString(),Object.class)); }
             catch(com.fasterxml.jackson.core.JsonProcessingException ex) { throw new IllegalStateException("invalid_history_json",ex); }
         }
-        return Map.of("items",history,"page",number,"pageSize",size,"totalPages",(total+size-1)/size);
+        return Map.of("items",history,"page",number,"pageSize",size,"total",total,"totalPages",(total+size-1)/size);
     }
     private int page(String input,int fallback){try{int v=input==null?fallback:Integer.parseInt(input);if(v<1)throw new NumberFormatException();return v;}catch(NumberFormatException e){throw ApiException.invalid("page","invalid_integer");}}
-    private Map<String,Object> slice(List<?> rows,int page,int size){int from=Math.min(rows.size(),(page-1)*size),to=Math.min(rows.size(),from+size);return Map.of("items",rows.subList(from,to),"page",page,"pageSize",size,"totalPages",(rows.size()+size-1)/size);}
+    private Map<String,Object> slice(List<?> rows,int page,int size){int from=Math.min(rows.size(),(page-1)*size),to=Math.min(rows.size(),from+size);return Map.of("items",rows.subList(from,to),"page",page,"pageSize",size,"total",rows.size(),"totalPages",(rows.size()+size-1)/size);}
 }

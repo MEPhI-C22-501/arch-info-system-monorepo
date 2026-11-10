@@ -58,7 +58,7 @@ export function App() {
 
   if (!ready) {
     return <main className="startup"><div className="spinner" /><h1>Task Tracker</h1><p>{error || 'Загрузка рабочего пространства…'}</p>
-      {error && <button onClick={() => void auth.signinRedirect()}>Войти снова</button>}</main>;
+      {error && <button className="button primary" onClick={() => void auth.signinRedirect()}>Войти снова</button>}</main>;
   }
 
   if(location.pathname==='/') return <Navigate to="/backlog" replace />;
