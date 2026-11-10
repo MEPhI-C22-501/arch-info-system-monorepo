@@ -14,7 +14,7 @@ class Reports(unittest.TestCase):
         self.db = Database('sqlite::memory:'); self.db.initialize()
         with self.db.transaction():
             for subject in (MEMBER_1, MEMBER_2):
-                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (subject, subject))
+                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (subject, subject))
         load(self.db, 'tracker', lambda: tracker_extract(Tracker()))
         self.member = {'sub': MEMBER_1, 'resource_access': {'reports': {'roles': ['reports-member']}}}
         self.admin = {'sub': 'admin', 'resource_access': {'reports': {'roles': ['reports-admin']}}}

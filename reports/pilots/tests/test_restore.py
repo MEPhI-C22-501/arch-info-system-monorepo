@@ -44,7 +44,7 @@ class Restore(unittest.TestCase):
                 source.initialize()
                 with source.transaction():
                     for subject in (MEMBER_1, MEMBER_2):
-                        source.execute('INSERT INTO app.subject_binding VALUES (?,?)', (subject, subject))
+                        source.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (subject, subject))
                 load(source, 'tracker', lambda: tracker_extract(Tracker()))
                 changed = fixture(); changed['work-items'][0]['plannedHours'] = 22
                 load(source, 'tracker', lambda: tracker_extract(Tracker(changed)))

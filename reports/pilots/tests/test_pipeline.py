@@ -68,7 +68,7 @@ class Pipeline(unittest.TestCase):
         self.db.initialize()
         with self.db.transaction():
             for subject in [MEMBER_1, MEMBER_2]:
-                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (subject, subject))
+                self.db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (subject, subject))
 
     def tearDown(self):
         self.db.close()
@@ -284,11 +284,24 @@ class Pipeline(unittest.TestCase):
         malicious = copy.deepcopy(member); malicious['sub'] = "' OR 1=1 --"
         with self.assertRaises(PermissionError): report(self.db, malicious)
 
-    def test_missing_identity_binding_denies_access_even_if_ids_coincide(self):
+    def test_tracker_user_id_is_the_subject_unless_bound_elsewhere(self):
+        # Task Tracker, #159 10.11.2026: TimeLog.userId is the Keycloak sub (ADR-021).
+        with self.db.transaction(): self.db.execute('DELETE FROM app.subject_binding')
         load(self.db, 'tracker', lambda: tracker_extract(Tracker()))
+        claims = {'sub': MEMBER_1, 'resource_access': {'reports': {'roles': ['reports-member']}}}
+        self.assertEqual(report(self.db, claims)['data'][0]['hours'], 3.75)
+        # An explicit binding of the subject to another tracker id stays; the coinciding id gives nothing.
         with self.db.transaction():
             self.db.execute('DELETE FROM app.subject_binding WHERE subject=?', (MEMBER_1,))
-        claims = {'sub': MEMBER_1, 'resource_access': {'reports': {'roles': ['reports-member']}}}
+            self.db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (MEMBER_1, 'tracker-person-a'))
+        load(self.db, 'tracker', lambda: tracker_extract(Tracker()))
+        bound = self.db.execute('SELECT tracker_user_id FROM app.subject_binding WHERE subject=?', (MEMBER_1,)).fetchone()[0]
+        self.assertEqual(bound, 'tracker-person-a')
+        self.assertEqual(report(self.db, claims)['data'], [])
+
+    def test_unknown_subject_without_tracker_records_is_denied(self):
+        load(self.db, 'tracker', lambda: tracker_extract(Tracker()))
+        claims = {'sub': 'not-in-tracker', 'resource_access': {'reports': {'roles': ['reports-member']}}}
         with self.assertRaises(PermissionError): report(self.db, claims)
 
     def test_explicit_tracker_to_subject_mapping_is_used(self):
@@ -345,7 +358,7 @@ class HttpSecurity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dsn = 'sqlite:'+str(Path(tmp)/'pilot.sqlite')
             db = Database(dsn); db.initialize()
-            with db.transaction(): db.execute('INSERT INTO app.subject_binding VALUES (?,?)', (MEMBER_1, MEMBER_1))
+            with db.transaction(): db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING', (MEMBER_1, MEMBER_1))
             load(db, 'tracker', lambda: tracker_extract(Tracker())); db.close()
             issuer = f'http://127.0.0.1:{keys.server_port}'
             ReportHandler.jwks = jwt.PyJWKClient(issuer)

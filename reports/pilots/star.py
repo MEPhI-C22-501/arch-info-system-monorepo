@@ -267,10 +267,13 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
         qa_project[r['id']]=r
         dimension(db,'test_plan','qa',r['id'],dict(test_plan_id=r['id'],project_key=project(r.get('project')),iteration_key=k('iteration','tracker',r.get('iteration')),release_key=k('release','planning',r.get('planningReleaseId')),name=r.get('title')),r,at)
     for r in records(db,'qa','test-cases'):dimension(db,'test_case','qa',r['id'],dict(test_case_id=r['id'],case_version=r.get('version'),name=r.get('title'),automated=int(bool(r.get('automated')))),r,at)
+    # The tracker's "Ошибка" created from a QA defect carries externalDefectId (#159, 10.11.2026);
+    # QA's own trackerWorkItemId wins when both are present.
+    bug_of={str(w['externalDefectId']):w['id'] for w in records(db,'tracker','work-items') if w.get('type')=='BUG' and w.get('externalDefectId')}
     for d in engine.qa_rows('defects'):
         severity=d.get('severity')
         dimension(db,'severity','qa',severity or 'UNKNOWN',dict(code=severity,name=severity),{'id':severity},at)
-        dimension(db,'defect','qa',d['id'],dict(defect_id=d['id'],project_key=project(d.get('project')),tt_work_item_id=d.get('trackerWorkItemId'),created_at=d.get('createdAt')),d,at)
+        dimension(db,'defect','qa',d['id'],dict(defect_id=d['id'],project_key=project(d.get('project')),tt_work_item_id=d.get('trackerWorkItemId') or bug_of.get(str(d['id'])),created_at=d.get('createdAt')),d,at)
         history=[h for h in d.get('history',[]) if h.get('field','status')=='status' and timestamp(h.get('occurredAt'))]
         closes=sorted(h['occurredAt'] for h in history if (h.get('newValue') or h.get('status'))=='CLOSED')
         first=closes[0] if closes else d.get('closedAt');created=timestamp(d.get('createdAt'));closed=timestamp(first)

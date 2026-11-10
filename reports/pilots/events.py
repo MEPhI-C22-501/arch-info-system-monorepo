@@ -99,6 +99,9 @@ def apply(db,body,source,identity,offset):
             changes={'state':'COMPLETED' if name=='IterationCompleted' else 'ACTIVE'} if name!='IterationCompositionChanged' else {}
             reload_request(db,source,identity,at,name)
         elif name!='NotificationCreated':reload_request(db,source,identity,at,name)
+        if changes.get('userId') or changes.get('assigneeId'):
+            from etl import bind_tracker_users
+            bind_tracker_users(db,[changes.get('userId'),changes.get('assigneeId')])
         if changes:
             payload,accepted=event(db,source,entity,target,changes,at,offset)
             if name=='TimeLogged' and accepted:

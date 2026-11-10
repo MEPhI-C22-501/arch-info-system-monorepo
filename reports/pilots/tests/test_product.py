@@ -35,7 +35,7 @@ def seed(db):
         entities=data[source];facts=transform_time_logs(entities['time-logs'],entities['work-items']) if source=='tracker' else None
         value=now();load(db,source,lambda e=entities,f=facts,s=value:(e,s,s,f))
     with db.transaction():
-        for subject in SUBJECTS.values(): db.execute('INSERT INTO app.subject_binding VALUES (?,?)',(subject,subject))
+        for subject in SUBJECTS.values(): db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING',(subject,subject))
         for link in data['links']: db.execute('INSERT INTO app.entity_link VALUES (?,?,?)',link)
         for c in [claims(),claims(MEMBER_1,[MB]),claims(MEMBER_2,[MB])]: remember(db,c)
         from star import refresh
@@ -120,6 +120,19 @@ class Product(unittest.TestCase):
         from etl import complete_reload_requests
         complete_reload_requests(self.db,'qa',now())
         self.assertEqual(analyst.route('GET','etl/loads',params={'source':'qa-system'})[1]['items'][0]['status'],'COMPLETED')
+
+    def test_defect_links_to_the_tracker_bug_by_external_defect_id(self):
+        # Task Tracker, #159 10.11.2026: a bug from QA is WorkItemCreated with type BUG and externalDefectId.
+        from star import refresh
+        defect=self.data['qa']['defects'][0]['id']
+        tracker=dict(self.data['tracker'])
+        bug=dict(tracker['work-items'][0],id=str(uuid.uuid4()),type='BUG',title='Ошибка из QA',externalSource='qa-system',externalDefectId=defect)
+        tracker['work-items']=tracker['work-items']+[bug]
+        facts=transform_time_logs(tracker['time-logs'],tracker['work-items']);value=now()
+        load(self.db,'tracker',lambda:(tracker,value,value,facts))
+        with self.db.transaction(): refresh(self.db,now())
+        linked=self.db.execute('SELECT COUNT(*) FROM dwh.dim_defect WHERE defect_id=? AND tt_work_item_id=?',(defect,bug['id'])).fetchone()[0]
+        self.assertGreaterEqual(linked,1)
 
     def test_project_scope_mapping_and_drilldown_never_expand_access(self):
         project=self.data['tracker']['work-items'][0]['projectId']

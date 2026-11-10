@@ -23,7 +23,7 @@ def seed(db):
         entities=data[source];facts=transform_time_logs(entities['time-logs'],entities['work-items']) if source=='tracker' else None
         at=now();assert load(db,source,lambda e=entities,f=facts,t=at:(e,t,t,f))['status']=='LOADED'
     with db.transaction():
-        for sub in [MEMBER_1,MEMBER_2]:db.execute('INSERT INTO app.subject_binding VALUES (?,?)',(sub,sub))
+        for sub in [MEMBER_1,MEMBER_2]:db.execute('INSERT INTO app.subject_binding VALUES (?,?) ON CONFLICT DO NOTHING',(sub,sub))
         for link in data['links']:db.execute('INSERT INTO app.entity_link VALUES (?,?,?)',link)
         refresh(db,now())
     return data
