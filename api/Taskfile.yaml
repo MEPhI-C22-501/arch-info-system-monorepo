@@ -6,11 +6,18 @@ vars:
   OUT_DIR: '{{.ROOT_DIR}}/out'
   NO_TESTS_AND_DOCS: modelTests=false,apiTests=false,modelDocs=false,apiDocs=false
   ALL_LANGS: [go, python, java, typescript]
+  SPEC_FILES:
+    sh: cd "{{.SPECS_DIR}}" && find . -type f \( -name openapi.yaml -o -name openapi.json \) | sed 's|^\./||' | sort
   # Spec paths relative to SPECS_DIR, e.g. reference-manager/currency/v1
   ALL_SPECS:
-    sh: cd {{.ROOT_DIR}}/openapi && find . -name openapi.yaml -exec dirname {} \; | sed 's|^\./||' | sort
+    sh: printf '%s\n' '{{.SPEC_FILES}}' | sed 's|/openapi\.[^.]*$||' | sort -u
 
 tasks:
+  sync-specs:
+    desc: Refresh the shared OpenAPI catalog from module-owned specifications
+    cmds:
+      - python3 "{{.ROOT_DIR}}/sync-specs.py"
+
   swagger:
     desc: Start Swagger UI in Docker for specs of all components (SWAGGER_PORT=8080)
     vars:
@@ -18,8 +25,8 @@ tasks:
     cmds:
       - |
         URLS_JSON="["
-        for spec in {{.ALL_SPECS | catLines}}; do
-          URLS_JSON="${URLS_JSON}{\"url\":\"api/${spec}/openapi.yaml\",\"name\":\"${spec}\"},"
+        for file in {{.SPEC_FILES | catLines}}; do
+          URLS_JSON="${URLS_JSON}{\"url\":\"api/${file}\",\"name\":\"${file%/*}\"},"
         done
         URLS_JSON="${URLS_JSON%,}]"
 
@@ -62,98 +69,119 @@ tasks:
 
   generate:go:
     internal: true
+    dir: &api-root '{{.ROOT_DIR}}'
     requires:
       vars: [SPEC]
     vars:
+      SPEC_FILE: &spec-file
+        sh: |
+          spec_dir="openapi/{{.SPEC}}"
+          if test -f "{{.ROOT_DIR}}/$spec_dir/openapi.json"; then
+            printf '%s\n' "$spec_dir/openapi.json"
+          else
+            printf '%s\n' "$spec_dir/openapi.yaml"
+          fi
       MODULE_DIR: '{{.OUT_DIR}}/go'
       PACKAGE_DIR: '{{.MODULE_DIR}}/{{.SPEC}}'
       # reference-manager/currency/v1 -> currency_v1
       PACKAGE_NAME: '{{splitList "/" .SPEC | initial | last | replace "-" "_"}}_{{splitList "/" .SPEC | last}}'
     preconditions: &spec-exists
-      - sh: test -f {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml
-        msg: 'Spec {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml not found'
+      - sh: test -f "{{.SPEC_FILE}}"
+        msg: 'Spec {{.SPEC}} must contain openapi.yaml or openapi.json'
     cmds:
-      - rm -rf {{.PACKAGE_DIR}}
+      - rm -rf "{{.PACKAGE_DIR}}"
       - |
         openapi-generator-cli generate \
-          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
-          -c {{.CONFIGS_DIR}}/go.yaml \
+          -i "{{.SPEC_FILE}}" \
+          -c "{{.CONFIGS_DIR}}/go.yaml" \
           -g go-server \
-          -o {{.PACKAGE_DIR}} \
+          -o "{{.PACKAGE_DIR}}" \
           --additional-properties=packageName={{.PACKAGE_NAME}} \
+          --model-name-mappings=Operation=ApiOperation \
           --global-property=models,apis,supportingFiles=api.go:routers.go:helpers.go:error.go:logger.go:impl.go
-      - rm -rf {{.PACKAGE_DIR}}/.openapi-generator
+      - rm -rf "{{.PACKAGE_DIR}}/.openapi-generator"
       # The generator creates a directory for the skipped api/openapi.yaml
-      - find {{.PACKAGE_DIR}} -type d -empty -delete
+      - find "{{.PACKAGE_DIR}}" -type d -empty -delete
       # go-server templates import "errors" in some models that never use it
-      - go run golang.org/x/tools/cmd/goimports@v0.52.0 -w {{.PACKAGE_DIR}}
-      - cd {{.MODULE_DIR}} && go mod tidy
+      - go run golang.org/x/tools/cmd/goimports@v0.52.0 -w "{{.PACKAGE_DIR}}"
+      - cd "{{.MODULE_DIR}}" && go mod tidy
 
   generate:python:
     internal: true
+    dir: *api-root
     requires:
       vars: [SPEC]
     vars:
+      SPEC_FILE: *spec-file
       PROJECT_DIR: '{{.OUT_DIR}}/python'
       # reference-manager/currency/v1 -> reference_manager.currency.v1
       PACKAGE_NAME: '{{.SPEC | replace "-" "_" | replace "/" "."}}'
       PACKAGE_DIR: '{{.PROJECT_DIR}}/{{.PACKAGE_NAME | replace "." "/"}}'
     preconditions: *spec-exists
     cmds:
-      - rm -rf {{.PACKAGE_DIR}}
+      - rm -rf "{{.PACKAGE_DIR}}"
       - |
         openapi-generator-cli generate \
-          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
-          -c {{.CONFIGS_DIR}}/python.yaml \
+          -i "{{.SPEC_FILE}}" \
+          -c "{{.CONFIGS_DIR}}/python.yaml" \
           -g python \
-          -o {{.PROJECT_DIR}} \
+          -o "{{.PROJECT_DIR}}" \
           --additional-properties=packageName={{.PACKAGE_NAME}} \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=__init__.py:api_client.py:api_response.py:configuration.py:exceptions.py:rest.py
-      - rm -rf {{.PROJECT_DIR}}/.openapi-generator
+      - rm -rf "{{.PROJECT_DIR}}/.openapi-generator"
 
   generate:java:
     internal: true
+    dir: *api-root
     requires:
       vars: [SPEC]
     vars:
+      SPEC_FILE: *spec-file
       PROJECT_DIR: '{{.OUT_DIR}}/java'
       # reference-manager/currency/v1 -> ru.mephi.arch.api.referencemanager.currency.v1
       PACKAGE_NAME: 'ru.mephi.arch.api.{{.SPEC | replace "-" "" | replace "/" "."}}'
       PACKAGE_DIR: '{{.PROJECT_DIR}}/src/main/java/{{.PACKAGE_NAME | replace "." "/"}}'
     preconditions: *spec-exists
     cmds:
-      - rm -rf {{.PACKAGE_DIR}}
+      - rm -rf "{{.PACKAGE_DIR}}"
       - |
         openapi-generator-cli generate \
-          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
-          -c {{.CONFIGS_DIR}}/java.yaml \
+          -i "{{.SPEC_FILE}}" \
+          -c "{{.CONFIGS_DIR}}/java.yaml" \
           -g java \
-          -o {{.PROJECT_DIR}} \
+          -o "{{.PROJECT_DIR}}" \
           --additional-properties=invokerPackage={{.PACKAGE_NAME}},apiPackage={{.PACKAGE_NAME}}.api,modelPackage={{.PACKAGE_NAME}}.model \
-          --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=ApiClient.java:ApiException.java:ApiResponse.java:Configuration.java:JSON.java:Pair.java:RFC3339DateFormat.java:RFC3339InstantDeserializer.java:RFC3339JavaTimeModule.java:ServerConfiguration.java:ServerVariable.java:AbstractOpenApiSchema.java
-      - rm -rf {{.PROJECT_DIR}}/.openapi-generator
+          {{if eq .SPEC "task-tracker/v1"}}--schema-mappings=CreateBugRequest=JsonNode \
+          --import-mappings=JsonNode=com.fasterxml.jackson.databind.JsonNode \
+          {{end}}--global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=ApiClient.java:ApiException.java:ApiResponse.java:Configuration.java:JSON.java:Pair.java:RFC3339DateFormat.java:RFC3339InstantDeserializer.java:RFC3339JavaTimeModule.java:ServerConfiguration.java:ServerVariable.java:AbstractOpenApiSchema.java
+      - rm -rf "{{.PROJECT_DIR}}/.openapi-generator"
       # The generator creates directories for skipped supporting files (gradle/, .github/, api/)
-      - find {{.PROJECT_DIR}} -type d -empty -delete
+      - find "{{.PROJECT_DIR}}" -type d -empty -delete
 
   generate:typescript:
     internal: true
+    dir: *api-root
     requires:
       vars: [SPEC]
     vars:
+      SPEC_FILE: *spec-file
       PACKAGE_DIR: '{{.OUT_DIR}}/typescript/src/{{.SPEC}}'
     preconditions: *spec-exists
     cmds:
-      - rm -rf {{.PACKAGE_DIR}}
+      - rm -rf "{{.PACKAGE_DIR}}"
       - |
         openapi-generator-cli generate \
-          -i {{.SPECS_DIR}}/{{.SPEC}}/openapi.yaml \
-          -c {{.CONFIGS_DIR}}/typescript.yaml \
+          -i "{{.SPEC_FILE}}" \
+          -c "{{.CONFIGS_DIR}}/typescript.yaml" \
           -g typescript-fetch \
-          -o {{.PACKAGE_DIR}} \
+          -o "{{.PACKAGE_DIR}}" \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=index.ts:runtime.ts
-      - rm -rf {{.PACKAGE_DIR}}/.openapi-generator
+      - rm -rf "{{.PACKAGE_DIR}}/.openapi-generator"
       # Generated code has unused imports/params that break consumers built with noUnusedLocals/noUnusedParameters
       - |
-        for f in $(find {{.PACKAGE_DIR}} -name '*.ts'); do
-          { echo '// @ts-nocheck'; cat "$f"; } > "$f.tmp" && mv "$f.tmp" "$f"
-        done
+        find "{{.PACKAGE_DIR}}" -name '*.ts' -exec sh -ec '
+          for file do
+            { echo "// @ts-nocheck"; cat "$file"; } > "$file.tmp"
+            mv "$file.tmp" "$file"
+          done
+        ' sh {} +

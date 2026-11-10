@@ -1,0 +1,32 @@
+name: Shared API contracts
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/api-contracts.yaml'
+      - 'api/**'
+      - 'planning-system/docs/contracts/*openapi.json'
+      - 'qa/api/openapi/**'
+      - 'reference-manager/backend/api/openapi/**'
+      - 'reports/api/openapi/**'
+      - 'task-tracker/docs/block-g-api-and-events/openapi.yaml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/api-contracts.yaml'
+      - 'api/**'
+      - 'planning-system/docs/contracts/*openapi.json'
+      - 'qa/api/openapi/**'
+      - 'reference-manager/backend/api/openapi/**'
+      - 'reports/api/openapi/**'
+      - 'task-tracker/docs/block-g-api-and-events/openapi.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 api/sync-specs.py --check
