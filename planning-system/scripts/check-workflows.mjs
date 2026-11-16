@@ -69,7 +69,15 @@ try{
  await go('gantt');await page.locator('.gantt-bar').first().waitFor();
  await page.locator('#gantt-scale-slider').fill('32');await page.locator('#gantt-scale-slider').dispatchEvent('change');
  await page.waitForFunction(()=>document.querySelector('#gantt-scale-slider')?.value==='32');
- const drag=async (selector,delta)=>{const bounds=await page.locator(selector).first().boundingBox();const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+delta,y,{steps:10});await page.mouse.up()};
+ const drag=async (selector,delta)=>{
+  const bar=page.locator(selector).first();
+  await bar.scrollIntoViewIfNeeded();
+  const {x,y,width,height}=await bar.boundingBox();
+  await page.mouse.move(x+width/2,y+height/2);
+  await page.mouse.down();
+  await page.mouse.move(x+width/2+delta,y+height/2,{steps:10});
+  await page.mouse.up();
+ };
  await commit(()=>drag('[data-gantt-work]',96),'/timeline');
  await page.waitForFunction(()=>document.querySelector('[data-gantt-work]')?.getAttribute('aria-label').includes('2026-10-08'));
  assert.ok((await page.locator('[data-gantt-work]').nth(1).getAttribute('aria-label')).includes('2026-10-12'));
