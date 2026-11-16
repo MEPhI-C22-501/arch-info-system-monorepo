@@ -238,7 +238,7 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "planning-api",
+            "included.client.audience": "planning-system",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
@@ -305,7 +305,7 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "planning-api",
+            "included.client.audience": "planning-system",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }

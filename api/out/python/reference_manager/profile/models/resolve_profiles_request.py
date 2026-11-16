@@ -92,5 +92,3 @@ class ResolveProfilesRequest(BaseModel):
             "keys": [ProfileKey.from_dict(_item) for _item in obj["keys"]] if obj.get("keys") is not None else None
         })
         return _obj
-
-

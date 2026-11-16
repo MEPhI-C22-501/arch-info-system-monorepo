@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -58,8 +59,9 @@ const profiles = `
 WITH profiles AS (
     SELECT * FROM v_employee_profile
     UNION ALL
-    SELECT 'u:' || subject::text, NULL, subject::text, display_name, work_email,
-           NULL, NULL, NULL, NULL, NULL, NULL, FALSE, is_technical, is_active, updated_at
+    SELECT 'u:' || subject::text, NULL AS employee_id, subject::text, display_name, work_email,
+           NULL AS org_unit_id, NULL AS org_unit_name, NULL AS position_id, NULL AS position_name,
+           NULL AS employment_state, NULL AS account_state, FALSE, is_technical, is_active, updated_at
     FROM user_profiles u
     WHERE issuer = $1 AND NOT EXISTS (
         SELECT 1 FROM employees e WHERE e.account_user_id = u.subject::text
@@ -152,7 +154,7 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	after, err := base64.RawURLEncoding.DecodeString(params.Get("pageToken"))
 	query := strings.TrimSpace(params.Get("q"))
-	if err != nil || len(after) > 40 || len([]rune(query)) > 120 || strings.ContainsRune(query, 0) || strings.ContainsRune(string(after), 0) {
+	if err != nil || len(after) > 40 || len([]rune(query)) > 120 || strings.ContainsRune(query, 0) || bytes.ContainsRune(after, 0) {
 		problem(w, r, http.StatusBadRequest, "invalid page token or search")
 		return
 	}

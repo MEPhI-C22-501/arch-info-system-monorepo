@@ -11,4 +11,3 @@ from qa.v1.api.suites_api import SuitesApi
 from qa.v1.api.templates_api import TemplatesApi
 from qa.v1.api.test_cases_api import TestCasesApi
 from qa.v1.api.test_plans_api import TestPlansApi
-

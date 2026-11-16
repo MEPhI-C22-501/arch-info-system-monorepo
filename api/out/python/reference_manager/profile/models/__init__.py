@@ -19,4 +19,3 @@ from reference_manager.profile.models.profile_key import ProfileKey
 from reference_manager.profile.models.resolve_profiles200_response import ResolveProfiles200Response
 from reference_manager.profile.models.resolve_profiles200_response_items_inner import ResolveProfiles200ResponseItemsInner
 from reference_manager.profile.models.resolve_profiles_request import ResolveProfilesRequest
-

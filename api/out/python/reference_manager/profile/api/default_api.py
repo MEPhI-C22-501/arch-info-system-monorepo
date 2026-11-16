@@ -561,21 +561,21 @@ class DefaultApi:
         # process the path parameters
         # process the query parameters
         if q is not None:
-            
+
             _query_params.append(('q', q))
-            
+
         if page_size is not None:
-            
+
             _query_params.append(('pageSize', page_size))
-            
+
         if page_token is not None:
-            
+
             _query_params.append(('pageToken', page_token))
-            
+
         if include_inactive is not None:
-            
+
             _query_params.append(('includeInactive', include_inactive))
-            
+
         # process the header parameters
         # process the form parameters
         # process the body parameter
@@ -889,5 +889,3 @@ class DefaultApi:
             _host=_host,
             _request_auth=_request_auth
         )
-
-

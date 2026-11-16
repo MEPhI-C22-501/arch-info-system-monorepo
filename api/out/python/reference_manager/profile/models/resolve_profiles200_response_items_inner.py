@@ -99,5 +99,3 @@ class ResolveProfiles200ResponseItemsInner(BaseModel):
             "profile": Profile.from_dict(obj["profile"]) if obj.get("profile") is not None else None
         })
         return _obj
-
-
