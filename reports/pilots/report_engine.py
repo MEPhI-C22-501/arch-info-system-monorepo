@@ -209,8 +209,9 @@ class Engine:
         elif slice=='iteration': result=named(self.records('tracker','iterations'))
         elif slice=='status': result=named(self.records('tracker','statuses'))
         elif slice=='employee':
-            result={employee_subject(e,self.links):' '.join(str(e.get(f) or '') for f in ['family_name','given_name','middle_name']).strip() or e.get('name')
+            result={employee_subject(e,self.links):e.get('display_name') or ' '.join(str(e.get(f) or '') for f in ['family_name','given_name','middle_name']).strip() or e.get('name')
                     for e in self.records('reference','employees')}
+            result.update({p['userId']:p['displayName'] for p in self.records('reference','profiles') if p.get('userId')})
         elif slice in {'unit','role','grade'}:
             result=named(self.records('reference',{'unit':'org_units','role':'project_roles','grade':'grades'}[slice]))
         elif slice=='type': result=dict(TYPE_NAMES)
@@ -221,7 +222,7 @@ class Engine:
     def label(self,slice,value):
         if value is None: return 'не задано'
         if slice=='record': return self.record_labels.get(value) or str(value)
-        return self.names(slice).get(str(value)) or str(value)
+        return self.names(slice).get(str(value)) or (f'Профиль не найден ({value})' if slice=='employee' else str(value))
 
     def freshness(self,n):
         result=[]

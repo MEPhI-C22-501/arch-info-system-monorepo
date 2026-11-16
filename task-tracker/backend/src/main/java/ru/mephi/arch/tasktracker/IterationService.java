@@ -1,6 +1,7 @@
 package ru.mephi.arch.tasktracker;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import static ru.mephi.arch.tasktracker.infrastructure.persistence.JdbcUserDirectoryRepository.ACTIVE_SUBJECT;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -35,7 +36,7 @@ public class IterationService {
     @Transactional public Map<String,Object> capacity(UUID id,Map<String,Object> body){
         access.require("capacity.write");editable(id);String user=Values.str(body,"userId",true);BigDecimal hours=Values.hours(body.get("availableHours"),"availableHours",false);
         if(hours==null)throw ApiException.invalid("availableHours","required");
-        Integer found=db.queryForObject("SELECT count(*) FROM user_cache WHERE external_user_id=? AND active=true",Integer.class,user);
+        Integer found=db.query(ACTIVE_SUBJECT, rs -> rs.next() ? 1 : 0, user);
         if(found==0)throw ApiException.invalid("userId","unknown_or_inactive");
         db.update("INSERT INTO capacity_entry(iteration_id,external_user_id,available_hours) VALUES(?,?,?) ON CONFLICT(iteration_id,external_user_id) DO UPDATE SET available_hours=EXCLUDED.available_hours",id,user,hours);
         return view(id);
@@ -102,7 +103,7 @@ public class IterationService {
         out.put("id",id);out.put("name",raw.get("name"));out.put("description",raw.get("description"));out.put("startDate",raw.get("start_date"));out.put("endDate",raw.get("end_date"));out.put("state",raw.get("state"));
         out.putAll(metrics(id));
         Map<String,Object> baseline=changes.parseMap(raw.get("baseline_snapshot")),result=changes.parseMap(raw.get("result_snapshot"));
-        if("MEMBER".equals(access.role())){
+        if(access.ownOnly("iteration.read")){
             out.put("items",visibleItems(out.get("items")));
             baseline=visibleSnapshot(baseline);
             result=visibleSnapshot(result);

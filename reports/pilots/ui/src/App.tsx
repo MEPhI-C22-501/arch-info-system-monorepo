@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { api, downloadBlob, errorMessage, setUnauthorizedHandler } from './api';
-import { login, type Session } from './auth';
+import { login, renewSession, type Session } from './auth';
 import { Header } from './components/Header';
 import { Failure } from './components/State';
 import { Audit } from './pages/Audit';
@@ -25,6 +25,17 @@ export const SNAPSHOT = 'reports.snapshot';
 export function App({ initialSession, initialError }: { initialSession: Session | null; initialError: string }) {
   const [session, setSession] = useState<Session | null>(initialSession);
   useEffect(() => setUnauthorizedHandler(() => setSession(null)), []);
+
+  useEffect(() => {
+    if (!session?.refreshToken) return;
+    let active = true;
+    const timeout = setTimeout(() => {
+      void renewSession(session).then(next => {
+        if (active) setSession(next);
+      }).catch(() => { if (active) setSession(null); });
+    }, Math.max(0, session.expiresAt - Date.now() - 20000));
+    return () => { active = false; clearTimeout(timeout); };
+  }, [session]);
 
   if (!session) {
     const returnTo = window.location.pathname.replace(/^\/ui/, '') + window.location.search;

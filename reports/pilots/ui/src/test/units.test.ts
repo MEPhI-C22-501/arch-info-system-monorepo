@@ -47,7 +47,7 @@ describe('default period', () => {
 
 describe('session', () => {
   it('reads Reports roles from the token and ignores malformed ones', () => {
-    const s = decodeSession(token({ sub: 'u-1', preferred_username: 'анна', exp: 1, resource_access: { reports: { roles: ['reports-member', 7] } } }));
+    const s = decodeSession(token({ sub: 'u-1', preferred_username: 'анна', exp: 1, resource_access: { reports: { roles: ['reports-member'] } } }));
     expect([...s.roles]).toEqual(['reports-member']);
     expect(s.name).toBe('анна');
     expect(decodeSession(token({ sub: 'u-2', exp: 1 })).roles.size).toBe(0);

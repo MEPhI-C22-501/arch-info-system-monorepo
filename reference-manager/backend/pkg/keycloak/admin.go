@@ -57,8 +57,6 @@ type AdminConfig struct {
 	ClientSecret string `yaml:"-" env:"KEYCLOAK_PROVISIONER_SECRET" env-required:"true"`
 	// RequestTimeout limits every call to Keycloak (NFR-RM-47).
 	RequestTimeout time.Duration `yaml:"request_timeout" env-default:"5s"`
-	// DefaultRealmRoles are given to every created account (FR-RM-53), the roles have to exist in the realm.
-	DefaultRealmRoles []string `yaml:"default_realm_roles"`
 }
 
 // Admin manages the accounts of employees through the Keycloak Admin REST API (FR-RM-53..58).
@@ -70,7 +68,6 @@ type Admin struct {
 	realm    string
 	clientID string
 	secret   string
-	roles    []string
 
 	mu        sync.Mutex
 	token     string
@@ -98,7 +95,6 @@ func NewAdmin(cfg *Config, log *slog.Logger) (*Admin, error) {
 		realm:    realm,
 		clientID: cfg.Provisioner.ClientID,
 		secret:   cfg.Provisioner.ClientSecret,
-		roles:    cfg.Provisioner.DefaultRealmRoles,
 	}, nil
 }
 
@@ -228,10 +224,6 @@ func (a *Admin) Create(ctx context.Context, account *Account, temporaryPassword 
 		return "", fmt.Errorf("%w: created account has no location", ErrAccountUnavailable)
 	}
 
-	if err := a.addRealmRoles(ctx, id, a.roles); err != nil {
-		return "", err
-	}
-
 	a.log.InfoContext(ctx, "keycloak account created", slog.String("account_id", id), slog.String("username", account.Username))
 
 	return id, nil
@@ -267,48 +259,6 @@ func (a *Admin) Update(ctx context.Context, account *Account) error {
 	default:
 		return unexpected(http.MethodPut, apiPath, status)
 	}
-}
-
-// addRealmRoles maps the realm roles to the account, a missing role is a configuration error.
-func (a *Admin) addRealmRoles(ctx context.Context, id string, roles []string) error {
-	if len(roles) == 0 {
-		return nil
-	}
-
-	representations := make([]roleRepresentation, 0, len(roles))
-
-	for _, name := range roles {
-		apiPath := "/roles/" + url.PathEscape(name)
-
-		status, _, body, err := a.call(ctx, http.MethodGet, apiPath, nil, nil)
-		if err != nil {
-			return err
-		}
-
-		if status != http.StatusOK {
-			return fmt.Errorf("%w: realm role %q: %s %s answered %d", ErrAccountUnavailable, name, http.MethodGet, apiPath, status)
-		}
-
-		var role roleRepresentation
-		if err := json.Unmarshal(body, &role); err != nil {
-			return fmt.Errorf("%w: decode role: %w", ErrAccountUnavailable, err)
-		}
-
-		representations = append(representations, role)
-	}
-
-	apiPath := "/users/" + url.PathEscape(id) + "/role-mappings/realm"
-
-	status, _, _, err := a.call(ctx, http.MethodPost, apiPath, nil, representations)
-	if err != nil {
-		return err
-	}
-
-	if status != http.StatusNoContent && status != http.StatusOK {
-		return unexpected(http.MethodPost, apiPath, status)
-	}
-
-	return nil
 }
 
 // call sends one request to the Admin REST API with the service token. A rejected token is renewed once.
@@ -455,11 +405,6 @@ type credentialRepresentation struct {
 	Type      string `json:"type"`
 	Value     string `json:"value"`
 	Temporary bool   `json:"temporary"`
-}
-
-type roleRepresentation struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 }
 
 func unexpected(method, apiPath string, status int) error {

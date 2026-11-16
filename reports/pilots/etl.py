@@ -7,10 +7,12 @@ import signal
 import sys
 import threading
 import uuid
+import urllib.parse
+import urllib.request
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from adapters import Client, HR_RESOURCES, QA_RESOURCES, Rejected, numbered, planning, reference
+from adapters import Client, HR_RESOURCES, QA_RESOURCES, NoRedirect, Rejected, numbered, planning, reference, reference_profiles
 from db import Database
 from contracts import validate_tracker
 
@@ -270,6 +272,12 @@ def catalog_extract(client, source):
     started = now()
     if source == "reference":
         entities = {resource: reference(client, resource) for resource in sorted(HR_RESOURCES)}
+        profiles = reference_profiles(client)
+        names = {p["employeeId"]:p["displayName"] for p in profiles if p.get("employeeId")}
+        for employee in entities["employees"]:
+            if employee["id"] in names:
+                employee["display_name"] = names[employee["id"]]
+        entities["profiles"] = profiles
     else:
         entities = {resource: numbered(client, resource, tracker=False) for resource in sorted(QA_RESOURCES)}
     return entities, started, started, None
@@ -278,7 +286,23 @@ def catalog_extract(client, source):
 def run_once(args):
     # Credentials are never command-line parameters. The launcher loads these
     # variables from ~/secrets.env, never from a repository .env file.
-    client = Client(args.url, os.getenv("REPORTS_SOURCE_TOKEN"), allow_http=args.allow_http)
+    token_url = os.getenv("REPORTS_SOURCE_TOKEN_URL")
+    token = None
+    if token_url:
+        target = urllib.parse.urlsplit(token_url)
+        if (target.username or target.password or not target.hostname
+                or (target.scheme != "https" and not (args.allow_http and target.scheme == "http"))):
+            raise Rejected("INVALID_TOKEN_ENDPOINT")
+        data = urllib.parse.urlencode({
+            "grant_type": "client_credentials", "client_id": os.environ["REPORTS_SOURCE_CLIENT_ID"],
+            "client_secret": os.environ["REPORTS_SOURCE_CLIENT_SECRET"],
+        }).encode()
+        request = urllib.request.Request(token_url, data=data)
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=10) as response:
+            token = json.load(response)["access_token"]
+    elif args.allow_http:
+        token = os.getenv("REPORTS_SOURCE_TOKEN")
+    client = Client(args.url, token, allow_http=args.allow_http)
     db = Database(os.environ["REPORTS_DATABASE_URL"])
     try:
         db.initialize()

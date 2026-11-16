@@ -8,13 +8,13 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { Field } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { canEditAutotest } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useLoad } from '../useLoad';
 import { useClassifiers } from '../useReferenceData';
 import { CaseFields } from './CaseFields';
 
 export function CaseCreate() {
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const toast = useToast();
   const classifiers = useClassifiers();

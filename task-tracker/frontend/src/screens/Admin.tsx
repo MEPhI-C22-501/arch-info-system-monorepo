@@ -18,7 +18,6 @@ export function Admin({ context, refreshAll }: { context: Context; refreshAll: (
   // section the current role can still see, without a setState-in-effect round-trip.
   const section = can(context, SECTION_PERMISSION[requestedSection]) ? requestedSection : (ALL_SECTIONS.find(key => can(context, SECTION_PERMISSION[key])) ?? requestedSection);
 
-  const [accessRows, setAccessRows] = useState<Array<Json>>([]);
   const [permissions, setPermissions] = useState<Array<Json>>([]);
   const [directory, setDirectory] = useState<Json>({});
   const [error, setError] = useState('');
@@ -29,10 +28,9 @@ export function Admin({ context, refreshAll }: { context: Context; refreshAll: (
   useEffect(() => {
     let active = true;
     Promise.all([
-      can(context, 'access.admin') ? request<Array<Json>>('/admin/access') : Promise.resolve([]),
       can(context, 'access.admin') ? request<Array<Json>>('/admin/permissions') : Promise.resolve([]),
       can(context, 'directory.admin') ? request<Json>('/admin/directory') : Promise.resolve({}),
-    ]).then(([a, p, d]) => { if (active) { setAccessRows(a); setPermissions(p); setDirectory(d); } })
+    ]).then(([p, d]) => { if (active) { setPermissions(p); setDirectory(d); } })
       .catch(e => { if (active) setError(getError(e)); });
     return () => { active = false; };
   }, [context, reloadToken]);
@@ -83,17 +81,6 @@ export function Admin({ context, refreshAll }: { context: Context; refreshAll: (
     </div></div>}
 
     {section === 'access' && <div className="panel">
-      <h3>Локальный допуск</h3>
-      <div className="settings-list">{context.users.map(user => {
-        const row = accessRows.find(entry => entry.userId === user.id);
-        return <div className="setting-row" key={user.id}>
-          <strong>{user.name}</strong>
-          <select aria-label={`Роль ${user.name}`} value={String(row?.role || 'MEMBER')} onChange={e => void action(`/admin/access/${user.id}`, json('PUT', { role: e.target.value, allowed: row?.allowed ?? true }))}>
-            <option value="MEMBER">Участник</option><option value="LEAD">Руководитель</option><option value="ADMIN">Администратор</option>
-          </select>
-          <label><input type="checkbox" checked={Boolean(row?.allowed)} onChange={e => void action(`/admin/access/${user.id}`, json('PUT', { role: row?.role || 'MEMBER', allowed: e.target.checked }))} /> Допущен</label>
-        </div>;
-      })}</div>
       <h3>Разрешения ролей</h3>
       <div className="permission-grid">{permissions.map(row => <label key={`${row.role}:${row.permission}`}>
         <input type="checkbox" checked={Boolean(row.allowed)} onChange={e => void action(`/admin/permissions/${row.role}/${row.permission}`, json('PUT', { allowed: e.target.checked }))} />

@@ -23,12 +23,18 @@ services:
       DATABASE_PASSWORD: task_tracker_dev
       OIDC_ISSUER_URI: http://localhost:8081/realms/arch-info-system
       OIDC_JWKS_URI: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
-      DEV_DIRECTORY: "true"
+      DIRECTORY_URL: http://reference-manager:8080
+      DIRECTORY_TOKEN_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/token
+      DIRECTORY_CLIENT_SECRET: ${KC_TRACKER_DIRECTORY_SECRET:-localdemotrackerdirectory}
     ports: ["127.0.0.1:8080:8080"]
     depends_on:
       task-tracker-db:
         condition: service_healthy
-      keycloak:
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+      reference-manager-seed:
+        condition: service_completed_successfully
+      reference-manager:
         condition: service_healthy
     networks: [edge, data]
   task-tracker-frontend:
@@ -52,6 +58,132 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  reference-manager-migrations:
+    profiles: ["modules"]
+    image: migrate/migrate:latest
+    command: ["-path=/migrations", "-database=postgres://reference_manager:reference_manager@reference-manager-db:5432/reference_manager?sslmode=disable", "up"]
+    volumes:
+      - ./reference-manager/deployments/migrations:/migrations:ro
+    depends_on:
+      reference-manager-db:
+        condition: service_healthy
+    networks: [data]
+    restart: "no"
+
+  reference-manager-seed:
+    profiles: ["modules"]
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      PGPASSWORD: reference_manager
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "reference-manager-db", "-U", "reference_manager", "-d", "reference_manager", "-f", "/seed/demo.sql", "-f", "/seed/shared-profiles.sql"]
+    volumes:
+      - ./reference-manager/deployments/seed:/seed:ro
+    depends_on:
+      reference-manager-migrations:
+        condition: service_completed_successfully
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    networks: [data]
+    restart: "no"
+
+  reference-manager:
+    profiles: ["modules"]
+    build:
+      context: ./reference-manager/backend
+      dockerfile: ../deployments/docker/reference-manager.dockerfile
+    command: ["--configs", "/app/configs/reference-manager"]
+    environment:
+      POSTGRES_PASSWORD: reference_manager
+      KEYCLOAK_PROVISIONER_SECRET: ${KC_PROVISIONER_SECRET:-localdemoprovisioner}
+    ports: ["127.0.0.1:8082:8080"]
+    volumes:
+      - ./infra/config/reference-manager/auth.yaml:/app/configs/reference-manager/auth.yaml:ro
+      - ./infra/config/reference-manager/databases.yaml:/app/configs/reference-manager/databases.yaml:ro
+      - ./reference-manager/deployments/configs/reference-manager/local/transport.yaml:/app/configs/reference-manager/transport.yaml:ro
+      - ./reference-manager/deployments/configs/reference-manager/local/telemetry.yaml:/app/configs/reference-manager/telemetry.yaml:ro
+    depends_on:
+      reference-manager-migrations:
+        condition: service_completed_successfully
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    networks: [edge, data]
+    healthcheck:
+      test: ["CMD", "/app/healthcheck", "-url", "http://127.0.0.1:8080/v1/health/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  planning-db:
+    profiles: ["modules"]
+    image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
+    environment:
+      POSTGRES_DB: planning
+      POSTGRES_USER: planning
+      POSTGRES_PASSWORD: planning-local
+    volumes: ["planning-db:/var/lib/postgresql"]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planning -d planning"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  planning-api:
+    profiles: ["modules"]
+    image: planning-system:local
+    build: {context: ., dockerfile: planning-system/Dockerfile}
+    environment: &planning-runtime
+      DATABASE_URL: postgresql+psycopg://planning:planning-local@planning-db:5432/planning
+      APP_ENV: development
+      AUTH_MODE: oidc
+      OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+      OIDC_DISCOVERY_URL: http://keycloak:8080/realms/arch-info-system/.well-known/openid-configuration
+      OIDC_JWKS_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      OIDC_AUDIENCE: planning-system
+      OIDC_CLIENT_ID: planning-system
+      OIDC_LOCAL_HTTP: "true"
+      INTEGRATION_MODE: mock
+      HR_MODE: real
+      RM_LOCAL_HTTP: "true"
+      RM_BASE_URL: http://reference-manager:8080/v1
+      RM_TOKEN_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/token
+      RM_CLIENT_ID: planning-service
+      RM_CLIENT_SECRET: ${KC_PLANNING_SERVICE_SECRET:-localdemoplan}
+      DEMO_SEED: "true"
+      DEMO_PORTFOLIO_OWNER_SUBJECT: 33333333-3333-3333-3333-333333333333
+      DEMO_PROJECT_MANAGER_SUBJECT: 22222222-2222-2222-2222-222222222222
+      STORAGE_MODE: local
+      LOCAL_FILES: /data/files
+      ALLOWED_ORIGINS: http://localhost:8085
+    volumes: ["planning-files:/data/files"]
+    ports: ["127.0.0.1:8085:8000"]
+    depends_on:
+      planning-db:
+        condition: service_healthy
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    networks: [edge, data]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  planning-worker:
+    profiles: ["modules"]
+    image: planning-system:local
+    pull_policy: never
+    environment: *planning-runtime
+    command: ["python", "-m", "server.worker"]
+    depends_on:
+      planning-api:
+        condition: service_healthy
+      reference-manager-seed:
+        condition: service_completed_successfully
+      reference-manager:
+        condition: service_healthy
+    networks: [edge, data]
+
   qa-db:
     profiles: ["modules"]
     image: postgres:18.6@sha256:fc973eb97c9fd04bfa1840e0f510719a584ccb3be8debfe6a4144637a9dfe8cf
@@ -74,9 +206,15 @@ services:
     environment: &qa-runtime
       DATABASE_URL: postgresql+psycopg://qa:qa-local@qa-db:5432/qa
       APP_ENV: development
-      AUTH_MODE: demo
+      AUTH_MODE: keycloak
+      OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+      OIDC_JWKS_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      RM_BASE_URL: http://reference-manager:8080/v1
+      RM_TOKEN_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/token
+      RM_CLIENT_ID: qa-executor
+      RM_CLIENT_SECRET: ${KC_QA_EXECUTOR_SECRET:-localdemoqaexec}
       TRACKER_SYNC_ENABLED: "false"
-      UI_BASE_URL: http://127.0.0.1:8091
+      UI_BASE_URL: http://localhost:8091
     depends_on:
       qa-db:
         condition: service_healthy
@@ -107,6 +245,10 @@ services:
         condition: service_completed_successfully
       qa-seed:
         condition: service_completed_successfully
+      reference-manager:
+        condition: service_healthy
+      reference-manager-seed:
+        condition: service_completed_successfully
     networks: [edge, data]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
@@ -127,7 +269,76 @@ services:
       timeout: 3s
       retries: 20
 
+  reports-api:
+    profiles: ["modules"]
+    image: reports-modules:local
+    build:
+      context: ./reports/pilots
+      args:
+        VITE_OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+        VITE_OIDC_CLIENT_ID: reports
+    environment: &reports-runtime
+      REPORTS_DATABASE_URL: postgresql://reports:${REPORTS_DB_PASSWORD:-localdemoreportsdb}@reports-db:5432/reports
+      REPORTS_BIND: 0.0.0.0
+      REPORTS_OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+      REPORTS_OIDC_JWKS_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      REPORTS_OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/arch-info-system
+      REPORTS_LOCAL_OIDC: "1"
+      REPORTS_DIRECTORY_CLIENT_SECRET: ${KC_REPORTS_DIRECTORY_SECRET:-localdemoreportsdirectory}
+    ports: ["127.0.0.1:8095:8081"]
+    depends_on:
+      reports-db:
+        condition: service_healthy
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    networks: [edge, data]
+
+  reports-jobs:
+    profiles: ["modules"]
+    image: reports-modules:local
+    pull_policy: never
+    command: ["python", "product_jobs.py"]
+    environment: *reports-runtime
+    volumes:
+      - ./reports/docs/contracts/events:/docs/contracts/events:ro
+    depends_on: [reports-api]
+    networks: [edge, data]
+
+  reports-load-qa:
+    profiles: ["modules"]
+    image: reports-modules:local
+    pull_policy: never
+    command: ["python", "etl.py", "--source", "qa", "--url", "http://qa-api:8000", "--allow-http", "--every", "900"]
+    environment: &reports-load-runtime
+      <<: *reports-runtime
+      REPORTS_SOURCE_TOKEN_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/token
+      REPORTS_SOURCE_CLIENT_ID: reports-client
+      REPORTS_SOURCE_CLIENT_SECRET: ${KC_REPORTS_CLIENT_SECRET:-localdemoreports}
+    depends_on:
+      reports-api:
+        condition: service_started
+      qa-api:
+        condition: service_healthy
+    networks: [edge, data]
+
+  reports-load-profiles:
+    profiles: ["modules"]
+    image: reports-modules:local
+    pull_policy: never
+    command: ["python", "etl.py", "--source", "reference", "--url", "http://reference-manager:8080", "--allow-http", "--every", "900"]
+    environment: *reports-load-runtime
+    depends_on:
+      reports-api:
+        condition: service_started
+      reference-manager:
+        condition: service_healthy
+      reference-manager-seed:
+        condition: service_completed_successfully
+    networks: [edge, data]
+
 volumes:
   task-tracker-db:
   reference-manager-db:
   qa-db:
+  planning-db:
+  planning-files:

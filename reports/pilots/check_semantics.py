@@ -35,7 +35,7 @@ def main():
             script="const S=require('@cubejs-backend/server');const c=require(process.env.REPORTS_CUBE_CONFIG);c.logger=()=>{};new S(c).listen().catch(()=>process.exit(1));"
             cube=subprocess.Popen([os.getenv('NODE','node'),'-e',script],cwd=Path(__file__).with_name('cube'),env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             def token(role=AN,subject=ADMIN,scope=''):
-                return jwt.encode(dict(iss=issuer,aud='reports',sub=subject,iat=int(time.time()),exp=int(time.time())+600,scope=scope,resource_access={'reports':{'roles':[role]}}),key,algorithm='RS256',headers={'kid':'semantic-ephemeral'})
+                return jwt.encode(dict(iss=issuer,aud='reports',sub=subject,iat=int(time.time()),exp=int(time.time())+600,scope=scope,resource_access={'reports':{'roles':[role, *(['cost.read'] if 'cost.read' in scope.split() else [])]}}),key,algorithm='RS256',headers={'kid':'semantic-ephemeral'})
             def request(route,q=None,access=None):
                 url=f'http://127.0.0.1:{port}/cubejs-api/v1/'+route
                 if q:url+='?'+urllib.parse.urlencode({'query':json.dumps(q)})

@@ -1,4 +1,6 @@
+import json
 import os
+from urllib.request import Request, urlopen
 import uuid
 import jwt
 from flask_appbuilder.security.manager import AUTH_OAUTH
@@ -6,8 +8,9 @@ from superset.security import SupersetSecurityManager
 from flask import session
 from session_policy import install
 
-ISSUER = 'http://localhost:8180/realms/reports-pilot'
-INTERNAL = 'http://keycloak:8080/realms/reports-pilot/protocol/openid-connect/'
+ISSUER = os.getenv('REPORTS_OIDC_ISSUER', 'http://localhost:8180/realms/reports-pilot')
+INTERNAL = os.getenv('REPORTS_OIDC_INTERNAL_ISSUER', 'http://keycloak:8080/realms/reports-pilot') + '/protocol/openid-connect/'
+JWKS = jwt.PyJWKClient(INTERNAL+'certs',timeout=5)
 SECRET_KEY = os.environ['SUPERSET_SECRET_KEY']
 SQLALCHEMY_DATABASE_URI = os.environ['REPORTS_BI_METADATA_URL']
 AUTH_TYPE = AUTH_OAUTH
@@ -43,9 +46,11 @@ class ReportsSecurityManager(SupersetSecurityManager):
         if provider != 'keycloak' or not response:
             raise PermissionError('OIDC response required')
         token = response['access_token']
-        key = jwt.PyJWKClient(INTERNAL+'certs').get_signing_key_from_jwt(token).key
+        key = JWKS.get_signing_key_from_jwt(token).key
         claims = jwt.decode(token, key, algorithms=['RS256'], audience='reports', issuer=ISSUER,
                             options={'require': ['exp', 'sub', 'iss', 'aud']})
+        if claims.get('typ') != 'Bearer':
+            raise PermissionError('Access token required')
         subject = str(uuid.UUID(claims['sub']))  # Safe UUID in RLS current_username().
         access = claims.get('resource_access', {})
         resource = access.get('reports', {}) if isinstance(access, dict) else {}
@@ -61,8 +66,17 @@ class ReportsSecurityManager(SupersetSecurityManager):
         else:
             raise PermissionError('Use Reports UI for this role')
         session['reports_token_exp'] = claims['exp']
-        return {'username': subject, 'first_name': claims.get('given_name', ''),
-                'last_name': claims.get('family_name', ''), 'email': claims.get('email', ''), 'role_keys': roles}
+        first_name, last_name = claims.get('given_name', ''), claims.get('family_name', '')
+        if profile_url := os.getenv('REPORTS_PROFILE_URL'):
+            try:
+                with urlopen(Request(profile_url,headers={'Authorization':'Bearer '+token}),timeout=3) as response:
+                    display_name = json.load(response).get('displayName')
+                if display_name:
+                    first_name, last_name = display_name, ''
+            except (OSError, ValueError):
+                pass
+        return {'username': subject, 'first_name': first_name, 'last_name': last_name,
+                'email': claims.get('email', ''), 'role_keys': roles}
 
 
 CUSTOM_SECURITY_MANAGER = ReportsSecurityManager

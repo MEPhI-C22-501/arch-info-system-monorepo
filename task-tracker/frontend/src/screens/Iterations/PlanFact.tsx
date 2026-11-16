@@ -1,6 +1,6 @@
 import { hours } from '../../api';
 import type { Item, Iteration, Json } from '../../api';
-import { selectName } from '../../context';
+import { selectPerson } from '../../context';
 import type { Context } from '../../context';
 import { compareAssignee } from '../../metrics';
 
@@ -36,7 +36,7 @@ export function PlanFact({ baseline, result, context }: { baseline: Json; result
         const current = actualCapacity.find(row => row.userId === entry.userId);
         const comparison = compareAssignee(entry, current);
         return <tr key={entry.userId}>
-          <td>{selectName(context.users, entry.userId)}</td><td>{hours(comparison.planned)}</td><td>{hours(comparison.currentPlan)}</td>
+          <td>{selectPerson(context.users, entry.userId)}</td><td>{hours(comparison.planned)}</td><td>{hours(comparison.currentPlan)}</td>
           <td>{hours(comparison.actual)}</td>
           <td className={comparison.deviation > 0 ? 'negative' : ''}>{hours(comparison.deviation)}</td>
           <td>{hours(comparison.available)}</td>

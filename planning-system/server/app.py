@@ -14,15 +14,18 @@ import jwt
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError, validators
+from fractions import Fraction
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from . import storage as db
 from .auth import actor, DEMO_PORTFOLIO, DEMO_PROJECT
 from .domain import fail, validate_draft, check_resources, forecast, hours
+from .hour_budget import budget_cents, comparison, public_budget, recalculate_items, summary_version, summary_versions
+from decimal import Decimal
 from .oidc import endpoint
-from .reference_manager import hr_required
+from .reference_manager import active_manager_profiles, hr_required
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = json.loads((ROOT/'docs/contracts/openapi.json').read_text())
@@ -98,7 +101,7 @@ def livez():return {'status':'ok'}
 def readyz():
     try:
         with db.engine.connect() as c:
-            expected=2 if db.engine.dialect.name=='postgresql' else 1
+            expected=3
             c.execute(select(db.schema_versions).where(db.schema_versions.c.version==expected)).one()
         return {'status':'ready','schemaVersion':expected}
     except Exception:raise HTTPException(503,'БД или миграции недоступны') from None
@@ -115,10 +118,11 @@ def allowed(a,roles):
 
 def get(c,kind,identifier,a,roles=None):
     if roles:allowed(a,roles)
+    acting_roles=a.roles & set(roles) if roles else a.roles
     row=db.find(c,kind,identifier)
     if not row:fail(404,'Объект не найден')
     if row['portfolio_id'] not in a.portfolios:fail(404,'Объект не найден')
-    if 'R-03' in a.roles and row['project_id'] and row['project_id'] not in a.projects and not a.roles & {'R-01','R-02'}:
+    if 'R-03' in acting_roles and row['project_id'] and row['project_id'] not in a.projects and not acting_roles & {'R-01','R-02'}:
         own=db.find(c,'project',row['project_id'])
         if not own or own['data']['managerSubject']!=a.subject:fail(404,'Объект не найден')
     return copy.deepcopy(row['data'])
@@ -149,8 +153,22 @@ def changed(c,kind,data,req,a):
 def plan_public(v):
     return {k:v[k] for k in SPEC['components']['schemas']['Plan']['properties'] if k in v}
 
+def decimal_multiple(validator, divisor, value, schema):
+    if not validator.is_type(value,'number'):
+        return
+    try:
+        quotient = Fraction(str(value)) / Fraction(str(divisor))
+    except ValueError:
+        quotient = None
+    if quotient is None or quotient.denominator != 1:
+        yield ValidationError(f'{value!r} is not a multiple of {divisor!r}')
+
+
+ContractValidator = validators.extend(Draft202012Validator, {'multipleOf':decimal_multiple})
+
+
 def validate(schema,data):
-    errs=list(Draft202012Validator({**schema,'components':SPEC['components']},format_checker=FormatChecker()).iter_errors(data))
+    errs=list(ContractValidator({**schema,'components':SPEC['components']},format_checker=FormatChecker()).iter_errors(data))
     if errs:fail(422,errs[0].message[:250])
 
 async def read_json(req):
@@ -198,6 +216,19 @@ def check_batch(b,a):
     if b['expiresAt']<=db.now():fail(409,'BATCH_EXPIRED')
     if b['status']!='READY':fail(409,'Партия не готова')
 
+def project_with_budget(project, plan):
+    return {**project, 'hourBudget':public_budget(project), 'hourBudgetComparison':comparison(project, plan)}
+
+
+def audit_budget(c, a, project, previous_cents, reason):
+    previous = None if previous_cents is None else float(Decimal(previous_cents) / 100)
+    c.execute(db.audit.insert().values(
+        id=db.uid(),subject=a.subject,project_id=project['id'],action='ProjectHourBudgetChanged',
+        occurred_at=db.now(),details={'previous':previous,'current':public_budget(project),
+                                     'reason':reason,'projectRevision':project['revision']},
+    ))
+
+
 def dispatch(c,op,req,a,b):
     pp=req.path_params
     if op=='listProjects':
@@ -212,23 +243,49 @@ def dispatch(c,op,req,a,b):
             rows.append({**v,'_key':f'{v["priority"]:010d}:{v["id"]}'})
         rows.sort(key=lambda r:r['_key'])
         values,nxt=page(rows,req,a,['projects',dict(req.query_params.multi_items()) | {'cursor':None,'pageSize':None}])
-        return {'items':values,'nextCursor':nxt}
+        versions = summary_versions(r['data'] for r in db.all_rows(c, 'plan'))
+        return {'items':[project_with_budget(v, summary_version(v, versions)) for v in values],'nextCursor':nxt}
     if op=='createProject':
         allowed(a,['R-01','R-02','R-03']);get(c,'portfolio',b['portfolioId'],a)
         if b['programId']:
             prog=get(c,'program',b['programId'],a)
             if prog['portfolioId']!=b['portfolioId']:fail(422,'Чужая программа')
-        if 'R-03' in a.roles and b['managerSubject']!=a.subject:fail(403,'Руководитель назначает себя')
+        if 'R-03' in a.roles and not a.roles & {'R-01','R-02'} and b['managerSubject']!=a.subject:fail(403,'Руководитель назначает себя')
+        if hr_required() and b['managerSubject'] not in active_manager_profiles(c):
+            fail(422,'Для назначения руководителя нужен активный профиль из справочника не старше часа')
         if any(r['data']['code']==b['code'] for r in db.all_rows(c,'project',b['portfolioId'])):fail(409,'Код проекта занят')
-        p={**b,'id':db.uid(),'revision':1,'priority':1,'status':'DRAFT','activePlanVersionId':None}
-        return save(c,'project',p,a,p['portfolioId'],p['id'])
+        p={k:v for k,v in b.items() if k != 'hourBudget'}
+        p.update(id=db.uid(),revision=1,priority=1,status='DRAFT',activePlanVersionId=None,
+                 hourBudgetCents=req.state.hour_budget_cents if 'hourBudget' in b else None)
+        save(c,'project',p,a,p['portfolioId'],p['id'])
+        if p['hourBudgetCents'] is not None:
+            audit_budget(c, a, p, None, None)
+        return project_with_budget(p, None)
     if op in {'getProject','updateProject','archiveProject'}:
         p=project(c,pp['projectId'],a,['R-01','R-02','R-03'])
-        if op=='getProject':return p
+        versions = summary_versions(r['data'] for r in db.all_rows(c, 'plan', project=p['id']))
+        selected = summary_version(p, versions)
+        if op=='getProject':return project_with_budget(p, selected)
         allowed(a,['R-01','R-02','R-03'] if op=='updateProject' else ['R-01','R-03'])
         if p['status']=='ARCHIVED':fail(409,'Проект архивирован')
-        p.update(b if op=='updateProject' else {'status':'ARCHIVED'})
-        return changed(c,'project',p,req,a)
+        previous = p.get('hourBudgetCents')
+        reason = None
+        if op == 'updateProject':
+            if ('managerSubject' in b and b['managerSubject'] != p['managerSubject']
+                    and hr_required() and b['managerSubject'] not in active_manager_profiles(c)):
+                fail(422,'Для назначения руководителя нужен активный профиль из справочника не старше часа')
+            p.update({k:v for k,v in b.items() if k not in {'hourBudget','hourBudgetReason'}})
+            if 'hourBudget' in b:
+                p['hourBudgetCents'] = req.state.hour_budget_cents
+                reason = b.get('hourBudgetReason', '').strip()
+                if previous != p['hourBudgetCents'] and not reason:
+                    fail(422,'Укажите причину изменения бюджета часов')
+        else:
+            p['status']='ARCHIVED'
+        changed(c,'project',p,req,a)
+        if previous != p.get('hourBudgetCents'):
+            audit_budget(c, a, p, previous, reason)
+        return project_with_budget(p, selected)
     if op=='createVersion':
         p=project(c,pp['projectId'],a,['R-02','R-03'])
         if p['status']=='ARCHIVED':fail(409,'Проект архивирован')
@@ -247,17 +304,20 @@ def dispatch(c,op,req,a,b):
           versionNumber=max([r['data']['versionNumber'] for r in db.all_rows(c,'plan',project=p['id'])]+[0])+1,
           revision=1,contentRevision=1,reviewRound=0,status='DRAFT',dataAsOf=None,reviewers=[],decisions=[])
         return save(c,'plan',v,a,p['portfolioId'],p['id'])
-    if op in {'getVersion','saveDraft','submitReview','recordDecision','activatePlan','calculateForecast'}:
-        v=version(c,pp['versionId'],a,['R-01','R-02','R-03','R-04'] if op=='recordDecision' else ['R-01','R-02','R-03']);p=project(c,v['projectId'],a)
+    if op in {'getVersion','getVersionHourBudget','saveDraft','submitReview','recordDecision','activatePlan','calculateForecast'}:
+        roles=['R-01','R-04'] if op=='recordDecision' else ['R-01','R-02','R-03']
+        v=version(c,pp['versionId'],a,roles);p=project(c,v['projectId'],a,roles)
         if op=='getVersion':return plan_public(v)
+        if op=='getVersionHourBudget':return comparison(p,v)
         if p['status']=='ARCHIVED':fail(409,'Проект архивирован')
         if op=='saveDraft':
             allowed(a,['R-02','R-03'])
             if v['status']!='DRAFT':fail(409,'Baseline неизменна; создайте сценарий')
             validate_draft(b)
+            recalculate_items(b)
             from .reference_manager import validate_new_allocations
             validate_new_allocations(c,b['allocations'],v['allocations'])
-            if 'R-03' in a.roles and b['allocations']!=v['allocations']:fail(403,'Изменение назначений недоступно R-03')
+            if 'R-02' not in a.roles and 'R-03' in a.roles and b['allocations']!=v['allocations']:fail(403,'Изменение назначений недоступно R-03')
             old={x['id']:x for x in v['allocations']}
             for x in b['allocations']:
                 prev=old.get(x['id'])
@@ -423,8 +483,18 @@ async def contract_handler(req:Request,definition):
             except ValueError:fail(422,'Нужно целое число')
         validate(param['schema'],value)
     if 'requestBody' in definition and op!='uploadAttachment':
-        try:body=await req.json()
-        except Exception:fail(400,'Неверный JSON')
+        try:
+            if op in {'createProject','updateProject'}:
+                body = json.loads(await req.body(), parse_float=Decimal, parse_constant=Decimal)
+            else:
+                body = await req.json()
+        except (ValueError, UnicodeError):
+            fail(400,'Неверный JSON')
+        if op in {'createProject','updateProject'} and isinstance(body, dict) and 'hourBudget' in body:
+            if op == 'updateProject' or body['hourBudget'] is not None:
+                allowed(a, ['R-01'])
+            req.state.hour_budget_cents = cents = budget_cents(body['hourBudget'])
+            body['hourBudget'] = None if cents is None else float(Decimal(cents) / 100)
         validate(definition['requestBody']['content']['application/json']['schema'],body)
     if op=='uploadAttachment':
         form=await req.form();file=form.get('file')

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type React from 'react';
 import { date, hours, iterationStateName, json, request, typeName } from '../../api';
 import type { Iteration } from '../../api';
-import { can, selectName } from '../../context';
+import { can, selectPerson } from '../../context';
 import type { Context } from '../../context';
 import { Badge } from '../../components/Badge';
 import { Empty } from '../../components/Empty';
@@ -77,7 +77,7 @@ export function Iterations({ context, revision, open, refresh }:
         <div className="panel">
           <div className="mini-head"><h3>Загрузка участников</h3><span>Резерв команды: <strong className={iteration.teamReserveHours < 0 ? 'negative' : ''}>{hours(iteration.teamReserveHours)}</strong></span></div>
           {iteration.capacity.length ? <div className="capacity-list">{iteration.capacity.map(entry => <div key={entry.userId} className="capacity-row">
-            <strong>{selectName(context.users, entry.userId)}</strong>
+            <strong>{selectPerson(context.users, entry.userId)}</strong>
             <div className="capacity-track"><span style={{ width: `${Math.min(100, entry.availableHours ? entry.plannedHours / entry.availableHours * 100 : 100)}%` }} className={entry.overloaded ? 'overload' : ''} /></div>
             <small className={entry.overloaded ? 'negative' : ''}>{hours(entry.plannedHours)} / {hours(entry.availableHours)} · резерв {hours(entry.reserveHours)}</small>
           </div>)}</div> : <Empty text="Ёмкость пока не задана" />}

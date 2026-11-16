@@ -1,14 +1,12 @@
-"""Авторизация по ролям из 070.
-
-Пока Keycloak не выдан (Q-06), работает только демо-режим: токен `demo-<роль>`
-или `demo-<роль>@<пользователь>`, например `Bearer demo-qa-lead@ivanov`.
-Проверка JWT Keycloak (ADR-011) — TECH-09.
-"""
+"""Авторизация по ролям клиента qa-system."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
 
+import jwt
+from jwt import PyJWKClient
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -38,6 +36,36 @@ class Principal:
 _bearer = HTTPBearer(auto_error=False)
 
 
+@lru_cache(maxsize=4)
+def jwks(url: str) -> PyJWKClient:
+    return PyJWKClient(url, timeout=5)
+
+
+def _oidc_principal(token: str) -> Principal:
+    settings = get_settings()
+    url = settings.oidc_jwks_url or settings.oidc_issuer + "/protocol/openid-connect/certs"
+    try:
+        key = jwks(url).get_signing_key_from_jwt(token).key
+        claims = jwt.decode(
+            token,
+            key,
+            algorithms=["RS256"],
+            issuer=settings.oidc_issuer,
+            audience="qa-system",
+            options={"require": ["sub", "iss", "aud", "exp"]},
+        )
+        if not claims["sub"].strip() or claims.get("typ") != "Bearer":
+            raise jwt.InvalidTokenError()
+    except (jwt.PyJWTError, TypeError, ValueError) as exc:
+        raise ApiError(401, "UNAUTHENTICATED", "Недействительный токен") from exc
+    access = claims.get("resource_access")
+    entry = access.get("qa-system") if isinstance(access, dict) else None
+    names = entry.get("roles") if isinstance(entry, dict) else None
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        names = []
+    return Principal(claims["sub"], frozenset(role for role in Role if role in names))
+
+
 def _demo_principal(token: str) -> Principal:
     role_part, _, user = token.removeprefix("demo-").partition("@")
     if not token.startswith("demo-") or role_part not in Role._value2member_map_:
@@ -53,7 +81,7 @@ def current_principal(
         raise ApiError(401, "UNAUTHENTICATED", "Нужен токен доступа")
     if get_settings().auth_mode == "demo":
         return _demo_principal(credentials.credentials)
-    raise ApiError(401, "UNAUTHENTICATED", "Недействительный токен")
+    return _oidc_principal(credentials.credentials)
 
 
 def require_roles(*roles: Role) -> Callable[..., Principal]:

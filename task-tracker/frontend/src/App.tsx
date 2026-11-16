@@ -2,7 +2,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { auth, date, request } from './api';
 import type { Status, Priority, User } from './api';
-import { can, emptyContext, selectName } from './context';
+import { can, emptyContext, selectPerson } from './context';
 import type { Context } from './context';
 import { Backlog } from './screens/Backlog';
 import { Board } from './screens/Board';
@@ -32,7 +32,7 @@ export function App() {
   const refresh = useCallback(() => setRevision(value => value + 1), []);
   const reloadContext = useCallback(async () => {
     const [me, statuses, priorities, users, types] = await Promise.all([
-      request<{ role: string; userId: string; permissions: string[] }>('/me'), request<Status[]>('/statuses'),
+      request<{ roles: string[]; userId: string; permissions: string[] }>('/me'), request<Status[]>('/statuses'),
       request<Priority[]>('/priorities'), request<User[]>('/users'), request<Context['types']>('/types'),
     ]);
     setContext({ ...me, statuses, priorities, users, types });
@@ -56,6 +56,14 @@ export function App() {
     return () => { cancelled = true; };
   }, [reloadContext, navigate]);
 
+  useEffect(() => auth.events.addUserLoaded(() => {
+    void reloadContext().then(() => { setReady(true); setError(''); refresh(); }).catch(error => {
+      setContext(emptyContext);
+      setReady(false);
+      setError(getError(error));
+    });
+  }), [reloadContext, refresh]);
+
   if (!ready) {
     return <main className="startup"><div className="spinner" /><h1>Task Tracker</h1><p>{error || 'Загрузка рабочего пространства…'}</p>
       {error && <button className="button primary" onClick={() => void auth.signinRedirect()}>Войти снова</button>}</main>;
@@ -76,7 +84,7 @@ export function App() {
       <div className="brand"><span className="brand-icon">T</span><div><strong>Task Tracker</strong><small>Рабочее пространство</small></div></div>
       <nav aria-label="Основная навигация">{nav.filter(visible).map(([key, icon]) =>
         <button key={key} className={`nav-link ${screen === key ? 'active' : ''}`} onClick={() => { setScreen(key); }}><span>{icon}</span>{titles[key]}</button>)}</nav>
-      <div className="sidebar-footer"><div className="avatar">{context.role.charAt(0)}</div><div><strong>{selectName(context.users, context.userId)}</strong><small>{context.role}</small></div>
+      <div className="sidebar-footer"><div className="avatar">{context.roles[0]?.charAt(0)}</div><div><strong>{selectPerson(context.users, context.userId)}</strong><small>{context.roles.join(", ")}</small></div>
         <button title="Выйти" onClick={() => void auth.signoutRedirect()}>↗</button></div>
     </aside>
     <main className="main">

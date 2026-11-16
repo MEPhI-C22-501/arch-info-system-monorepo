@@ -11,6 +11,7 @@
     "gen:api": "openapi-typescript ../api/openapi/v1/openapi.yaml -o src/api/schema.d.ts --default-non-nullable=false"
   },
   "dependencies": {
+    "oidc-client-ts": "3.5.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "8.5.1"

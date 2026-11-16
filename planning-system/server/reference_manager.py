@@ -112,7 +112,7 @@ class ReferenceManagerClient:
     def from_env(cls):
         base = os.environ.get('RM_BASE_URL', '')
         checked_url(base)
-        token = os.environ.get('RM_TOKEN')
+        token = os.environ.get('RM_TOKEN') if os.environ.get('APP_ENV') == 'development' else None
         if not token:
             endpoint = checked_url(os.environ.get('RM_TOKEN_URL', ''))
             client_id, secret = os.environ.get('RM_CLIENT_ID'), os.environ.get('RM_CLIENT_SECRET')
@@ -130,7 +130,8 @@ class ReferenceManagerClient:
     def _get(self, client, collection, params):
         for attempt in range(3):
             try:
-                response = client.get(self.base_url + '/' + collection + '/', params=params)
+                suffix = '' if collection == 'profiles' else '/'
+                response = client.get(self.base_url + '/' + collection + suffix, params=params)
             except httpx.TransportError:
                 if attempt == 2:raise ReferenceManagerError('RM network unavailable') from None
             else:
@@ -168,16 +169,49 @@ class ReferenceManagerClient:
                     tokens.add(token)
                 else:raise ReferenceManagerError('RM page limit reached')
                 collections[collection] = sorted(rows, key=lambda r: r['id'])
+            profiles = self._profiles(client)
         subjects = [r['account_user_id'] for r in collections['employees'] if r.get('account_user_id')]
         if len(subjects) != len(set(subjects)):
             raise ReferenceManagerError('RM returned duplicate account subjects')
-        return {'readTime': read_time, 'collections': collections}
+        return {'readTime': read_time, 'collections': collections, 'profiles': profiles}
+
+    def _profiles(self, client):
+        rows, seen, ids = [], set(), set()
+        cursor = None
+        for _ in range(10000):
+            params = {'pageSize': self.page_size, 'includeInactive': 'true'}
+            if cursor:params['pageToken'] = cursor
+            body = self._get(client, 'profiles', params)
+            if not isinstance(body, dict) or not isinstance(body.get('items'), list):
+                raise ReferenceManagerError('RM returned an invalid profile page')
+            for row in body['items']:
+                if not isinstance(row, dict):
+                    raise ReferenceManagerError('RM contains an invalid profile')
+                employee = row.get('employeeId')
+                user = row.get('userId')
+                key = ('employee',employee) if employee is not None else ('user',user)
+                if ((employee is not None and not positive_integer(employee))
+                        or (user is not None and (not isinstance(user,str) or not user.strip()))
+                        or not (employee or user) or key in ids
+                        or not isinstance(row.get('displayName'),str) or not row['displayName'].strip()
+                        or type(row.get('isTechnical')) is not bool or type(row.get('isActive')) is not bool):
+                    raise ReferenceManagerError('RM contains an invalid profile')
+                issuer = os.environ.get('OIDC_ISSUER')
+                if issuer and row.get('issuer') != issuer.rstrip('/'):
+                    raise ReferenceManagerError('RM returned an unexpected profile issuer')
+                ids.add(key);rows.append(row)
+            cursor = body.get('nextPageToken')
+            if cursor in (None,''):return rows
+            if not isinstance(cursor,str) or cursor in seen:
+                raise ReferenceManagerError('RM returned an invalid profile cursor')
+            seen.add(cursor)
+        raise ReferenceManagerError('RM profile page limit reached')
 
 
 def snapshot_summary(snapshot):
     return {'source': 'ReferenceManager', 'contractVersion': '1.1.0', 'readTime': snapshot['readTime'],
             'counts': {k: len(v) for k, v in snapshot['collections'].items()},
-            'sha256': hashlib.sha256(canonical(snapshot['collections']).encode()).hexdigest()}
+            'sha256': hashlib.sha256(canonical([snapshot['collections'],snapshot.get('profiles',[])]).encode()).hexdigest()}
 
 
 def refresh_cache(client, *, read_time=None):
@@ -201,15 +235,28 @@ def refresh_cache(client, *, read_time=None):
             old_data = copy.deepcopy(old['data']);old_data.update(readTime=snapshot['readTime'], fetchedAt=db.now())
             db.put(c, 'hr_snapshot', old_data, 'technical')
             return {**summary, 'changed': False}
+        profiles = snapshot.get('profiles', [])
+        by_employee = {p['employeeId']:p for p in profiles if p['employeeId'] is not None}
+        for profile in profiles:
+            subject = profile.get('userId')
+            if subject and not profile['isTechnical']:
+                cached = {'id':subject,'displayName':profile['displayName']}
+                previous = db.find(c,'profile',subject)
+                if not previous or cached != previous['data']:
+                    db.put(c,'profile',cached,'technical')
         seen = set()
         for row in snapshot['collections']['employees']:
             identifier = 'employees/' + str(row['id']);seen.add(identifier)
             employee = {'id': identifier, 'source': 'ReferenceManager', 'sourceId': row['id'], 'sourceRevision': row['revision'],
-                        'displayName': ' '.join(row[k].strip() for k in ('family_name', 'given_name', 'middle_name') if row.get(k)),
+                        'displayName': by_employee.get(row['id'],{}).get('displayName')
+                        or ('Профиль не найден (' + identifier + ')' if 'profiles' in snapshot
+                            else ' '.join(row[k].strip() for k in ('family_name', 'given_name', 'middle_name') if row.get(k))),
                         'accountSubject': row.get('account_user_id'), 'employmentState': row['employment_state'],
                         'accountState': row['account_state'], 'isDeleted': row['is_deleted'], 'sourceMissing': False,
                         'hireDate': row.get('hire_date'), 'dismissalDate': row.get('dismissal_date'),
-                        'eligibleForAssignment': not row['is_deleted'] and row['employment_state'] == 'EMPLOYED'
+                        'eligibleForAssignment': ('profiles' not in snapshot
+                            or (row['id'] in by_employee and not by_employee[row['id']]['isTechnical']))
+                        and not row['is_deleted'] and row['employment_state'] == 'EMPLOYED'
                         and row['account_state'] == 'ENABLED' and bool(row.get('account_user_id'))}
             current = db.find(c, 'employee', identifier)
             if not current or current['data'] != employee:db.put(c, 'employee', employee, 'technical')
@@ -237,6 +284,15 @@ def validate_new_allocations(c, allocations, previous=()):
         if (not employee['eligibleForAssignment'] or (employee.get('hireDate') and allocation['date'] < employee['hireDate'])
                 or (employee.get('dismissalDate') and allocation['date'] > employee['dismissalDate'])):
             fail(422, 'Кадровый справочник запрещает новое назначение сотрудника')
+
+
+def active_manager_profiles(c):
+    row = db.find(c, 'hr_snapshot', SNAPSHOT_ID)
+    if not row or cache_status(c)['quality'] != 'CURRENT':
+        return {}
+    return {profile['userId']: profile['displayName'] for profile in row['data'].get('profiles', [])
+            if profile.get('userId') and profile['isActive'] and not profile['isTechnical']
+            and (profile.get('employeeId') is None or profile.get('accountState') == 'ENABLED')}
 
 
 def cache_status(c):

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { api } from '../api';
 import { logout } from '../auth';
 import { abilities, useSession } from '../session';
 
@@ -7,6 +8,15 @@ export function Header({ unread }: { unread: number }) {
   const session = useSession();
   const can = abilities(session);
   const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState<{ subject: string; name: string }>();
+  const { subject, token } = session;
+  useEffect(() => {
+    let active = true;
+    void api<{ displayName: string | null }>(token, 'profile').then(value => {
+      if (active && value?.displayName) setProfile({ subject, name: value.displayName });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [subject, token]);
   const close = () => setOpen(false);
   return (
     <header className="header">
@@ -27,7 +37,7 @@ export function Header({ unread }: { unread: number }) {
         </NavLink>
       </nav>
       <div className="profile">
-        <span className="user" title={session.subject}>{session.name}</span>
+        <span className="user" title={session.subject}>{profile?.subject === subject ? profile.name : session.name}</span>
         <button type="button" className="secondary" onClick={logout}>Выйти</button>
       </div>
     </header>

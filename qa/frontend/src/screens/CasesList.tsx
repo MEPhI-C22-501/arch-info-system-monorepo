@@ -9,7 +9,7 @@ import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { canEditCase } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 import { useClassifiers } from '../useReferenceData';
@@ -25,7 +25,7 @@ const COLUMNS: Column<TestCase>[] = [
 ];
 
 export function CasesList() {
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const toast = useToast();
   const { values, page, setFilter, setPage, reset } = useListParams();

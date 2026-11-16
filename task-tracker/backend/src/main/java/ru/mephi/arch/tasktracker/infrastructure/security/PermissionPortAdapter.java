@@ -14,7 +14,7 @@ public class PermissionPortAdapter implements PermissionPort {
     public PermissionPortAdapter(AccessService access) { this.access = access; }
 
     @Override public String currentSubject() { return access.subject(); }
-    @Override public String currentRole() { return access.role(); }
+    @Override public boolean ownOnly(String permission) { return access.ownOnly(permission); }
     @Override public void require(String permission) { access.require(permission); }
 
     @Override public void requireItemReadable(String assigneeExternalId) {

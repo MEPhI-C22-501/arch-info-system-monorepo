@@ -40,6 +40,17 @@ def migrate():
             c.connection.driver_connection.execute(script)
             c.execute(schema_versions.insert().values(version=2,applied_at=now()))
 
+        if not c.execute(select(schema_versions).where(schema_versions.c.version == 3)).first():
+            if engine.dialect.name == 'postgresql':
+                script = (Path(__file__).parents[1] / 'migrations/003-project-hour-budget.sql').read_text()
+                c.connection.driver_connection.execute(script)
+            else:
+                for row in all_rows(c, 'project'):
+                    if 'hourBudgetCents' not in row['data']:
+                        c.execute(update(records).where(records.c.kind == 'project', records.c.id == row['id'])
+                                  .values(data={**row['data'], 'hourBudgetCents': None}))
+            c.execute(schema_versions.insert().values(version=3, applied_at=now()))
+
 def find(c, kind, identifier):
     return c.execute(select(records).where(records.c.kind == kind, records.c.id == identifier)).mappings().first()
 

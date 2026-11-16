@@ -12,9 +12,9 @@ type Config struct {
 	// JWKSURL is the URL of the realm keys. It is set when the service reaches Keycloak by another address
 	// than the one in the issuer, by default it is derived from the issuer.
 	JWKSURL string `yaml:"jwks_url"`
-	// Audience is required in the "aud" claim of the tokens when set.
+	// Audience defaults to reference-manager and is required in the "aud" claim.
 	Audience string `yaml:"audience"`
-	// ClientID is the client whose roles from the "resource_access" claim are taken in addition to the realm roles.
+	// ClientID is the client whose roles from the "resource_access" claim are used.
 	ClientID string `yaml:"client_id"`
 	// Algorithms are the accepted signing algorithms.
 	Algorithms []string `yaml:"algorithms" env-default:"RS256"`

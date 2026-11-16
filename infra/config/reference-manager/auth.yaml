@@ -1,0 +1,8 @@
+auth:
+  keycloak:
+    issuer_url: http://localhost:8081/realms/arch-info-system
+    jwks_url: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+    audience: reference-manager
+    client_id: reference-manager
+    provisioner:
+      client_id: reference-manager-provisioner

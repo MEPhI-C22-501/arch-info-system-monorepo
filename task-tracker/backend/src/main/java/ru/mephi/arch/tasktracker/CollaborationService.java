@@ -67,7 +67,7 @@ public class CollaborationService {
     public ResponseEntity<byte[]> download(UUID id,UUID aid){read(id);var a=attachmentRaw(id,aid);return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename*=UTF-8''"+java.net.URLEncoder.encode((String)a.get("file_name"),java.nio.charset.StandardCharsets.UTF_8)).contentType(MediaType.parseMediaType((String)a.get("content_type"))).body((byte[])a.get("content"));}
     @Transactional public void deleteAttachment(UUID id,UUID aid){
         read(id);access.require("attachment.delete");var a=attachmentRaw(id,aid);
-        if("MEMBER".equals(access.role())&&!access.subject().equals(a.get("uploaded_by_external_id")))throw new ApiException(403,"attachment","forbidden");
+        if(access.ownOnly("attachment.delete")&&!access.subject().equals(a.get("uploaded_by_external_id")))throw new ApiException(403,"attachment","forbidden");
         db.update("DELETE FROM attachment WHERE id=?",aid);items.touch(id);
         changes.record(id,access.subject(),null,Map.of("attachmentRemoved",false),Map.of("attachmentRemoved",aid.toString()),"Удалён файл");
     }

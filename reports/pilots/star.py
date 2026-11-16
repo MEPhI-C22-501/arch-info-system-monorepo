@@ -225,7 +225,7 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
     def emp(subject,when=at):return k('employee','reference',employee_inverse.get(subject),when)
     def project(tracker,when=at):return k('project','planning',project_inverse.get(tracker),when)
     for r in employees:
-        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=employee_subject(r,links),full_name=' '.join(str(r.get(f,'')) for f in ['family_name','given_name','middle_name']).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=r.get('grade'),is_active=int(not r.get('is_deleted',False))),r,at)
+        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=employee_subject(r,links),full_name=r.get('display_name') or ' '.join(str(r[f]) for f in ('family_name','given_name','middle_name') if r.get(f)).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=r.get('grade'),is_active=int(not r.get('is_deleted',False))),r,at)
     for entity,name,idcol in [('org_units','org_unit','org_unit_id'),('positions','position','position_id'),('project_roles','project_role','role_code'),('grades','grade','grade_id')]:
         for r in records(db,'reference',entity):dimension(db,name,'reference',r['id'],{idcol:str(r['id']),'name':r.get('name'),'parent_id':str(r['parent_id']) if r.get('parent_id') is not None else None},r,at)
     plans=records(db,'planning','plan')

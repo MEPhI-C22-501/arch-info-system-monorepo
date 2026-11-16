@@ -156,8 +156,7 @@ def test_planning_choices_scope_and_manager_identity(client,monkeypatch):
     assert {'id':'another-manager','name':'Второй руководитель'} in call(client,'GET','planning-options?portfolioId='+PORT)['managers']
     monkeypatch.setattr('server.ui_features.actor',lambda req:Actor('planner',{'R-02'},set(),{PORT},{PID},set()))
     monkeypatch.setenv('APP_ENV','production')
-    # Existing manager subjects remain available without creating imaginary accounts.
-    assert any(x['id']=='demo-R-03' for x in call(client,'GET','planning-options?portfolioId='+PORT)['managers'])
+    assert call(client,'GET','planning-options?portfolioId='+PORT)['managers']==[]
 
 
 def test_project_timeline_real_records_and_scope(client,monkeypatch):

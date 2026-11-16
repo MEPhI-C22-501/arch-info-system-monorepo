@@ -32,7 +32,7 @@ class Service:
         self.db,self.claims=db,claims;self.subject=claims['sub'];self.roles=roles(claims)
         self.correlation=correlation or str(uuid.uuid4())
         if not self.roles & {PM,TL,QA,MB,AN,AD}: raise Problem(403,'FORBIDDEN')
-        self.resolve=resolver or (lambda subject:local_principal(db,subject))
+        self.resolve=resolver
         principal=db.execute('SELECT enabled FROM app.principal WHERE subject=?',(self.subject,)).fetchone()
         if principal and not principal[0]: raise Problem(403,'FORBIDDEN')
 
@@ -73,8 +73,16 @@ class Service:
         rid,query,fmt,status,expires,fingerprint,data,checksum=row
         if instant(expires)<=datetime.now(timezone.utc): raise Problem(410,'GONE')
         if status!='COMPLETED' or data is None: raise Problem(409,'NOT_READY')
-        scope=Scope(self.db,self.claims,rid); expected=scope.fingerprint()
-        if fingerprint!=hashlib.sha256(expected.encode()).hexdigest(): raise Problem(403,'FORBIDDEN')
+        scope = Scope(self.db, self.claims, rid)
+        owner = json.loads(query).get('_ceilingOwner')
+        resolver = self.resolve or (lambda subject: local_principal(self.db, subject))
+        ceiling = Scope(self.db, resolver(owner), rid) if owner else None
+        if fingerprint != export_fingerprint(scope, ceiling):
+            raise Problem(403, 'FORBIDDEN')
+        if self.resolve:
+            current = Scope(self.db, self.resolve(self.subject), rid)
+            if fingerprint != export_fingerprint(current, ceiling):
+                raise Problem(403, 'FORBIDDEN')
         raw=bytes(data)
         if hashlib.sha256(raw).hexdigest()!=checksum: raise Problem(503,'FILE_INTEGRITY_ERROR')
         mime='text/csv; charset=utf-8' if fmt=='csv' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -149,6 +157,17 @@ class Service:
     def route(self,method,path,body=None,params=None,headers=None):
         params=params or {};headers={k.lower():v for k,v in (headers or {}).items()};parts=path.strip('/').split('/')
         if set(params)-{'page','pageSize','reportId','source','status'}: raise Problem(422,'INVALID_PARAMETER')
+        if parts==['profile'] and method=='GET':
+            employee = self.db.execute(
+                'SELECT full_name FROM dwh.dim_employee WHERE is_current=1 AND account_user_id=?',
+                (self.subject,),
+            ).fetchone()
+            if employee and employee[0]:
+                return 200, {'displayName': employee[0]}, {}
+            from star import read
+            profile = next((row for row in read(self.db,'reference','profiles')
+                            if row.get('userId') == self.subject and not row.get('isTechnical')),None)
+            return 200, {'displayName': profile['displayName'] if profile else None}, {}
         if parts==['reports'] and method=='GET':
             items=[definition(f'R-{n:02d}') for n in range(1,12) if self.roles & ACCESS[n] or AD in self.roles]
             return 200,{'items':items},{}
@@ -272,6 +291,13 @@ class Service:
         raise Problem(404,'NOT_FOUND')
 
 
+def export_fingerprint(scope, ceiling):
+    recipient = scope.fingerprint()
+    if ceiling:
+        recipient += ':' + ceiling.fingerprint()
+    return hashlib.sha256(recipient.encode()).hexdigest()
+
+
 def complete_export(db,key,resolver):
     row=db.execute("SELECT owner_sub,report_id,query,format,expires_at FROM app.export_job WHERE id=? AND status='QUEUED'",(key,)).fetchone()
     if not row: return False
@@ -285,9 +311,9 @@ def complete_export(db,key,resolver):
         result=Engine(db).query(rid,claims,query,limit=100000,ceiling=ceiling)
         data,_=encode(result,query,subject,fmt)
         if len(data)>20*1024*1024: raise Problem(422,'RESULT_TOO_LARGE')
-        fingerprint=scope.fingerprint()
+        fingerprint=export_fingerprint(scope, ceiling)
         db.execute("UPDATE app.export_job SET status='COMPLETED',fingerprint=?,row_count=?,checksum=?,file_data=? WHERE id=?",
-                   (hashlib.sha256(fingerprint.encode()).hexdigest(),len(result['rows']),hashlib.sha256(data).hexdigest(),data,key))
+                   (fingerprint,len(result['rows']),hashlib.sha256(data).hexdigest(),data,key))
         notify(db,subject,kind,key)
         from event_outbox import enqueue
         if subscription:

@@ -75,6 +75,7 @@ class Database:
     def initialize(self):
         with self.transaction():
             if not self.sqlite:
+                self.execute("SELECT pg_advisory_xact_lock(hashtext('reports-schema-init'))")
                 for schema in ("etl", "stg", "dwh", "app", "ops"):
                     self.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
             for statement in DDL.split(";"):

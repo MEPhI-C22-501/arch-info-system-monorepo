@@ -156,10 +156,7 @@
           "If-Match": "\"1\"",
           "Idempotency-Key": "10000000-0000-4000-8000-000000000001"
         },
-        "body": {
-          "name": "demo",
-          "goal": "demo"
-        }
+        "body": {}
       },
       "response": {
         "status": 200,
@@ -185,10 +182,7 @@
         "headers": {
           "Authorization": "Bearer <token-of-other-scope>"
         },
-        "body": {
-          "name": "demo",
-          "goal": "demo"
-        }
+        "body": {}
       },
       "response": {
         "status": 403,
@@ -357,6 +351,54 @@
       "request": {
         "method": "GET",
         "path": "/api/v1/versions/{versionId}",
+        "headers": {
+          "Authorization": "Bearer <token-of-other-scope>"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "code": "FORBIDDEN",
+          "message": "Область недоступна",
+          "correlationId": "10000000-0000-4000-8000-000000000001",
+          "details": []
+        }
+      }
+    }
+  },
+  {
+    "operationId": "getVersionHourBudget",
+    "success": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/versions/{versionId}/hour-budget",
+        "headers": {
+          "Authorization": "Bearer <test-token>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "projectId": "10000000-0000-4000-8000-000000000001",
+          "projectRevision": 1,
+          "planVersionId": null,
+          "planVersionNumber": null,
+          "planVersionName": null,
+          "planVersionStatus": null,
+          "planVersionRevision": null,
+          "hourBudget": null,
+          "plannedHours": null,
+          "remainingHours": null,
+          "exceededHours": null,
+          "usagePercent": null,
+          "status": "NOT_SET"
+        }
+      }
+    },
+    "failure": {
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/versions/{versionId}/hour-budget",
         "headers": {
           "Authorization": "Bearer <token-of-other-scope>"
         }

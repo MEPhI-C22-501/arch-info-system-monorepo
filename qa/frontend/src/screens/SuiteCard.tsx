@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { Link, useNavigate, useParams } from 'react-router';
 import { TestCase, listCases } from '../api/cases';
 import { getSuite } from '../api/suites';
@@ -9,7 +10,7 @@ import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
 import { KIND_LABELS, PURPOSE_LABELS } from '../labels';
 import { canCreateRun } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 import { SMOKE_EMPTY_HINT, isEmptySmoke } from './SuitesList';
@@ -23,10 +24,11 @@ const COLUMNS: Column<TestCase>[] = [
 
 export function SuiteCard() {
   const { id = '' } = useParams();
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const { page, setPage } = useListParams();
   const suite = useLoad(() => getSuite(id), [id]);
+  const person = usePeople([suite.data?.owner]);
   const cases = useLoad(() => listCases({ suiteId: id, page }), [id, page]);
 
   if (!suite.data) return suite.error ? <ErrorMessage error={suite.error} onRetry={suite.reload} /> : <p className="muted" aria-busy="true">Загрузка…</p>;
@@ -43,7 +45,7 @@ export function SuiteCard() {
         <dl className="props">
           <Prop name="Вид">{KIND_LABELS[current.kind]}</Prop>
           <Prop name="Назначение">{PURPOSE_LABELS[current.purpose]}</Prop>
-          <Prop name="Владелец">{current.owner}</Prop>
+          <Prop name="Владелец">{person(current.owner)}</Prop>
           {current.kind === 'FILTER' && <Prop name="Условие">{describeCaseFilter(current.filter)}</Prop>}
           <Prop name="Кейсов сейчас">{String(current.caseCount)}</Prop>
         </dl>

@@ -1,0 +1,19 @@
+databases:
+  postgres:
+    host: reference-manager-db
+    port: 5432
+    user: reference_manager
+    database: reference_manager
+    connect_retry:
+      enabled: true
+      attempt_timeout: 5s
+      initial_delay: 1s
+      max_delay: 5s
+      backoff_scale: 1.1
+    pool:
+      max_connections: 10
+      min_connections: 1
+      min_idle_connections: 1
+      max_connection_lifetime: 1h
+      max_connection_idle_time: 30m
+      health_check_period: 1m

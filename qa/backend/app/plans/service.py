@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.profiles import require_current_owner
 from app.auth import Principal
 from app.cases.schemas import CaseFilter
 from app.cases.service import CURRENT_VERSION, filter_clauses, last_results
@@ -87,6 +88,7 @@ def read_plan(session: Session, plan_id: uuid.UUID) -> TestPlan:
 
 
 def create_plan(session: Session, data: TestPlanInput) -> TestPlan:
+    require_current_owner(session, data.owner)
     plan = insert_plan(session, data)
     session.commit()
     return _plan(session, plan)
@@ -109,6 +111,8 @@ def insert_plan(session: Session, data: TestPlanInput) -> TestPlanRow:
 def update_plan(session: Session, plan_id: uuid.UUID, data: TestPlanInput) -> TestPlan:
     plan = _get(session, plan_id, lock=True)
     _ensure_open(plan)
+    if plan.owner != data.owner:
+        require_current_owner(session, data.owner)
     values = _validated(data)
     for column, value in values.items():
         setattr(plan, column, value)

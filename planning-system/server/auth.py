@@ -42,9 +42,16 @@ def actor(request: Request):
         key = client.get_signing_key_from_jwt(token).key
         claims = jwt.decode(token, key, algorithms=['RS256'], audience=audience,
                             issuer=issuer, options={'require':['exp','iat','sub','iss','aud']})
-        roles = set(claims.get('realm_access',{}).get('roles',[]))
-        roles |= set(claims.get('resource_access',{}).get(audience,{}).get('roles',[]))
-        return Actor(claims['sub'], {ROLES.get(r,r) for r in roles}, set(claims.get('scope','').split()),
+        if not claims['sub'].strip() or claims.get('typ') != 'Bearer':
+            raise ValueError('Expected access token')
+        access = claims.get('resource_access')
+        entry = access.get(os.environ.get('OIDC_ROLE_CLIENT_ID', 'planning-system')) if isinstance(access, dict) else None
+        values = entry.get('roles') if isinstance(entry, dict) else None
+        roles = set(values) if isinstance(values, list) and all(isinstance(value, str) for value in values) else set()
+        scopes = set(claims.get('scope','').split())
+        if 'cost.read' not in roles:
+            scopes.discard('cost.read')
+        return Actor(claims['sub'], {ROLES.get(r,r) for r in roles}, scopes,
                      set(claims.get('portfolio_ids',[])), set(claims.get('project_ids',[])), set(claims.get('employee_ids',[])))
     except Exception:
         raise HTTPException(401, 'Недействительный токен') from None

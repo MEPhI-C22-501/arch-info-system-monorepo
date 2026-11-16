@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/go-chi/chi/v5"
 	"golang.org/x/sync/errgroup"
 
 	currencyrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres/currency"
 	currencysrv "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/services/currency"
 	httptr "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server"
+	profilehndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/profile"
 	httpserver "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/http/server"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/keycloak"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/postgres"
@@ -59,6 +61,10 @@ func NewApp(cfg *Config) (*App, error) {
 		currencyrepo.NewExpandedCurrencyRepository(postgresClient),
 	)
 
+	mounts := catalogMounts(log, txManager, postgresClient, accounts)
+	mounts = append(mounts, func(r chi.Router) {
+		profilehndl.Mount(r, postgresClient, cfg.Auth.Keycloak.IssuerURL, log)
+	})
 	httpServer := httpserver.NewServer(&cfg.Transport.HTTP)
 	httpServer.RegisterRouter(httptr.NewRouter(
 		log,
@@ -66,7 +72,7 @@ func NewApp(cfg *Config) (*App, error) {
 		verifier,
 		&cfg.Transport.Limits,
 		currencyService,
-		catalogMounts(log, txManager, postgresClient, accounts)...,
+		mounts...,
 	))
 
 	log.Info("application initialized successfully")

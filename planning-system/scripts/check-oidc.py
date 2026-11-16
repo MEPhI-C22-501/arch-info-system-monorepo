@@ -13,7 +13,7 @@ def main():
         assert config.json()['mode']=='oidc', 'Start compose.oidc.yaml first'
 
         def token(username):
-            response=client.post('http://localhost:8081/realms/planning/protocol/openid-connect/token',data={
+            response=client.post('http://localhost:8081/realms/arch-info-system/protocol/openid-connect/token',data={
                 'client_id':'planning-smoke','grant_type':'password',
                 'username':username,'password':'local-planning-demo'})
             response.raise_for_status()

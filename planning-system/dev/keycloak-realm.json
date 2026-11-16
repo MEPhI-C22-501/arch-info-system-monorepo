@@ -1,30 +1,32 @@
 {
-  "realm": "planning",
+  "realm": "arch-info-system",
   "enabled": true,
   "sslRequired": "none",
   "registrationAllowed": false,
   "resetPasswordAllowed": false,
   "roles": {
-    "realm": [
-      {
-        "name": "PORTFOLIO_OWNER"
-      },
-      {
-        "name": "PLANNER"
-      },
-      {
-        "name": "PROJECT_MANAGER"
-      },
-      {
-        "name": "RESOURCE_MANAGER"
-      },
-      {
-        "name": "TEAM_MEMBER"
-      },
-      {
-        "name": "MODULE_ADMIN"
-      }
-    ]
+    "client": {
+      "planning-system": [
+        {
+          "name": "PORTFOLIO_OWNER"
+        },
+        {
+          "name": "PLANNER"
+        },
+        {
+          "name": "PROJECT_MANAGER"
+        },
+        {
+          "name": "RESOURCE_MANAGER"
+        },
+        {
+          "name": "TEAM_MEMBER"
+        },
+        {
+          "name": "MODULE_ADMIN"
+        }
+      ]
+    }
   },
   "users": [
     {
@@ -35,16 +37,18 @@
       "firstName": "owner",
       "lastName": "Local",
       "email": "owner@example.invalid",
-      "realmRoles": [
-        "PORTFOLIO_OWNER"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "PORTFOLIO_OWNER"
+        ]
+      }
     },
     {
       "id": "demo-R-02",
@@ -54,16 +58,18 @@
       "firstName": "planner",
       "lastName": "Local",
       "email": "planner@example.invalid",
-      "realmRoles": [
-        "PLANNER"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "PLANNER"
+        ]
+      }
     },
     {
       "id": "demo-R-03",
@@ -73,16 +79,18 @@
       "firstName": "manager",
       "lastName": "Local",
       "email": "manager@example.invalid",
-      "realmRoles": [
-        "PROJECT_MANAGER"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "PROJECT_MANAGER"
+        ]
+      }
     },
     {
       "id": "demo-R-04",
@@ -92,16 +100,18 @@
       "firstName": "resource",
       "lastName": "Local",
       "email": "resource@example.invalid",
-      "realmRoles": [
-        "RESOURCE_MANAGER"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "RESOURCE_MANAGER"
+        ]
+      }
     },
     {
       "id": "demo-R-05",
@@ -111,16 +121,18 @@
       "firstName": "member",
       "lastName": "Local",
       "email": "member@example.invalid",
-      "realmRoles": [
-        "TEAM_MEMBER"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "TEAM_MEMBER"
+        ]
+      }
     },
     {
       "id": "demo-R-06",
@@ -130,16 +142,18 @@
       "firstName": "admin",
       "lastName": "Local",
       "email": "admin@example.invalid",
-      "realmRoles": [
-        "MODULE_ADMIN"
-      ],
       "credentials": [
         {
           "type": "password",
           "value": "local-planning-demo",
           "temporary": false
         }
-      ]
+      ],
+      "clientRoles": {
+        "planning-system": [
+          "MODULE_ADMIN"
+        ]
+      }
     },
     {
       "id": "demo-outsider",
@@ -224,12 +238,13 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "planning-api",
+            "included.client.audience": "planning-system",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     },
     {
       "clientId": "planning-smoke",
@@ -290,12 +305,46 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "planning-api",
+            "included.client.audience": "planning-system",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
+    },
+    {
+      "clientId": "planning-system",
+      "enabled": true,
+      "bearerOnly": true,
+      "fullScopeAllowed": false
     }
-  ]
+  ],
+  "accessTokenLifespan": 300,
+  "clientScopeMappings": {
+    "planning-system": [
+      {
+        "client": "planning-web",
+        "roles": [
+          "PORTFOLIO_OWNER",
+          "PLANNER",
+          "PROJECT_MANAGER",
+          "RESOURCE_MANAGER",
+          "TEAM_MEMBER",
+          "MODULE_ADMIN"
+        ]
+      },
+      {
+        "client": "planning-smoke",
+        "roles": [
+          "PORTFOLIO_OWNER",
+          "PLANNER",
+          "PROJECT_MANAGER",
+          "RESOURCE_MANAGER",
+          "TEAM_MEMBER",
+          "MODULE_ADMIN"
+        ]
+      }
+    ]
+  }
 }

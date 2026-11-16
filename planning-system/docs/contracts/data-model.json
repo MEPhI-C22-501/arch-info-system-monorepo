@@ -182,6 +182,12 @@
         "managerSubject"
       ],
       [
+        "hour_budget",
+        "numeric(12,2)",
+        "NULL, CHECK >= 0",
+        "hourBudget; в записи проекта хранятся сотые часа целым JSON-числом. Миграция 003 заполняет отсутствующие значения null без изменения редакции."
+      ],
+      [
         "priority",
         "integer",
         "NN, CHECK >= 1",

@@ -1218,6 +1218,18 @@
             "examples": [
               "demo-manager"
             ]
+          },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
           }
         },
         "required": [
@@ -1286,6 +1298,18 @@
               "demo-manager"
             ]
           },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
+          },
           "id": {
             "type": "string",
             "minLength": 1,
@@ -1336,6 +1360,9 @@
               null
             ],
             "format": "uuid"
+          },
+          "hourBudgetComparison": {
+            "$ref": "#/components/schemas/HourBudgetComparison"
           }
         },
         "required": [
@@ -1350,6 +1377,174 @@
           "priority",
           "status",
           "activePlanVersionId"
+        ],
+        "additionalProperties": false
+      },
+      "HourBudgetComparison": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "projectRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция проекта",
+            "examples": [
+              1
+            ]
+          },
+          "planVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "planVersionNumber": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Номер версии",
+            "examples": [
+              null
+            ]
+          },
+          "planVersionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Название версии",
+            "examples": [
+              null
+            ]
+          },
+          "planVersionStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Статус версии",
+            "examples": [
+              null
+            ],
+            "enum": [
+              "DRAFT",
+              "ON_REVIEW",
+              "APPROVED",
+              "ACTIVE",
+              "SUPERSEDED",
+              "ARCHIVED",
+              null
+            ]
+          },
+          "planVersionRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Редакция версии",
+            "examples": [
+              null
+            ]
+          },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
+          },
+          "plannedHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "remainingHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "exceededHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "usagePercent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_SET",
+              "WITHIN_BUDGET",
+              "AT_LIMIT",
+              "EXCEEDED",
+              null
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "projectRevision",
+          "planVersionId",
+          "planVersionNumber",
+          "planVersionName",
+          "planVersionStatus",
+          "planVersionRevision",
+          "hourBudget",
+          "plannedHours",
+          "remainingHours",
+          "exceededHours",
+          "usagePercent",
+          "status"
         ],
         "additionalProperties": false
       },

@@ -367,10 +367,10 @@ class HttpSecurity(unittest.TestCase):
             try:
                 with patch.dict(os.environ, {'REPORTS_DATABASE_URL': dsn, 'REPORTS_OIDC_ISSUER': issuer}):
                     stamp = int(datetime.now(timezone.utc).timestamp())
-                    base = {'sub': MEMBER_1, 'iss': issuer, 'aud': 'reports', 'iat': stamp, 'exp': stamp+60,
+                    base = {'sub': MEMBER_1, 'iss': issuer, 'aud': 'reports', 'typ': 'Bearer', 'iat': stamp, 'exp': stamp+60,
                             'resource_access': {'reports': {'roles': ['reports-member']}}}
                     def call(claims, signing_key=key, kid='test'):
-                        headers = {} if claims is None else {'Authorization': 'Bearer '+jwt.encode(claims, signing_key, algorithm='RS256', headers={'kid': kid})}
+                        headers = {} if claims is None else {'Authorization': 'Bearer '+jwt.encode({'typ':'Bearer', **claims}, signing_key, algorithm='RS256', headers={'kid': kid})}
                         request = urllib.request.Request(f'http://127.0.0.1:{api.server_port}/pilot/reports/time-logs', headers=headers)
                         try:
                             with urllib.request.urlopen(request) as response: return response.status, json.load(response)

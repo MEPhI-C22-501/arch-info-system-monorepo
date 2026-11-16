@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './AdminApi';
+export * from './DefaultApi';
 export * from './DefectsApi';
 export * from './HealthApi';
 export * from './ReportsApi';

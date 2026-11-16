@@ -129,6 +129,7 @@ tasks:
           --additional-properties=packageName={{.PACKAGE_NAME}} \
           --global-property=models,apis,{{.NO_TESTS_AND_DOCS}},supportingFiles=__init__.py:api_client.py:api_response.py:configuration.py:exceptions.py:rest.py
       - rm -rf "{{.PROJECT_DIR}}/.openapi-generator"
+      - python3 "{{.ROOT_DIR}}/trim-generated-whitespace.py" "{{.PACKAGE_DIR}}"
 
   generate:java:
     internal: true
@@ -157,6 +158,7 @@ tasks:
       - rm -rf "{{.PROJECT_DIR}}/.openapi-generator"
       # The generator creates directories for skipped supporting files (gradle/, .github/, api/)
       - find "{{.PROJECT_DIR}}" -type d -empty -delete
+      - python3 "{{.ROOT_DIR}}/trim-generated-whitespace.py" "{{.PACKAGE_DIR}}"
 
   generate:typescript:
     internal: true
@@ -185,3 +187,4 @@ tasks:
             mv "$file.tmp" "$file"
           done
         ' sh {} +
+      - python3 "{{.ROOT_DIR}}/trim-generated-whitespace.py" "{{.PACKAGE_DIR}}"

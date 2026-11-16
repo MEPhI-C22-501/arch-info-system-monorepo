@@ -114,7 +114,7 @@ class Acceptance(unittest.TestCase):
             with report_server(self.dsn, base, base+'/jwks') as api:
                 for name, subject, role in [('member1', MEMBER_1, 'reports-member'),
                                             ('member2', MEMBER_2, 'reports-member'), ('admin', uid(9000), 'reports-analyst')]:
-                    token = jwt.encode({'sub': subject, 'iss': base, 'aud': 'reports', 'iat': int(time.time()),
+                    token = jwt.encode({'sub': subject, 'iss': base, 'aud': 'reports', 'typ': 'Bearer', 'iat': int(time.time()),
                                         'exp': int(time.time())+120, 'resource_access': {'reports': {'roles': [role]}}},
                                        key, algorithm='RS256', headers={'kid': 'acceptance'})
                     status, _, body = request(api+'/pilot/reports/time-logs?startDate=2026-10-01&endDate=2026-10-01', token)

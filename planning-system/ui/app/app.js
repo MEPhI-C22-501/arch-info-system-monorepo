@@ -1,12 +1,21 @@
 
 'use strict';
 const initial=()=>({name:'ERP · планирование ресурсов',role:'R-02',status:'DRAFT',revision:1,version:1,scenario:false,demand:6,allocation:6,availability:4,confirmed:false,reviewRound:0,baseline:null,publication:'FAILED',events:['Создан демонстрационный черновик'],attachment:false,date:'2026-10-09'});
+let oidcConfig, refreshToken, refreshAt=0, renewing;
 let state=initial(), token='', authMode='demo', plan=null, projectId='10000000-0000-4000-8000-000000000002', pending=false;
 const screens=[['portfolio','Портфель и проекты','01'],['structure','Декомпозиция','02'],['demand','Потребность','03'],['resources','Доступность и назначения','04'],['gantt','Диаграмма Ганта','05'],['conflicts','Конфликты ресурсов','06'],['scenarios','Сравнение сценариев','07'],['approval','Согласование версии','08'],['calendar','Личный календарь','09'],['attachments','Вложения','10'],['forecast','План-факт и прогноз','11'],['exchange','Журнал обмена','12']];
 let screen=location.hash.slice(1)||'portfolio', mode='normal',timer;
 const $=id=>document.getElementById(id), escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const editable=()=>state.projectStatus!=='ARCHIVED'&&state.status==='DRAFT'&&['R-02','R-03'].includes(state.role);
-const roleScreens=()=>state.role==='R-06'?['exchange']:state.role==='R-05'?['calendar','attachments']:state.role==='R-04'?['portfolio','resources','conflicts','gantt','approval','attachments']:screens.map(x=>x[0]).filter(x=>x!=='exchange');
+const hasRole=(...roles)=>roles.some(role=>(state.identity?.roles||[state.role]).includes(role));
+const editable=()=>state.projectStatus!=='ARCHIVED'&&state.status==='DRAFT'&&hasRole('R-02','R-03');
+const roleScreens=()=>{
+ const visible=new Set();
+ if(hasRole('R-01','R-02','R-03'))screens.filter(x=>x[0]!=='exchange').forEach(x=>visible.add(x[0]));
+ if(hasRole('R-04'))['portfolio','resources','conflicts','gantt','approval','attachments'].forEach(x=>visible.add(x));
+ if(hasRole('R-05'))['calendar','attachments'].forEach(x=>visible.add(x));
+ if(hasRole('R-06'))visible.add('exchange');
+ return [...visible];
+};
 const overload=()=>state.overloadHours??Math.max(state.allocation-state.availability,0), deficit=()=>state.deficitHours??Math.max(state.demand-state.allocation,0);
 function save(message){$('saved').textContent='Сохранено на сервере · редакция '+state.revision;if(message)toast(message)}
 function toast(text){$('toast').textContent=text;clearTimeout(timer);timer=setTimeout(()=>{$('toast').textContent=''},5500)}
@@ -15,7 +24,7 @@ function confirmAction(title,text,fn){$('confirm-title').textContent=title;$('co
 const link=(id,text)=>`<a href="#${id}">${text}</a>`, button=(action,text,primary=false,disabled=false)=>`<button data-action="${action}" ${primary?'class="primary"':''} ${disabled?'disabled':''}>${text}</button>`;
 const badge=()=>`<span class="badge ${state.status==='ACTIVE'?'good':''}">${state.status} · V${state.version}</span>`;
 function nav(){const visible=roleScreens();if(!visible.includes(screen))screen=visible[0];$('nav').innerHTML=screens.filter(s=>visible.includes(s[0])).map(([id,title,no])=>`<a href="#${id}" ${screen===id?'aria-current="page"':''}><span style="opacity:.5;margin-right:8px">${no}</span>${title}</a>`).join('');$('role').value=state.role}
-function render(){nav();const title=screens.find(s=>s[0]===screen)[1];$('main').innerHTML=`<div class="notice"><strong>Planning System.</strong> Данные сохраняются на сервере. ${authMode==='demo'?'Учебный вход и локальные интеграционные заглушки; переключение ролей разрешено только в этой среде.':'Вход через Keycloak.'}</div><div class="page-top"><div><div class="eyebrow">Портфель ERP / ${escape(state.name)}</div><h1>${title}</h1><span class="muted">Версия ${state.version}${state.scenario?' · сценарий «Что если»':''}</span></div><div>${badge()}<div class="status-line">Редакция ${state.revision}</div></div></div><details class="screen-debug"><summary>Проверка состояний экрана</summary><div class="tools" style="margin-bottom:20px"><label for="view-state">Проверка состояния экрана</label><select id="view-state"><option value="normal">Обычный экран</option><option value="loading">Загрузка</option><option value="empty">Нет данных</option><option value="error">Ошибка</option></select></div></details><div id="project-context"></div><div id="content"></div><footer>Planning System · серверная версия · контракты 110–165.</footer>`;$('view-state').value=mode;$('view-state').onchange=e=>{mode=e.target.value;render()};if(mode!=='normal'){$('content').innerHTML=`<div class="card empty" role="status"><h2>${{loading:'Загрузка данных…',empty:'Пока нет данных',error:'Не удалось загрузить данные'}[mode]}</h2><p>${mode==='loading'?'Подождите завершения запроса. Это демонстрационное состояние.':mode==='empty'?'Данные появятся после создания плана или назначения.':'Последний сохранённый план не изменён. Проверьте соединение и повторите.'}</p>${button('normal',mode==='error'?'Повторить':'Вернуться к данным',true)}</div>`;return}$('content').innerHTML=cards[screen]();bindFields();}
+function render(){nav();const title=screens.find(s=>s[0]===screen)?.[1];if(!title){$('main').textContent='У вашей учётной записи нет доступа к Planning System.';return;}$('main').innerHTML=`<div class="notice"><strong>Planning System.</strong> Данные сохраняются на сервере. ${authMode==='demo'?'Учебный вход и локальные интеграционные заглушки; переключение ролей разрешено только в этой среде.':'Вход через Keycloak.'}</div><div class="page-top"><div><div class="eyebrow">Портфель ERP / ${escape(state.name)}</div><h1>${title}</h1><span class="muted">Версия ${state.version}${state.scenario?' · сценарий «Что если»':''}</span></div><div>${badge()}<div class="status-line">Редакция ${state.revision}</div></div></div><details class="screen-debug"><summary>Проверка состояний экрана</summary><div class="tools" style="margin-bottom:20px"><label for="view-state">Проверка состояния экрана</label><select id="view-state"><option value="normal">Обычный экран</option><option value="loading">Загрузка</option><option value="empty">Нет данных</option><option value="error">Ошибка</option></select></div></details><div id="project-context"></div><div id="content"></div><footer>Planning System · серверная версия · контракты 110–165.</footer>`;$('view-state').value=mode;$('view-state').onchange=e=>{mode=e.target.value;render()};if(mode!=='normal'){$('content').innerHTML=`<div class="card empty" role="status"><h2>${{loading:'Загрузка данных…',empty:'Пока нет данных',error:'Не удалось загрузить данные'}[mode]}</h2><p>${mode==='loading'?'Подождите завершения запроса. Это демонстрационное состояние.':mode==='empty'?'Данные появятся после создания плана или назначения.':'Последний сохранённый план не изменён. Проверьте соединение и повторите.'}</p>${button('normal',mode==='error'?'Повторить':'Вернуться к данным',true)}</div>`;return}$('content').innerHTML=cards[screen]();bindFields();}
 const cards={
  portfolio:()=>`<div class="grid"><div class="card"><div class="eyebrow">Проект в портфеле</div><div class="stat">01</div><span class="muted">ERP · годовой план</span></div><div class="card"><div class="eyebrow">Оценка до завершения</div><div class="stat">8 <small>ч</small></div><span class="muted">Ручная оценка планировщика</span></div><div class="card"><div class="eyebrow">Ресурсный конфликт</div><div class="stat">${overload()} <small>ч</small></div><span class="muted">Перегрузка · 5 октября</span></div></div><div class="card"><h2>Проекты</h2><div class="scroll"><table><thead><tr><th>Проект</th><th>Владелец</th><th>План</th><th>Следующий шаг</th></tr></thead><tbody><tr><td><strong>${escape(state.name)}</strong><br><span class="muted">ERP-A · приоритет 1</span></td><td>Демо-руководитель</td><td>${badge()}</td><td>${link('structure','Открыть структуру →')}</td></tr></tbody></table></div></div><div class="card"><h3>Три демонстрационных маршрута</h3><p>${link('structure','Годовое планирование')} → ${link('resources','Ресурсы')} → ${link('approval','Согласование')}.</p><p>${link('conflicts','Конфликт')} → ресурсный руководитель подтверждает доступность → планировщик отправляет версию.</p><p>${link('scenarios','Сценарий')} → сравнение с baseline → новое согласование.</p></div>`,
  structure:()=>`<div class="card"><h2>Работы проекта</h2>${draftHelp()}<label class="field">Название проекта<input id="project-name" value="${escape(state.name)}" ${editable()?'':'disabled'} maxlength="120"></label><p class="muted">Название черновика сохраняется автоматически. Для изменения утверждённого плана создайте сценарий.</p><div class="scroll"><table><thead><tr><th>Элемент</th><th>Тип</th><th>Срок</th><th>План</th></tr></thead><tbody><tr><td>Релиз ERP 1.0</td><td>RELEASE</td><td>05.10 — ${escape(state.date)}</td><td>${state.demand} ч</td></tr><tr><td>↳ Планирование</td><td>EPIC</td><td>05.10 — ${escape(state.date)}</td><td>${state.demand} ч</td></tr><tr><td>　↳ Интерфейс</td><td>FEATURE</td><td>05.10</td><td>${state.demand} ч</td></tr><tr><td>　↳ Приёмка</td><td>MILESTONE</td><td>${escape(state.date)}</td><td>0 ч</td></tr></tbody></table></div><div class="actions">${link('demand','Далее: потребность →')}</div></div>`,
@@ -23,14 +32,30 @@ const cards={
  resources:()=>`<div class="grid two"><div class="card"><h2>Доступность · 5 октября</h2><p>Демо-сотрудник · employees/demo-1</p><label class="field">Доступно часов<input id="available-hours" type="number" min="0" max="24" value="${state.availability}" ${state.role==='R-04'?'':'disabled'}></label><p class="muted">В исходном примере: 8 часов нормы − 4 часа отсутствия. Изменение здесь моделирует подтверждённую плановую предпосылку.</p>${button('confirm-resource','Подтвердить доступность и назначение',true,state.role!=='R-04'||state.status!=='DRAFT'||overload()>0||deficit()>0)}<p>${state.confirmed?'<span class="badge good">Подтверждено</span>':'Ожидает ресурсного руководителя'}</p></div><div class="card"><h2>Назначение на работу</h2><label class="field">Назначено часов<input id="allocation-hours" type="number" min="1" max="24" value="${state.allocation}" ${editable()?'':'disabled'}></label><p>Потребность: ${state.demand} ч</p><p>Перегрузка: <strong>${overload()} ч</strong> · дефицит: <strong>${deficit()} ч</strong></p><div class="actions">${link('conflicts','Проверить конфликты →')}</div></div></div>`,
  gantt:()=>'<div class="card">Загрузка диаграммы проекта…</div>',
  conflicts:()=>`<div class="card"><h2>${overload()||deficit()?'Нужно уточнить ресурсы':'Блокирующих конфликтов нет'}</h2><p>${overload()?`Назначено ${state.allocation} ч при доступных ${state.availability} ч: перегрузка ${overload()} ч.`:'Перегрузка: 0 ч.'}</p><p>Дефицит потребности: ${deficit()} ч. ${state.allocation>state.demand?'Есть превышение назначения над потребностью.':''}</p><p>Для демо переключитесь на R-04, установите доступность 6 ч и подтвердите назначение. Затем R-02 отправляет план на согласование.</p><div class="actions">${link('resources','Исправить ресурсы →')} ${link('approval','Перейти к согласованию →')}</div></div>`,
- scenarios:()=>`<div class="grid two"><div class="card"><h2>Действующая baseline</h2><p>${state.baseline?`Версия ${state.baseline.version} · ${state.baseline.demand} ч · веха ${escape(state.baseline.date)}`:'Пока нет. Сначала утвердите и активируйте первоначальный план.'}</p><span class="badge good">Содержимое не редактируется</span></div><div class="card"><h2>Вариант «Что если»</h2><p>Копия сохраняет связь с исходной версией. Изменения не затрагивают baseline.</p>${button('scenario','Создать сценарий',true,!state.baseline||!['R-02','R-03'].includes(state.role)||state.scenario&&state.status==='DRAFT')}<label class="field">Веха сценария<input id="scenario-date" type="date" min="2026-10-05" max="2026-12-31" value="${escape(state.date)}" ${state.scenario&&editable()?'':'disabled'}></label><p>${state.scenario&&state.baseline?`Вариант V${state.version}: ${state.date===state.baseline.date?'срок не изменён':'срок изменён, требуется новое согласование'}`:''}</p>${link('approval','Согласовать вариант →')}</div></div>`,
- approval:()=>`<div class="card"><div class="steps">${['DRAFT','ON_REVIEW','APPROVED','ACTIVE'].map(x=>`<span class="step ${x===state.status?'done':''}">${x}</span>`).join('')}</div><h2 style="margin-top:24px">Решение по версии ${state.version}</h2><p>Раунд ${state.reviewRound} · перегрузка ${overload()} ч · дефицит ${deficit()} ч · ресурсы ${state.confirmed?'подтверждены':'не подтверждены'}.</p><p class="muted">Отправка: R-02/R-03. Финальное решение и активация: R-01. Возврат открывает новый цикл редактирования.</p><div class="actions">${button('submit','Отправить на согласование',true,!editable()||!state.confirmed||overload()>0||deficit()>0||state.allocation>state.demand)}${button('approve','Утвердить',true,state.role!=='R-01'||state.status!=='ON_REVIEW')}${button('return','Вернуть на доработку',false,state.role!=='R-01'||state.status!=='ON_REVIEW')}${button('activate','Активировать',true,state.role!=='R-01'||state.status!=='APPROVED')}</div><label class="field">Комментарий для возврата<input id="return-comment" placeholder="Укажите причину"></label></div>`,
+ scenarios:()=>`<div class="grid two"><div class="card"><h2>Действующая baseline</h2><p>${state.baseline?`Версия ${state.baseline.version} · ${state.baseline.demand} ч · веха ${escape(state.baseline.date)}`:'Пока нет. Сначала утвердите и активируйте первоначальный план.'}</p><span class="badge good">Содержимое не редактируется</span></div><div class="card"><h2>Вариант «Что если»</h2><p>Копия сохраняет связь с исходной версией. Изменения не затрагивают baseline.</p>${button('scenario','Создать сценарий',true,!state.baseline||!hasRole('R-02','R-03')||state.scenario&&state.status==='DRAFT')}<label class="field">Веха сценария<input id="scenario-date" type="date" min="2026-10-05" max="2026-12-31" value="${escape(state.date)}" ${state.scenario&&editable()?'':'disabled'}></label><p>${state.scenario&&state.baseline?`Вариант V${state.version}: ${state.date===state.baseline.date?'срок не изменён':'срок изменён, требуется новое согласование'}`:''}</p>${link('approval','Согласовать вариант →')}</div></div>`,
+ approval:()=>`<div class="card"><div class="steps">${['DRAFT','ON_REVIEW','APPROVED','ACTIVE'].map(x=>`<span class="step ${x===state.status?'done':''}">${x}</span>`).join('')}</div><h2 style="margin-top:24px">Решение по версии ${state.version}</h2><p>Раунд ${state.reviewRound} · перегрузка ${overload()} ч · дефицит ${deficit()} ч · ресурсы ${state.confirmed?'подтверждены':'не подтверждены'}.</p><p class="muted">Отправка: R-02/R-03. Финальное решение и активация: R-01. Возврат открывает новый цикл редактирования.</p><div class="actions">${button('submit','Отправить на согласование',true,!editable()||!state.confirmed||overload()>0||deficit()>0||state.allocation>state.demand)}${button('approve','Утвердить',true,!hasRole('R-01')||state.status!=='ON_REVIEW')}${button('return','Вернуть на доработку',false,!hasRole('R-01')||state.status!=='ON_REVIEW')}${button('activate','Активировать',true,!hasRole('R-01')||state.status!=='APPROVED')}</div><label class="field">Комментарий для возврата<input id="return-comment" placeholder="Укажите причину"></label></div>`,
  calendar:()=>`<div class="card"><h2>Мои назначения</h2><p>Демо-сотрудник · рабочая неделя 05–09 октября</p><div class="grid"><div class="card"><h3>Понедельник · 05</h3><div class="stat">${state.baseline?state.baseline.allocation:0} ч</div><p>ERP-A · Интерфейс</p></div><div class="card"><h3>Вторник · 06</h3><div class="stat">0 ч</div><p>Назначений нет</p></div><div class="card"><h3>Оповещения</h3><p>${state.baseline?'Опубликована версия V'+state.baseline.version:'Активного плана ещё нет'}</p></div></div><p class="muted">Показаны назначения активной baseline. Факт работы вводится в Task Tracker.</p></div>`,
- attachments:()=>`<div class="card"><h2>Обоснования проекта</h2><p>Файл загружается на сервер; размер и MIME проверяются.</p>${state.attachment?'<p>Загруженные файлы перечислены ниже.</p>':'<p class="muted">Вложений пока нет.</p>'}<div class="actions">${['R-02','R-03'].includes(state.role)?button('attachment','Загрузить вложение',true):''}</div></div>`,
+ attachments:()=>`<div class="card"><h2>Обоснования проекта</h2><p>Файл загружается на сервер; размер и MIME проверяются.</p>${state.attachment?'<p>Загруженные файлы перечислены ниже.</p>':'<p class="muted">Вложений пока нет.</p>'}<div class="actions">${hasRole('R-02','R-03')?button('attachment','Загрузить вложение',true):''}</div></div>`,
  forecast:()=>`<div class="grid"><div class="card"><div class="eyebrow">Факт</div><div class="stat">12 ч</div><p>Абсолютный срез Task Tracker </p></div><div class="card"><div class="eyebrow">Остаток ETC</div><div class="stat">8 ч</div><p>Явная оценка планировщика</p></div><div class="card"><div class="eyebrow">Полная трудоёмкость</div><div class="stat">20 ч</div><p>Факт + ETC</p></div></div><div class="card"><h2>Качество прогноза <span class="badge bad">PARTIAL</span></h2><p>Нет подтверждённой ставки. Денежный итог не рассчитан. Арифметический остаток задачи не подменяет оценку будущей работы.</p>${link('scenarios','Создать сценарий по отклонению →')}</div>`,
  exchange:()=>`<div class="card"><h2>Публикация плана · Task Tracker</h2><p>Состояние: <strong>${state.publication}</strong> </p><p>Ключ: ERP-A / версия ${state.baseline?.version||1}. В локальной среде ответ приёмника — заглушка.</p>${button('retry','Повторить доставку',true,state.publication==='SUCCEEDED'||!state.baseline)}<p class="muted">Повтор не меняет baseline и сохраняет ключ. Без активного плана отправка недоступна.</p></div><div class="card"><h2>Журнал действий</h2><div class="timeline">${state.events.slice(-10).map(x=>`<p>${escape(x)}</p>`).join('')}</div></div>`
 };
+function takeTokens(value){
+ token=value.access_token;
+ refreshToken=value.refresh_token;
+ refreshAt=Date.now()+Math.max(0,(value.expires_in-20))*1000;
+}
+async function refreshOidc(){
+ if(authMode!=='oidc'||!refreshToken||Date.now()<refreshAt)return;
+ renewing ||= fetch(oidcConfig.tokenEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+  body:new URLSearchParams({grant_type:'refresh_token',client_id:oidcConfig.clientId,refresh_token:refreshToken})})
+ .then(async response=>{
+  if(!response.ok){token='';refreshToken=null;throw Error('Сеанс завершён. Войдите снова.')}
+  takeTokens(await response.json());
+ }).finally(()=>{renewing=null});
+ await renewing;
+}
 async function api(path,method='GET',body=null,revision=null){
+ await refreshOidc();
  const headers={Authorization:'Bearer '+token};
  if(method!=='GET'){headers['Idempotency-Key']=crypto.randomUUID();if(revision!==null)headers['If-Match']='"'+revision+'"'}
  if(body!==null && !(body instanceof FormData))headers['Content-Type']='application/json';
@@ -39,9 +64,9 @@ async function api(path,method='GET',body=null,revision=null){
  return response.headers.get('content-type')?.includes('json')?response.json():response;
 }
 async function refresh(){
- const next=await api('/api/v1/workspace?projectId='+encodeURIComponent(projectId));
- state={...initial(),...next};state.identity=await api('/api/v1/me');
- if(['R-01','R-02','R-03'].includes(state.role) && state.versionId)plan=await api('/api/v1/versions/'+state.versionId);else plan=null;
+ const next=await api('/api/v1/workspace?projectId='+encodeURIComponent(projectId)+'&view='+encodeURIComponent(screen));
+ state={...initial(),...next};state.identity=await api('/api/v1/me');$('session-name').textContent=authMode==='oidc'?state.identity.displayName:'';
+ if(hasRole('R-01','R-02','R-03') && state.versionId)plan=await api('/api/v1/versions/'+state.versionId);else plan=null;
  if(state.role==='R-04'){const rows=await api('/api/v1/availability');state.availabilityRecord=rows.find(x=>x.data.id===state.availabilityId)}
  sessionStorage.setItem('planning-project',projectId);render();save();
 }
@@ -66,7 +91,7 @@ function bindFields(){
    await saveDraft(d);
   }
  });
- if($('project-name'))$('project-name').onchange=e=>command(()=>api('/api/v1/projects/'+projectId,'PATCH',{name:e.target.value.trim(),goal:'Демонстрация планирования'},state.projectRevision));
+ if($('project-name'))$('project-name').onchange=e=>command(()=>api('/api/v1/projects/'+projectId,'PATCH',{name:e.target.value.trim()},state.projectRevision));
  if($('scenario-date'))$('scenario-date').onchange=e=>command(async()=>{const d=draft();for(const x of d.items){if(['MILESTONE','EPIC','RELEASE'].includes(x.type))x.finish=e.target.value;if(x.type==='MILESTONE')x.start=e.target.value}await saveDraft(d)});
  if(screen==='attachments'){
   const content=$('content');content.insertAdjacentHTML('beforeend','<div class="card"><label class="field">Выбрать файл<input type="file" id="upload-file" accept=".txt,.pdf,.png,.jpg"></label><div id="file-list"></div></div>');
@@ -75,7 +100,7 @@ function bindFields(){
  if(screen==='forecast'){
   $('content').innerHTML=`<div class="grid"><div class="card"><h2>Факт</h2><div class="stat">${state.actualHours??'—'} ч</div></div><div class="card"><h2>Остаток ETC</h2><div class="stat">${state.forecast?.remainingHours??'—'} ч</div></div><div class="card"><h2>Прогноз стоимости</h2><div class="stat">${state.forecast?.estimatedTotalCost??'—'} ${escape(state.forecast?.currencyCode||'')}</div></div></div><div class="card"><h2>${escape(state.forecast?.quality||'Не рассчитан')}</h2><p>${escape((state.forecast?.missingInputs||[]).join(', '))}</p><button data-action="forecast">Пересчитать прогноз</button></div>`;
  }
- if(screen==='calendar' && state.role==='R-05')$('content').innerHTML='<div class="card"><h2>Мои назначения</h2>'+(state.allocations||[]).map(x=>`<p>${escape(x.date)} · ${x.hours} ч · ${escape(x.employeeId)}</p>`).join('')+'</div>';
+ if(screen==='calendar' && state.role==='R-05')$('content').innerHTML='<div class="card"><h2>Мои назначения</h2>'+(state.allocations||[]).map(x=>`<p>${escape(x.date)} · ${x.hours} ч · ${escape(x.employeeName||x.employeeId)}</p>`).join('')+'</div>';
 }
 document.addEventListener('click',e=>{
  const download=e.target.closest('[data-download]');if(download){command(async()=>{const response=await api('/api/v1/attachments/'+download.dataset.download+'/content');const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download='attachment';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});return}
@@ -98,11 +123,21 @@ document.addEventListener('click',e=>{
  });
  if(action==='activate')confirmAction('Активировать план?','Утверждённая версия станет действующей.',execute);else execute();
 });
-$('role').onchange=async e=>{if(authMode!=='demo')return;token='demo-'+e.target.value;await refresh().catch(e=>toast(e.message))};
+$('role').onchange=async e=>{
+ if(authMode!=='demo')return;
+ contextRequest++;
+ token='demo-'+e.target.value;
+ await refresh().catch(e=>toast(e.message));
+};
 $('reset').hidden=true;
-window.addEventListener('hashchange',()=>{screen=location.hash.slice(1);mode='normal';render();$('main').focus()});
+window.addEventListener('hashchange',()=>{
+ screen=location.hash.slice(1);mode='normal';
+ if(hasRole('R-05','R-06')&&hasRole('R-01','R-02','R-03','R-04'))void refresh().catch(error=>toast(error.message));
+ else render();
+ $('main').focus();
+});
 async function start(){
- const config=await (await fetch('/auth/config')).json();authMode=config.mode;
+ const config=await (await fetch('/auth/config')).json();authMode=config.mode;oidcConfig=config;
  if(authMode==='demo'){token='demo-R-02';const remembered=sessionStorage.getItem('planning-project');if(remembered){const projects=await api('/api/v1/project-cards');if(projects.items.some(p=>p.id===remembered))projectId=remembered;}await refresh();return}
  $('role').hidden=true;
  const url=new URL(location.href);const code=url.searchParams.get('code');
@@ -110,7 +145,7 @@ async function start(){
   if(url.searchParams.get('state')!==sessionStorage.getItem('oidc-state'))throw Error('Неверный state входа');
   const verifier=sessionStorage.getItem('oidc-verifier');sessionStorage.removeItem('oidc-state');sessionStorage.removeItem('oidc-verifier');
   const r=await fetch(config.tokenEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:config.clientId,redirect_uri:location.origin+'/',code,code_verifier:verifier})});
-  if(!r.ok)throw Error('Не удалось завершить вход');token=(await r.json()).access_token;history.replaceState({},'',location.origin+'/');
+  if(!r.ok)throw Error('Не удалось завершить вход');takeTokens(await r.json());history.replaceState({},'',location.origin+'/');
   const me=await api('/api/v1/me');const remembered=sessionStorage.getItem('planning-project');if(me.roles.some(r=>['R-01','R-02','R-03','R-04'].includes(r))){const list=await api('/api/v1/project-cards');projectId=list.items.find(p=>p.id===remembered)?.id||list.items.find(p=>me.projects.includes(p.id))?.id||list.items[0]?.id||projectId;}else if(me.projects.length)projectId=me.projects[0];await refresh();return;
  }
  const bytes=crypto.getRandomValues(new Uint8Array(32));const encode=b=>btoa(String.fromCharCode(...b)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
@@ -130,7 +165,7 @@ async function portfolioScreen(){
  }catch(e){toast(e.message)}
 }
 function structureScreen(){
- if(!plan){$('content').innerHTML='<div class="card"><h2>План ещё не создан</h2>'+(['R-02','R-03'].includes(state.role)?'<button data-extra="first-plan">Создать первый план</button>':'<p>План создаёт планировщик или руководитель проекта.</p>')+'</div>';return;}
+ if(!plan){$('content').innerHTML='<div class="card"><h2>План ещё не создан</h2>'+(hasRole('R-02','R-03')?'<button data-extra="first-plan">Создать первый план</button>':'<p>План создаёт планировщик или руководитель проекта.</p>')+'</div>';return;}
  const itemRows=plan.items.map(x=>`<tr><td><input data-item="${x.id}" data-field="name" value="${escape(x.name)}" ${editable()?'':'disabled'} aria-label="Название работы"></td><td>${escape(workTypes[x.type]||x.type)}</td><td><input type="date" data-item="${x.id}" data-field="start" value="${x.start}" ${editable()?'':'disabled'} aria-label="Начало работы"></td><td><input type="date" data-item="${x.id}" data-field="finish" value="${x.finish}" ${editable()?'':'disabled'} aria-label="Окончание работы"></td><td><input type="number" data-item="${x.id}" data-field="plannedHours" value="${x.plannedHours}" ${editable()?'':'disabled'} min="0" step="0.01" aria-label="Плановые часы"></td><td>${editable()?`<button data-remove-item="${x.id}">Удалить</button>`:''}</td></tr>`).join('');
  $('content').innerHTML=`<div class="card"><h2>Работы проекта</h2>${draftHelp()}<label class="field">Название проекта<input id="project-name" value="${escape(state.name)}" ${editable()?'':'disabled'}></label><div class="scroll"><table><thead><tr><th>Работа</th><th>Тип</th><th>Начало</th><th>Окончание</th><th>Часы</th><th></th></tr></thead><tbody>${itemRows}</tbody></table></div>${editable()?`<details open class="add-work"><summary>Добавить работу</summary><label class="field">Название<input id="new-item-name"></label><label class="field">Тип<select id="new-item-type">${['FEATURE','STAGE','EPIC','RELEASE','MILESTONE'].map(x=>'<option value="'+x+'">'+workTypes[x]+'</option>').join('')}</select></label><label class="field">Родитель<select id="new-item-parent"><option value="">Без родителя</option>${plan.items.filter(x=>x.type!=='MILESTONE'&&!plan.demands.some(d=>d.planItemId===x.id)).map(x=>`<option value="${x.id}">${escape(x.name)}</option>`).join('')}</select></label><div class="filter-grid"><label class="field">Начало<input id="new-item-start" type="date" value="${plan.horizonStart}"></label><label class="field">Окончание<input id="new-item-finish" type="date" value="${plan.horizonEnd}"></label></div><button data-extra="new-item" class="primary">Добавить работу</button></details>`:''}<div class="actions">${link('demand','Далее: потребность →')}</div></div>`;
  for(const input of document.querySelectorAll('[data-item]'))input.onchange=()=>command(async()=>{const d=draft();const item=d.items.find(x=>x.id===input.dataset.item);if(['start','finish'].includes(input.dataset.field)){const start=item.type==='MILESTONE'||input.dataset.field==='start'?input.value:item.start;const finish=item.type==='MILESTONE'||input.dataset.field==='finish'?input.value:item.finish;await api('/api/v1/versions/'+plan.id+'/timeline','PATCH',{itemId:item.id,start,finish},plan.revision);return;}item[input.dataset.field]=input.dataset.field==='plannedHours'?Number(input.value):input.value;if(item.type==='MILESTONE'){if(['start','finish'].includes(input.dataset.field)){item.start=input.value;item.finish=input.value;}item.plannedHours=0}await saveDraft(d)});
@@ -149,7 +184,7 @@ bindFields=function(){
   $('content').innerHTML=`<div class="card"><h2>Потребность</h2><p>Выберите листовую работу и задайте роль, грейд и часы.</p><label class="field">Работа<select id="new-demand-item">${plan.items.filter(x=>x.type!=='MILESTONE'&&!plan.items.some(i=>i.parentItemId===x.id)).map(x=>`<option value="${x.id}">${escape(x.name)}</option>`).join('')}</select></label><label class="field">Специализация<select id="new-demand-role" disabled><option>Загрузка…</option></select></label><label class="field">Грейд<select id="new-demand-grade" disabled><option>Загрузка…</option></select></label><label class="field">Часы<input id="new-demand-hours" type="number" min="0" step="0.01" value="6"></label><button data-extra="new-demand">Добавить потребность</button></div>`;
  }
  if(screen==='resources' && plan && !plan.allocations.length)$('content').insertAdjacentHTML('beforeend','<div class="card"><p>Назначить сотрудника на первую потребность</p><label class="field">HR resource name<input id="new-allocation-employee" value="employees/demo-1"></label><button data-extra="new-allocation">Создать назначение</button></div>');
- if(screen==='forecast' && ['R-02','R-03'].includes(state.role))$('content').insertAdjacentHTML('beforeend','<div class="card"><label class="field">Оценка до завершения, ч<input id="etc-hours" type="number" min="0" step="0.01" value="8"></label><button data-extra="save-etc">Сохранить оценку</button></div>');
+ if(screen==='forecast' && hasRole('R-02','R-03'))$('content').insertAdjacentHTML('beforeend','<div class="card"><label class="field">Оценка до завершения, ч<input id="etc-hours" type="number" min="0" step="0.01" value="8"></label><button data-extra="save-etc">Сохранить оценку</button></div>');
 };
 document.addEventListener('click',e=>{
  const selected=e.target.closest('[data-project]');if(selected){projectId=selected.dataset.project;command(()=>Promise.resolve());return}
@@ -157,14 +192,20 @@ document.addEventListener('click',e=>{
  const extra=e.target.closest('[data-extra]');if(!extra)return;
  command(async()=>{
   if(extra.dataset.extra==='new-project'){
-   const created=await api('/api/v1/projects','POST',{portfolioId:state.portfolioId,programId:null,code:$('new-code').value.trim(),name:$('new-name').value.trim(),goal:$('new-goal').value.trim(),managerSubject:$('new-manager').value.trim()});projectId=created.id;
-   if(['R-02','R-03'].includes(state.role))await api('/api/v1/projects/'+created.id+'/versions','POST',{baseVersionId:null,kind:'PLAN',name:'Первый план'});
+   const created=await api('/api/v1/projects','POST',{portfolioId:state.portfolioId,programId:null,code:$('new-code').value.trim(),name:$('new-name').value.trim(),goal:$('new-goal').value.trim(),managerSubject:$('new-manager').value.trim(),...($('new-hour-budget') ? {hourBudget:readBudget($('new-hour-budget'))} : {})});projectId=created.id;
+   if(hasRole('R-02','R-03'))await api('/api/v1/projects/'+created.id+'/versions','POST',{baseVersionId:null,kind:'PLAN',name:'Первый план'});
+  }
+  if(extra.dataset.extra==='save-hour-budget'){
+   const field=$('hour-budget'), reason=$('hour-budget-reason');
+   if(!field.reportValidity()||!reason.reportValidity())return;
+   await api('/api/v1/projects/'+projectId,'PATCH',{hourBudget:readBudget(field),hourBudgetReason:reason.value.trim()},state.projectRevision);
+   toast('Бюджет часов сохранён');
   }
   if(extra.dataset.extra==='first-plan')await api('/api/v1/projects/'+projectId+'/versions','POST',{baseVersionId:null,kind:'PLAN',name:'Первый план'});
   if(extra.dataset.extra==='new-item'){
    const d=draft(),type=$('new-item-type').value,parentId=$('new-item-parent').value||null,parent=d.items.find(x=>x.id===parentId),start=$('new-item-start').value,finish=$('new-item-finish').value;
    if(!start||!finish||start>finish)throw Error('Укажите начало и окончание работы');
-   if(parent&&d.demands.some(x=>x.planItemId===parent.id))throw Error('У работы с потребностью не может быть дочерних работ. Выберите другого родителя.');
+   if(parent&&d.demands.some(x=>x.planItemId===parent.id))throw Error('Перед декомпозицией перенесите потребность родителя на листовые работы.');
    d.items.push({id:crypto.randomUUID(),logicalItemId:crypto.randomUUID(),parentItemId:parentId,type,name:$('new-item-name').value.trim(),start:type==='MILESTONE'?finish:start,finish,plannedHours:0});await saveDraft(d);
   }
   if(extra.dataset.extra==='new-demand'){
@@ -196,7 +237,7 @@ async function downloadExcel(kind,values){
  }catch(e){toast(e.message)}
 }
 const filterDates=(prefix,values)=>`<label class="field">С даты<input id="${prefix}-from" type="date" value="${escape(values.dateFrom)}"></label><label class="field">По дату<input id="${prefix}-to" type="date" value="${escape(values.dateTo)}"></label>`;
-cards.portfolio=()=>`<div class="card"><div class="section-heading"><div><h2>Проекты</h2><p class="muted">Общая выгрузка содержит все доступные проекты, работы и сотрудников. «Выгрузить по фильтрам» учитывает выбранного сотрудника и остальные параметры. Выберите хотя бы один фильтр, чтобы появилась кнопка персональной выгрузки.</p></div>${state.role!=='R-04'?'<div class="actions"><button id="export-all-projects" class="primary">Все проекты и сотрудники · Excel</button><button id="export-projects" hidden>Выгрузить по фильтрам · Excel</button></div>':''}</div><div class="filter-grid"><label class="field">Название или код<input id="cards-search" value="${escape(projectFilters.q)}" placeholder="Найти проект"></label><label class="field">Статус проекта<select id="cards-status">${options(projectStatusLabels,projectFilters.status,'Все статусы')}</select></label><label class="field">Сотрудник<select id="cards-employee"><option value="">Все сотрудники</option></select></label>${filterDates('cards',projectFilters)}</div><div class="actions"><button id="cards-apply" class="primary">Применить фильтры</button><button id="cards-reset">Сбросить</button></div><p class="muted">Период: пересечение с горизонтом последней версии плана.</p></div>${['R-01','R-02','R-03'].includes(state.role)?`<details class="card create-project"><summary>Создать проект</summary><div class="filter-grid"><label class="field">Код<input id="new-code" maxlength="40"></label><label class="field">Название<input id="new-name" maxlength="120"></label><label class="field">Цель<input id="new-goal" maxlength="500"></label><label class="field">Руководитель проекта<select id="new-manager" disabled><option value="">Загрузка руководителей…</option></select></label></div><button data-extra="new-project" class="primary">Создать</button></details>`:''}<p id="project-count" class="muted" role="status">Загрузка проектов…</p><div id="project-grid" class="project-groups"></div>`;
+cards.portfolio=()=>`<div class="card"><div class="section-heading"><div><h2>Проекты</h2><p class="muted">Общая выгрузка содержит все доступные проекты, работы и сотрудников. «Выгрузить по фильтрам» учитывает выбранного сотрудника и остальные параметры. Выберите хотя бы один фильтр, чтобы появилась кнопка персональной выгрузки.</p></div>${state.role!=='R-04'?'<div class="actions"><button id="export-all-projects" class="primary">Все проекты и сотрудники · Excel</button><button id="export-projects" hidden>Выгрузить по фильтрам · Excel</button></div>':''}</div><div class="filter-grid"><label class="field">Название или код<input id="cards-search" value="${escape(projectFilters.q)}" placeholder="Найти проект"></label><label class="field">Статус проекта<select id="cards-status">${options(projectStatusLabels,projectFilters.status,'Все статусы')}</select></label><label class="field">Сотрудник<select id="cards-employee"><option value="">Все сотрудники</option></select></label>${filterDates('cards',projectFilters)}</div><div class="actions"><button id="cards-apply" class="primary">Применить фильтры</button><button id="cards-reset">Сбросить</button></div><p class="muted">Период: пересечение с горизонтом последней версии плана.</p></div>${hasRole('R-01','R-02','R-03')?`<details class="card create-project"><summary>Создать проект</summary><div class="filter-grid"><label class="field">Код<input id="new-code" maxlength="40"></label><label class="field">Название<input id="new-name" maxlength="120"></label><label class="field">Цель<input id="new-goal" maxlength="500"></label><label class="field">Руководитель проекта<select id="new-manager" disabled><option value="">Загрузка руководителей…</option></select></label>${hasRole('R-01')?budgetInput('new-hour-budget',null):''}</div><button data-extra="new-project" class="primary">Создать</button></details>`:''}<p id="project-count" class="muted" role="status">Загрузка проектов…</p><div id="project-grid" class="project-groups"></div>`;
 portfolioScreen=async function(){
  const request=++projectRequest;
  const syncExportButton=()=>{const button=$('export-projects');if(button)button.hidden=!['cards-search','cards-status','cards-employee','cards-from','cards-to'].some(id=>$(id).value.trim());};
@@ -218,8 +259,25 @@ portfolioScreen=async function(){
  }catch(e){if(screen==='portfolio'&&request===projectRequest){$('project-count').textContent='Не удалось загрузить проекты: '+e.message;}}
 };
 const planStatusNames={DRAFT:'Черновик',ON_REVIEW:'На согласовании',APPROVED:'Утверждён',ACTIVE:'Действующий',SUPERSEDED:'Заменён',ARCHIVED:'Архив'};
+const budgetStatuses={NOT_SET:'Бюджет не задан',WITHIN_BUDGET:'В пределах бюджета',AT_LIMIT:'На пределе',EXCEEDED:'Бюджет превышен'};
+const hourLabel=value=>value==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value);
+const budgetInput=(id,value)=>`<label class="field">Бюджет часов, чел.-ч<input id="${id}" type="number" min="0" max="9999999999.99" step="0.01" value="${value??''}" placeholder="Бюджет не задан"></label>`;
+function readBudget(field){
+ if(!field.checkValidity())throw Error('Введите неотрицательное число с точностью до сотых');
+ return field.value===''?null:Number(field.value);
+}
+function budgetSummary(summary, full=false){
+ if(!summary)return '';
+ const b=summary,status=b.planVersionId?budgetStatuses[b.status]:'План отсутствует';
+ const version=b.planVersionId?`V${b.planVersionNumber} · ${b.planVersionName} · ${planStatusNames[b.planVersionStatus]||b.planVersionStatus}`:'План отсутствует';
+ return `<dl class="budget-summary"><dt>Текущий бюджет, чел.-ч</dt><dd>${b.hourBudget==null?'Бюджет не задан':hourLabel(b.hourBudget)}</dd>
+ <dt>Плановые часы</dt><dd>${hourLabel(b.plannedHours)}</dd>
+ <dt>Сравнение</dt><dd><strong>${escape(status||'—')}</strong>${b.status==='EXCEEDED'?' · '+hourLabel(b.exceededHours)+' ч':''}</dd>
+ <dt>Выбранная версия</dt><dd>${escape(version)}</dd>
+ ${full?`<dt>Остаток, чел.-ч</dt><dd>${hourLabel(b.remainingHours)}</dd><dt>Использование</dt><dd>${b.usagePercent==null?'—':hourLabel(b.usagePercent)+'%'}</dd>`:''}</dl>`;
+}
 function projectCard(p){
- const canPlan=['R-02','R-03'].includes(state.role),resource=state.role==='R-04',archived=p.status==='ARCHIVED';
+ const canPlan=hasRole('R-02','R-03'),resource=state.role==='R-04',archived=p.status==='ARCHIVED';
  const action=(target,label,primary=false)=>`<button data-project="${escape(p.id)}" data-project-screen="${target}" ${primary?'class="primary"':''}>${label}</button>`;
  let hint='',actions='';
  if(archived){hint='Архив: можно просматривать сохранённые работы и сроки. Изменения недоступны.';actions=action(resource?'gantt':'structure','Посмотреть архив',true);}
@@ -229,16 +287,16 @@ function projectCard(p){
   hint=p.status==='ACTIVE'?'Проект работает по действующему плану. Отдельный черновик можно уточнить и отправить на согласование.':p.status==='ON_HOLD'?'Проект приостановлен. Можно уточнять черновик; для начала исполнения нужен согласованный действующий план.':'Черновик: добавьте работы, задайте потребности и назначьте сотрудников, затем отправьте план на согласование.';
   actions=action(resource?'resources':'structure',resource?'Ресурсы и назначения':canPlan?'Редактировать черновик':'Посмотреть работы',true)+action('gantt','Открыть Гант')+action('approval',canPlan?'Подготовить согласование':'Посмотреть согласование');
  }else if(p.planStatus==='ON_REVIEW'){
-  hint=state.role==='R-01'?'План на согласовании: можно утвердить или вернуть на доработку.':'План на согласовании. Работы доступны для просмотра; редактирование — после возврата на доработку.';
-  actions=action('approval',state.role==='R-01'?'Рассмотреть план':'Статус согласования',true)+action('gantt','Посмотреть сроки');
+  hint=hasRole('R-01')?'План на согласовании: можно утвердить или вернуть на доработку.':'План на согласовании. Работы доступны для просмотра; редактирование — после возврата на доработку.';
+  actions=action('approval',hasRole('R-01')?'Рассмотреть план':'Статус согласования',true)+action('gantt','Посмотреть сроки');
  }else if(p.planStatus==='APPROVED'){
-  hint=state.role==='R-01'?'План утверждён. Проверьте его и активируйте в разделе согласования.':'План утверждён. Активацию выполняет руководитель портфеля; сроки можно просмотреть на Ганте.';
-  actions=action('approval',state.role==='R-01'?'Перейти к активации':'Посмотреть утверждение',true)+action('gantt','Посмотреть сроки');
+  hint=hasRole('R-01')?'План утверждён. Проверьте его и активируйте в разделе согласования.':'План утверждён. Активацию выполняет руководитель портфеля; сроки можно просмотреть на Ганте.';
+  actions=action('approval',hasRole('R-01')?'Перейти к активации':'Посмотреть утверждение',true)+action('gantt','Посмотреть сроки');
  }else{
   hint=p.status==='ACTIVE'?'Действующий план доступен для просмотра. Для изменения работ и сроков создайте отдельный сценарий.':'Можно просмотреть работы и сроки последней версии проекта.';
   actions=action('gantt','Посмотреть Гант',true)+(canPlan&&p.status==='ACTIVE'?action('scenarios','Подготовить сценарий'):'')+(resource?'':action('forecast','План-факт и прогноз'));
  }
- return `<article class="card project-card ${p.id===projectId?'selected-project':''}" data-project-status="${escape(p.status)}"><div class="section-heading"><span class="eyebrow">${escape(p.code)}</span><span class="badge ${p.status==='ACTIVE'?'good':''}">${escape(projectStatusLabels[p.status]||p.status)}</span></div><h2>${escape(p.name)}</h2><p class="project-goal">${escape(p.goal||'Планирование ресурсов проекта')}</p><dl><dt>Последняя версия плана</dt><dd>${p.versionNumber?'V'+p.versionNumber+' · '+escape(planStatusNames[p.planStatus]||p.planStatus):'План ещё не создан'}</dd><dt>Горизонт</dt><dd>${escape(p.start||'—')} — ${escape(p.finish||'—')}</dd></dl><div class="project-next"><h3>Что можно сделать</h3><p>${hint}</p><div class="actions">${actions}</div></div></article>`;
+ return `<article class="card project-card ${p.id===projectId?'selected-project':''}" data-project-status="${escape(p.status)}"><div class="section-heading"><span class="eyebrow">${escape(p.code)}</span><span class="badge ${p.status==='ACTIVE'?'good':''}">${escape(projectStatusLabels[p.status]||p.status)}</span></div><h2>${escape(p.name)}</h2><p class="project-goal">${escape(p.goal||'Планирование ресурсов проекта')}</p><dl><dt>Последняя версия плана</dt><dd>${p.versionNumber?'V'+p.versionNumber+' · '+escape(planStatusNames[p.planStatus]||p.planStatus):'План ещё не создан'}</dd><dt>Горизонт</dt><dd>${escape(p.start||'—')} — ${escape(p.finish||'—')}</dd></dl>${budgetSummary(p.hourBudgetComparison)}<div class="project-next"><h3>Что можно сделать</h3><p>${hint}</p><div class="actions">${actions}</div></div></article>`;
 }
 cards.resources=()=>'<div class="card" id="assignments-panel" role="status">Загрузка назначений…</div>';
 async function assignmentScreen(){
@@ -249,7 +307,7 @@ async function assignmentScreen(){
   const hr=resource.hrCache||{quality:'DEMO'},hrReady=!hr.required||hr.quality==='CURRENT';
   const hrMessage=hr.quality==='CURRENT'?'Справочник сотрудников обновлён: '+new Date(hr.fetchedAt).toLocaleString('ru-RU'):hr.quality==='STALE'?'Справочник сотрудников устарел. Обратитесь к администратору для обновления.':hr.quality==='UNAVAILABLE'?'Справочник сотрудников пока не загружен. Обратитесь к администратору.':'Используется учебный набор сотрудников.';
   const employeeOptions=(selected,assignment=false)=>'<option value="">Выберите сотрудника</option>'+resource.employees.map(x=>`<option value="${escape(x.id)}" ${x.id===selected?'selected':''} ${assignment&&(!hrReady||x.eligibleForAssignment===false)?'disabled':''}>${escape(x.name)} · ${escape(x.id)}${assignment&&x.eligibleForAssignment===false?' · недоступен для назначения':''}</option>`).join('');
-  const canAssign=['R-02','R-04'].includes(state.role)&&resource.planStatus==='DRAFT';
+  const canAssign=hasRole('R-02','R-04')&&resource.planStatus==='DRAFT';
   const first=resource.demands[0];
   $('content').innerHTML=`<div class="card"><div class="section-heading"><div><h2>Назначения на работы</h2><p class="muted">Последняя версия каждого проекта. Каждый сотрудник назначается на конкретную потребность и дату.</p></div><button id="export-assignments">Скачать назначения Excel</button></div><label class="field">Проект<select id="assignment-project">${projects.items.map(p=>`<option value="${escape(p.id)}" ${p.id===projectId?'selected':''}>${escape(p.code+' · '+p.name)}</option>`).join('')}</select></label><div class="filter-grid"><label class="field">Сотрудник<select id="filter-employee">${employeeOptions(assignmentFilters.employeeId)}</select></label><label class="field">Статус назначения<select id="filter-assignment-status">${options(assignmentStatusLabels,assignmentFilters.status,'Все статусы')}</select></label>${filterDates('assignments',assignmentFilters)}</div><p class="muted" id="hr-cache-status">${escape(hrMessage)}</p><div class="actions"><button id="assignments-apply" class="primary">Применить фильтры</button><button id="assignments-reset">Сбросить</button></div><p class="muted" id="assignment-count">Найдено назначений: ${list.total}</p><div class="scroll"><table><thead><tr><th>Работа</th><th>Сотрудник</th><th>Дата</th><th>Часы</th><th>Статус</th></tr></thead><tbody>${list.items.length?list.items.map(x=>`<tr><td>${escape(x.workName)}</td><td>${canAssign&&x.status!=='CANCELLED'?`<select data-assignment-employee="${escape(x.id)}" aria-label="Сотрудник для ${escape(x.workName)}">${employeeOptions(x.employeeId,true)}</select>`:escape(x.employeeName)}</td><td>${escape(x.date)}</td><td>${x.hours}</td><td><span data-assignment-status="${x.status}">${escape(assignmentStatusLabels[x.status])}</span>${canAssign&&x.status!=='CANCELLED'?` <button data-cancel-assignment="${escape(x.id)}">Отменить</button>`:''}</td></tr>`).join(''):'<tr><td colspan="5">Назначений по фильтрам нет</td></tr>'}</tbody></table></div></div>${canAssign?`<div class="card"><h2>Назначить сотрудника на работу</h2>${first?`<div class="filter-grid"><label class="field">Работа / потребность<select id="assignment-demand">${resource.demands.map(d=>`<option value="${escape(d.id)}">${escape(d.workName+' · '+d.roleCode+' / '+d.gradeCode)} · ${d.hours} ч</option>`).join('')}</select></label><label class="field">Сотрудник<select id="assignment-employee">${employeeOptions('',true)}</select></label><label class="field">Дата<input id="assignment-date" type="date" value="${first.periodStart}" min="${first.periodStart}" max="${first.periodEnd}"></label><label class="field">Часы<input id="assignment-hours" type="number" min="0.01" step="0.01" value="${first.hours}"></label></div><p class="muted">Сотрудники показаны из доступных ресурсов Planning System. Новый ресурс сначала должен появиться в кадровом кэше/доступности.</p><button id="add-assignment" class="primary" ${!hrReady?'disabled':''}>Добавить назначение</button>`:'<p>Сначала создайте работу и потребность в разделе «Потребность».</p>'}</div>`:'<div class="card"><p>Добавление назначений доступно планировщику или ресурсному руководителю в черновике. Для утверждённого плана создайте сценарий.</p></div>'}${state.role==='R-04'?'<div class="card"><h2>Доступность и подтверждение ресурсов</h2><div class="filter-grid"><label class="field">Сотрудник<select id="availability-employee">'+employeeOptions(resource.employees[0]?.id||'')+'</select></label><label class="field">Дата<input id="availability-date" type="date" value="'+(first?.periodStart||resource.availability[0]?.data.date||'')+'"></label></div><div id="availability-editor"></div><button id="confirm-all-resources" class="primary" '+(resource.planStatus!=='DRAFT'?'disabled':'')+'>Подтвердить назначения моих сотрудников</button></div>':''}`;
   const readFilters=()=>{assignmentFilters.employeeId=$('filter-employee').value;assignmentFilters.status=$('filter-assignment-status').value;assignmentFilters.dateFrom=$('assignments-from').value;assignmentFilters.dateTo=$('assignments-to').value;};
@@ -291,14 +349,14 @@ function dependencyForm(){
 const workTypes={RELEASE:'Релиз',STAGE:'Этап',EPIC:'Эпик',FEATURE:'Работа',MILESTONE:'Веха'};
 let planningChoices=null,contextRequest=0,ganttZoom='week',ganttPixels=null,selectedWork=null;
 const choiceName=(kind,id)=>planningChoices?.[kind]?.find(x=>x.id===id)?.name||id;
-const draftHelp=()=>editable()?'<p class="muted">Черновик: изменения сохраняются на сервере. Сначала добавьте работы, затем потребность и назначения.</p>':`<div class="notice">${plan?'Эта версия доступна для просмотра. Чтобы изменить утверждённый план, создайте сценарий.':'План ещё не создан.'} ${plan&&['APPROVED','ACTIVE'].includes(plan.status)&&['R-02','R-03'].includes(state.role)?link('scenarios','Создать сценарий →'):''}</div>`;
+const draftHelp=()=>editable()?'<p class="muted">Черновик: изменения сохраняются на сервере. Сначала добавьте работы, затем потребность и назначения.</p>':`<div class="notice">${plan?'Эта версия доступна для просмотра. Чтобы изменить утверждённый план, создайте сценарий.':'План ещё не создан.'} ${plan&&['APPROVED','ACTIVE'].includes(plan.status)&&hasRole('R-02','R-03')?link('scenarios','Создать сценарий →'):''}</div>`;
 function syncWorkHours(d){
  const total=id=>{const children=d.items.filter(x=>x.parentItemId===id);const item=d.items.find(x=>x.id===id);item.plannedHours=item.type==='MILESTONE'?0:children.length?children.reduce((n,x)=>n+total(x.id),0):d.demands.filter(x=>x.planItemId===id).reduce((n,x)=>n+x.hours,0);return item.plannedHours;};
  d.items.filter(x=>!x.parentItemId).forEach(x=>total(x.id));
 }
 async function fillPlanningChoices(){
  const current=screen,pid=projectId;
- if(!['portfolio','demand'].includes(current)||!['R-01','R-02','R-03'].includes(state.role))return;
+ if(!['portfolio','demand'].includes(current)||!hasRole('R-01','R-02','R-03'))return;
  try{
   const data=await api('/api/v1/planning-options?portfolioId='+encodeURIComponent(state.portfolioId));
   if(screen!==current||projectId!==pid)return;planningChoices=data;
@@ -314,6 +372,17 @@ async function projectContext(){
  try{
   const projects=await api('/api/v1/project-cards');if(request!==contextRequest||!target.isConnected)return;
   target.innerHTML=`<div class="card project-switch"><label class="field">Текущий проект<select id="working-project">${projects.items.map(x=>`<option value="${escape(x.id)}" ${x.id===projectId?'selected':''}>${escape(x.code+' · '+x.name)}</option>`).join('')}</select></label><p class="muted">Все работы, потребности и сроки ниже относятся к этому проекту.</p></div>`;
+  const budget=plan ? await api('/api/v1/versions/'+plan.id+'/hour-budget') : projects.items.find(p=>p.id===projectId)?.hourBudgetComparison;
+  if(request!==contextRequest||!target.isConnected)return;
+  if(budget){
+   const canEdit=hasRole('R-01')&&state.projectStatus!=='ARCHIVED';
+   target.insertAdjacentHTML('beforeend',`<section class="card"><h2>Бюджет часов</h2><p>С текущим бюджетом проекта</p>
+    ${budgetSummary(budget,true)}
+    ${canEdit?`<details><summary>Изменить бюджет часов</summary><div class="filter-grid">
+      ${budgetInput('hour-budget',budget.hourBudget)}
+      <label class="field">Причина изменения<input id="hour-budget-reason" required maxlength="500"></label>
+      </div><button data-extra="save-hour-budget" class="primary">Сохранить бюджет</button></details>`:''}</section>`);
+  }
   $('working-project').onchange=e=>{projectId=e.target.value;selectedWork=null;void command(async()=>{});};
  }catch(e){toast(e.message)}
 }

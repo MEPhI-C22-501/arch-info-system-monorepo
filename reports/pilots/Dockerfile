@@ -4,6 +4,8 @@ WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY ui/ ./
+ARG VITE_OIDC_ISSUER
+ARG VITE_OIDC_CLIENT_ID
 RUN npm run build
 
 FROM python:3.12.14-slim
