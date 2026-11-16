@@ -123,7 +123,12 @@ document.addEventListener('click',e=>{
  });
  if(action==='activate')confirmAction('Активировать план?','Утверждённая версия станет действующей.',execute);else execute();
 });
-$('role').onchange=async e=>{if(authMode!=='demo')return;token='demo-'+e.target.value;await refresh().catch(e=>toast(e.message))};
+$('role').onchange=async e=>{
+ if(authMode!=='demo')return;
+ contextRequest++;
+ token='demo-'+e.target.value;
+ await refresh().catch(e=>toast(e.message));
+};
 $('reset').hidden=true;
 window.addEventListener('hashchange',()=>{
  screen=location.hash.slice(1);mode='normal';
