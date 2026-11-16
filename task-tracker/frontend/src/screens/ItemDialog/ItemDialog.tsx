@@ -9,7 +9,7 @@ import { Empty } from '../../components/Empty';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { WorkItemPicker } from '../../components/WorkItemPicker';
 import { CreateItem } from './CreateItem';
-import { can, selectName } from '../../context';
+import { can, selectPerson } from '../../context';
 import type { Context } from '../../context';
 
 const iso = (value: unknown) => (value ? String(value).slice(0, 10) : '');
@@ -178,13 +178,13 @@ export function ItemDialog({ id, context, close, open, refresh }:
         </div>
         {tab === 'discussion' && <div className="tab-body"><div className="stack">
           {comments.length ? comments.map(c => <div className="activity" key={String(c.id)}>
-            <div className="activity-meta"><strong>{selectName(context.users, String(c.authorId))}</strong><small>{dateTime(c.createdAt)}</small></div>
+            <div className="activity-meta"><strong>{selectPerson(context.users, String(c.authorId))}</strong><small>{dateTime(c.createdAt)}</small></div>
             <p>{String(c.body)}</p>
             {(c.authorId === context.userId || can(context, 'comment.manage')) && <div className="inline-actions"><button onClick={() => void editComment(c)}>Изменить</button><button onClick={() => void removeComment(c)}>Удалить</button></div>}
           </div>) : <Empty text="Комментариев пока нет" />}
         </div>{can(context, 'comment.create') && <div className="composer"><textarea placeholder="Написать комментарий" value={comment} onChange={e => setComment(e.target.value)} /><button className="button primary" onClick={() => void sendComment()}>Отправить</button></div>}</div>}
         {tab === 'time' && <div className="tab-body"><div className="stack">
-          {logs.length ? logs.map(log => <div className="activity" key={String(log.id)}><strong>{hours(log.hours)}</strong> · {date(log.loggedDate)} · {selectName(context.users, String(log.userId))}{Boolean(log.comment) && <p>{String(log.comment)}</p>}</div>) : <Empty text="Записей времени пока нет" />}
+          {logs.length ? logs.map(log => <div className="activity" key={String(log.id)}><strong>{hours(log.hours)}</strong> · {date(log.loggedDate)} · {selectPerson(context.users, String(log.userId))}{Boolean(log.comment) && <p>{String(log.comment)}</p>}</div>) : <Empty text="Записей времени пока нет" />}
         </div>{can(context, 'time.create') && item.children.length === 0 && !['PROJECT', 'EPIC'].includes(item.type) &&
           <div className="composer row"><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} /><input aria-label="Часы" type="number" min="0.01" step="0.01" placeholder="Часы" value={logHours} onChange={e => setLogHours(e.target.value)} /><button className="button primary" onClick={() => void sendTime()}>Добавить время</button></div>}</div>}
         {tab === 'files' && <div className="tab-body"><div className="stack">

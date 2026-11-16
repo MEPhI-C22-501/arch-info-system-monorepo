@@ -41,7 +41,11 @@ class FixtureClient:
 
 
 def adapter(handler, **kwargs):
-    return ReferenceManagerClient('https://rm.test/v1', 'secret-fixture', transport=httpx.MockTransport(handler), sleep=lambda _: None, **kwargs)
+    def including_profiles(request):
+        if request.url.path == '/v1/profiles':
+            return httpx.Response(200, json={'items': []})
+        return handler(request)
+    return ReferenceManagerClient('https://rm.test/v1', 'secret-fixture', transport=httpx.MockTransport(including_profiles), sleep=lambda _: None, **kwargs)
 
 
 def test_reads_all_pages_and_five_collections_with_shared_read_time():

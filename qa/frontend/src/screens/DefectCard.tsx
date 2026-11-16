@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { FormEvent, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { Severity } from '../api/client';
@@ -9,7 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { SEVERITIES, formatDateTime, statusLabel } from '../labels';
 import { canCommentDefect, canEditDefect, defectTransitions } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useLoad } from '../useLoad';
 
 const HISTORY_COLUMNS: Column<DefectHistoryEntry>[] = [
@@ -25,10 +26,11 @@ const isWebLink = (url?: string | null): url is string => !!url && /^https?:\/\/
 
 export function DefectCard() {
   const { id = '' } = useParams();
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const toast = useToast();
   const defect = useLoad(() => getDefect(id), [id]);
   const history = useLoad(() => listDefectHistory(id), [id]);
+  const person = usePeople([defect.data?.author, ...(defect.data?.comments?.map(row => row.author) ?? []), ...(history.data?.items.map(row => row.author) ?? [])]);
   const [comment, setComment] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -94,7 +96,7 @@ export function DefectCard() {
       <div className="panel">
         <dl className="props">
           <Prop name="Происхождение">{current.origin === 'AUTO' ? 'Автодефект' : 'Вручную'}</Prop>
-          <Prop name="Автор">{current.author}</Prop>
+          <Prop name="Автор">{person(current.author)}</Prop>
           <Prop name="Кейс">{current.testCaseId && <><Link to={`/test-cases/${current.testCaseId}`}>{current.testCaseKey}</Link>{current.caseVersion ? `, версия ${current.caseVersion}` : ''}</>}</Prop>
           <Prop name="Окружение">{current.environment}</Prop>
           <Prop name="Версия сборки">{current.buildVersion}</Prop>
@@ -124,7 +126,7 @@ export function DefectCard() {
       <div className="panel">
         <h3>История</h3>
         <DataTable
-          columns={HISTORY_COLUMNS}
+          columns={HISTORY_COLUMNS.map(column => column.header === 'Кто' ? { ...column, render: (row: DefectHistoryEntry) => person(row.author) } : column)}
           rows={history.data?.items}
           rowKey={(row) => `${row.occurredAt}:${row.field}:${row.newValue}`}
           loading={history.loading}
@@ -138,7 +140,7 @@ export function DefectCard() {
         {current.comments.length === 0 && <p className="muted">Комментариев нет</p>}
         {current.comments.map((item) => (
           <p key={item.id}>
-            <span className="muted">{formatDateTime(item.createdAt)} · {item.author}{item.source === 'TRACKER' ? ' · из Task Tracker' : ''}</span><br />
+            <span className="muted">{formatDateTime(item.createdAt)} · {person(item.author)}{item.source === 'TRACKER' ? ' · из Task Tracker' : ''}</span><br />
             {item.body}
           </p>
         ))}

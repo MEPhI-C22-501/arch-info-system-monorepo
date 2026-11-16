@@ -21,7 +21,7 @@ public class ListWorkItems {
         permissions.require("item.read");
         int page = Math.max(1, parseInt(filters.get("page"), 1));
         int size = Math.min(500, Math.max(1, parseInt(filters.get("pageSize"), 50)));
-        String restrictToAssigneeId = "MEMBER".equals(permissions.currentRole()) ? permissions.currentSubject() : null;
+        String restrictToAssigneeId = permissions.ownOnly("item.read") ? permissions.currentSubject() : null;
         var filter = new WorkItemRepository.WorkItemFilter(
             filters.get("type"), Values.uuid(filters.get("statusId"), "statusId"), Values.uuid(filters.get("priorityId"), "priorityId"),
             filters.get("assigneeId"), Values.uuid(filters.get("iterationId"), "iterationId"),

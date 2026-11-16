@@ -60,7 +60,7 @@ services:
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
 
-    command: [ "psql", "-v", "ON_ERROR_STOP=1", "-h", "reference-manager-database", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}", "-f", "/seed/demo.sql" ]
+    command: [ "psql", "-v", "ON_ERROR_STOP=1", "-h", "reference-manager-database", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}", "-f", "/seed/demo.sql", "-f", "/seed/profiles.sql" ]
 
     volumes:
       - ./seed/demo.sql:/seed/demo.sql:ro

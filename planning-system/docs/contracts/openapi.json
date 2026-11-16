@@ -120,6 +120,18 @@
                               "demo-manager"
                             ]
                           },
+                          "hourBudget": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "minimum": 0,
+                            "maximum": 9999999999.99,
+                            "description": "Бюджет часов, до двух десятичных знаков",
+                            "examples": [
+                              null
+                            ]
+                          },
                           "id": {
                             "type": "string",
                             "minLength": 1,
@@ -170,6 +182,9 @@
                               null
                             ],
                             "format": "uuid"
+                          },
+                          "hourBudgetComparison": {
+                            "$ref": "#/components/schemas/HourBudgetComparison"
                           }
                         },
                         "required": [
@@ -403,7 +418,7 @@
       "post": {
         "operationId": "createProject",
         "summary": "Проект и первый DRAFT",
-        "description": "R-02/R-03. Сервер проверяет область и состояние; см. 070/050.",
+        "description": "R-01/R-02/R-03; бюджет только R-01. Сервер проверяет область и состояние; см. 070/050.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -503,6 +518,18 @@
                         "demo-manager"
                       ]
                     },
+                    "hourBudget": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 9999999999.99,
+                      "description": "Бюджет часов, до двух десятичных знаков",
+                      "examples": [
+                        null
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "minLength": 1,
@@ -553,6 +580,9 @@
                         null
                       ],
                       "format": "uuid"
+                    },
+                    "hourBudgetComparison": {
+                      "$ref": "#/components/schemas/HourBudgetComparison"
                     }
                   },
                   "required": [
@@ -830,6 +860,18 @@
                     "examples": [
                       "demo-manager"
                     ]
+                  },
+                  "hourBudget": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 9999999999.99,
+                    "description": "Бюджет часов, до двух десятичных знаков",
+                    "examples": [
+                      null
+                    ]
                   }
                 },
                 "required": [
@@ -964,6 +1006,18 @@
                         "demo-manager"
                       ]
                     },
+                    "hourBudget": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 9999999999.99,
+                      "description": "Бюджет часов, до двух десятичных знаков",
+                      "examples": [
+                        null
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "minLength": 1,
@@ -1014,6 +1068,9 @@
                         null
                       ],
                       "format": "uuid"
+                    },
+                    "hourBudgetComparison": {
+                      "$ref": "#/components/schemas/HourBudgetComparison"
                     }
                   },
                   "required": [
@@ -1236,7 +1293,7 @@
       "patch": {
         "operationId": "updateProject",
         "summary": "Изменить карточку",
-        "description": "R-02/R-03. Сервер проверяет область и состояние; см. 070/050.",
+        "description": "R-01/R-02/R-03; бюджет только R-01. Сервер проверяет область и состояние; см. 070/050.",
         "parameters": [
           {
             "name": "projectId",
@@ -1363,6 +1420,18 @@
                         "demo-manager"
                       ]
                     },
+                    "hourBudget": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 9999999999.99,
+                      "description": "Бюджет часов, до двух десятичных знаков",
+                      "examples": [
+                        null
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "minLength": 1,
@@ -1413,6 +1482,9 @@
                         null
                       ],
                       "format": "uuid"
+                    },
+                    "hourBudgetComparison": {
+                      "$ref": "#/components/schemas/HourBudgetComparison"
                     }
                   },
                   "required": [
@@ -1653,20 +1725,34 @@
                     "examples": [
                       "demo"
                     ]
+                  },
+                  "hourBudget": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 9999999999.99,
+                    "description": "Бюджет часов, до двух десятичных знаков",
+                    "examples": [
+                      null
+                    ]
+                  },
+                  "hourBudgetReason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Причина изменения бюджета",
+                    "examples": [
+                      "demo"
+                    ]
                   }
                 },
-                "required": [
-                  "name",
-                  "goal"
-                ],
+                "required": [],
                 "additionalProperties": false
               },
               "examples": {
                 "success": {
-                  "value": {
-                    "name": "demo",
-                    "goal": "demo"
-                  }
+                  "value": {}
                 }
               }
             }
@@ -1805,6 +1891,18 @@
                         "demo-manager"
                       ]
                     },
+                    "hourBudget": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 9999999999.99,
+                      "description": "Бюджет часов, до двух десятичных знаков",
+                      "examples": [
+                        null
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "minLength": 1,
@@ -1855,6 +1953,9 @@
                         null
                       ],
                       "format": "uuid"
+                    },
+                    "hourBudgetComparison": {
+                      "$ref": "#/components/schemas/HourBudgetComparison"
                     }
                   },
                   "required": [
@@ -3506,6 +3607,418 @@
                       "baseVersionId": null,
                       "status": "DRAFT",
                       "dataAsOf": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "STATE_CONFLICT",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "REVISION_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "REVISION_CONFLICT",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "DEPENDENCY_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "message": "Запрос отклонён без изменения данных",
+                      "correlationId": "10000000-0000-4000-8000-000000000001",
+                      "details": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/versions/{versionId}/hour-budget": {
+      "get": {
+        "operationId": "getVersionHourBudget",
+        "summary": "Сравнить версию с текущим бюджетом проекта",
+        "description": "R-01/R-02/R-03. Сервер проверяет область и состояние; см. 070/050.",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Устойчивый UUID",
+              "examples": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Сравнить версию с текущим бюджетом проекта",
+            "headers": {
+              "X-Correlation-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Устойчивый UUID",
+                  "examples": [
+                    "10000000-0000-4000-8000-000000000001"
+                  ],
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        "10000000-0000-4000-8000-000000000001"
+                      ],
+                      "format": "uuid"
+                    },
+                    "projectRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Редакция проекта",
+                      "examples": [
+                        1
+                      ]
+                    },
+                    "planVersionId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1,
+                      "description": "Устойчивый UUID",
+                      "examples": [
+                        null
+                      ],
+                      "format": "uuid"
+                    },
+                    "planVersionNumber": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1,
+                      "description": "Номер версии",
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "planVersionName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1,
+                      "description": "Название версии",
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "planVersionStatus": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1,
+                      "description": "Статус версии",
+                      "examples": [
+                        null
+                      ],
+                      "enum": [
+                        "DRAFT",
+                        "ON_REVIEW",
+                        "APPROVED",
+                        "ACTIVE",
+                        "SUPERSEDED",
+                        "ARCHIVED",
+                        null
+                      ]
+                    },
+                    "planVersionRevision": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1,
+                      "description": "Редакция версии",
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "hourBudget": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 9999999999.99,
+                      "description": "Бюджет часов, до двух десятичных знаков",
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "plannedHours": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "remainingHours": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "exceededHours": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "usagePercent": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "examples": [
+                        null
+                      ]
+                    },
+                    "status": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "NOT_SET",
+                        "WITHIN_BUDGET",
+                        "AT_LIMIT",
+                        "EXCEEDED",
+                        null
+                      ]
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "projectRevision",
+                    "planVersionId",
+                    "planVersionNumber",
+                    "planVersionName",
+                    "planVersionStatus",
+                    "planVersionRevision",
+                    "hourBudget",
+                    "plannedHours",
+                    "remainingHours",
+                    "exceededHours",
+                    "usagePercent",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "projectId": "10000000-0000-4000-8000-000000000001",
+                      "projectRevision": 1,
+                      "planVersionId": null,
+                      "planVersionNumber": null,
+                      "planVersionName": null,
+                      "planVersionStatus": null,
+                      "planVersionRevision": null,
+                      "hourBudget": null,
+                      "plannedHours": null,
+                      "remainingHours": null,
+                      "exceededHours": null,
+                      "usagePercent": null,
+                      "status": "NOT_SET"
                     }
                   }
                 }
@@ -15143,6 +15656,18 @@
             "examples": [
               "demo-manager"
             ]
+          },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
           }
         },
         "required": [
@@ -15211,6 +15736,18 @@
               "demo-manager"
             ]
           },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
+          },
           "id": {
             "type": "string",
             "minLength": 1,
@@ -15261,6 +15798,9 @@
               null
             ],
             "format": "uuid"
+          },
+          "hourBudgetComparison": {
+            "$ref": "#/components/schemas/HourBudgetComparison"
           }
         },
         "required": [
@@ -15275,6 +15815,174 @@
           "priority",
           "status",
           "activePlanVersionId"
+        ],
+        "additionalProperties": false
+      },
+      "HourBudgetComparison": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              "10000000-0000-4000-8000-000000000001"
+            ],
+            "format": "uuid"
+          },
+          "projectRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Редакция проекта",
+            "examples": [
+              1
+            ]
+          },
+          "planVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Устойчивый UUID",
+            "examples": [
+              null
+            ],
+            "format": "uuid"
+          },
+          "planVersionNumber": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Номер версии",
+            "examples": [
+              null
+            ]
+          },
+          "planVersionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Название версии",
+            "examples": [
+              null
+            ]
+          },
+          "planVersionStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Статус версии",
+            "examples": [
+              null
+            ],
+            "enum": [
+              "DRAFT",
+              "ON_REVIEW",
+              "APPROVED",
+              "ACTIVE",
+              "SUPERSEDED",
+              "ARCHIVED",
+              null
+            ]
+          },
+          "planVersionRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Редакция версии",
+            "examples": [
+              null
+            ]
+          },
+          "hourBudget": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9999999999.99,
+            "description": "Бюджет часов, до двух десятичных знаков",
+            "examples": [
+              null
+            ]
+          },
+          "plannedHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "remainingHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "exceededHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "usagePercent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "examples": [
+              null
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_SET",
+              "WITHIN_BUDGET",
+              "AT_LIMIT",
+              "EXCEEDED",
+              null
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "projectRevision",
+          "planVersionId",
+          "planVersionNumber",
+          "planVersionName",
+          "planVersionStatus",
+          "planVersionRevision",
+          "hourBudget",
+          "plannedHours",
+          "remainingHours",
+          "exceededHours",
+          "usagePercent",
+          "status"
         ],
         "additionalProperties": false
       },

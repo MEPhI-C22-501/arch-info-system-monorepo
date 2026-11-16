@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast';
 import { RESULT_STATUSES, statusLabel } from '../labels';
 import { canRecordResult } from '../permissions';
 import { ResultFormValues, defectMessage, deriveStatus, finalStatus, resultFormOf, toResultInput, validateResult } from '../resultForm';
-import { useSession } from '../session';
+import { useSession, sessionSubject } from '../session';
 import { useLoad } from '../useLoad';
 
 type Saved = { text: string; defectId: string; defectKey: string };
@@ -178,7 +178,7 @@ export function ExecuteCase() {
         <ResultForm run={run.data} result={current} onSaved={(saved) => { result.setData(saved); run.reload(); }} />
       ) : (
         <>
-          <div className="notice">{readOnlyReason(run.data, current, session.name)}</div>
+          <div className="notice">{readOnlyReason(run.data, current, sessionSubject(session))}</div>
           {current.defect && current.status === 'FAILED' && <p>Дефект: <Link to={`/defects/${current.defect.id}`}>{current.defect.key}</Link></p>}
           <ReadOnlyResult result={current} />
         </>

@@ -1216,8 +1216,13 @@
 
   function showHeader() {
     const user = session.user;
-    replace($('#who'), user ? [el('b', {}, user.username), ' ', el('span', { class: 'muted' }, user.roles.filter((r) => r.startsWith('reference-')).join(', ') || 'без ролей сервиса')] : '');
+    replace($('#who'), user ? [el('b', { id: 'profile-display-name' }, user.username), ' ', el('span', { class: 'muted' }, user.roles.filter((r) => r.startsWith('reference-')).join(', ') || 'без ролей сервиса')] : '');
     $('#logout').hidden = !user;
+    if (user) void api.request('GET', '/profiles/me').then(profile => {
+      const label = document.getElementById('profile-display-name');
+      if (label && session.user === user && profile?.displayName) label.textContent = profile.displayName;
+    }).catch(() => { /* The current session already has a temporary label. */ });
+
   }
 
   // a click anywhere on a row with data-href opens it like its link: the controls inside the row keep their own

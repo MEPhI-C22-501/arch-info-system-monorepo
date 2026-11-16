@@ -6,6 +6,8 @@ x-app: &app
     REPORTS_OIDC_ISSUER: http://localhost:8180/realms/reports-pilot
     REPORTS_OIDC_JWKS_URL: http://keycloak:8080/realms/reports-pilot/protocol/openid-connect/certs
     REPORTS_BIND: 0.0.0.0
+    REPORTS_LOCAL_OIDC: "1"
+    REPORTS_OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/reports-pilot
 services:
   kafka:
     image: apache/kafka:3.9.1
@@ -92,6 +94,7 @@ services:
       REPORTS_CUBE_DB_PASSWORD: ${REPORTS_CUBE_DB_PASSWORD:?Use launch.py}
       REPORTS_SUPERSET_CLIENT_SECRET: ${REPORTS_SUPERSET_CLIENT_SECRET:?Use launch.py}
       REPORTS_KC_ADMIN_PASSWORD: ${REPORTS_KC_ADMIN_PASSWORD:?Use launch.py}
+      REPORTS_DIRECTORY_CLIENT_SECRET: ${REPORTS_DIRECTORY_CLIENT_SECRET:?Use launch.py}
       REPORTS_DEMO_ADMIN_PASSWORD: ${REPORTS_DEMO_ADMIN_PASSWORD:?Use launch.py}
       REPORTS_DEMO_MEMBER_PASSWORD: ${REPORTS_DEMO_MEMBER_PASSWORD:?Use launch.py}
     volumes: [demo-data:/demo]
@@ -128,6 +131,7 @@ services:
     <<: *app
     environment:
       <<: *app-env
+      REPORTS_DIRECTORY_CLIENT_SECRET: ${REPORTS_DIRECTORY_CLIENT_SECRET:?Use launch.py}
       REPORTS_DATABASE_URL: ${REPORTS_APP_DATABASE_URL:?Use launch.py}
     ports: ["127.0.0.1:8081:8081"]
     depends_on:
@@ -159,8 +163,8 @@ services:
     command: [python, product_jobs.py]
     environment:
       REPORTS_DATABASE_URL: ${REPORTS_APP_DATABASE_URL:?Use launch.py}
-      REPORTS_PRODUCT_DIRECTORY: keycloak
-      REPORTS_KC_ADMIN_PASSWORD: ${REPORTS_KC_ADMIN_PASSWORD:?Use launch.py}
+      <<: *app-env
+      REPORTS_DIRECTORY_CLIENT_SECRET: ${REPORTS_DIRECTORY_CLIENT_SECRET:?Use launch.py}
     depends_on:
       etl: {condition: service_completed_successfully}
     stop_grace_period: 60s
@@ -208,6 +212,7 @@ services:
       SUPERSET_SECRET_KEY: ${REPORTS_SUPERSET_SECRET_KEY:?Use launch.py}
       REPORTS_BI_METADATA_URL: ${REPORTS_BI_METADATA_URL:?Use launch.py}
       REPORTS_CUBE_SQL_PASSWORD: ${REPORTS_CUBE_SQL_PASSWORD:?Use launch.py}
+      REPORTS_PROFILE_URL: http://api:8081/api/v1/profile
       REPORTS_SUPERSET_CLIENT_SECRET: ${REPORTS_SUPERSET_CLIENT_SECRET:?Use launch.py}
       REPORTS_DEMO_ADMIN_PASSWORD: ${REPORTS_DEMO_ADMIN_PASSWORD:?Use launch.py}
     ports: ["127.0.0.1:8088:8088"]

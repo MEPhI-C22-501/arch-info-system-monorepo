@@ -123,6 +123,13 @@ def source_server(data, public_jwk=None):
                 if source == 'tracker': result['total'] = len(rows)
                 return self.reply(200, result)
             if parts[0] == 'reference' and parts[1] == 'v1':
+                if parts[-1] == 'profiles':
+                    return self.reply(200, {'items': [
+                        {'employeeId': employee['id'], 'userId': employee.get('account_user_id'),
+                         'displayName': ' '.join(employee[k] for k in ('family_name','given_name','middle_name') if employee.get(k))
+                                        or employee.get('name') or ('Employee ' + str(employee['id']))}
+                        for employee in data['reference']['employees']
+                    ]})
                 resource = parts[-1]; rows = data['reference'][resource]
                 if query.get('allowDeleted') != ['true']: return self.reply(422, {})
                 start = int(query.get('pageToken', ['0'])[0]); size = int(query['pageSize'][0])

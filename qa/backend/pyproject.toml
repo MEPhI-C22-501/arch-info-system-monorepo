@@ -8,6 +8,7 @@ dependencies = [
     "psycopg[binary]==3.2.13",
     # pydantic 2.12+ несовместим с FastAPI 0.115 (UnsupportedFieldAttributeWarning на телах запросов).
     "pydantic==2.11.10",
+    "pyjwt[crypto]==2.10.1",
     "sqlalchemy==2.0.45",
     "uvicorn==0.34.2",
 ]

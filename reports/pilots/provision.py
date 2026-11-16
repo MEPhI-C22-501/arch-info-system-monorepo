@@ -66,11 +66,13 @@ def main():
 
     realm = '/reports-pilot'
     request('', {'realm': 'reports-pilot', 'enabled': True, 'registrationAllowed': False})
+    request(realm, {'accessTokenLifespan': 300}, 'PUT')
+    request(realm+'/events/config', {'adminEventsEnabled': True, 'eventsExpiration': 7776000}, 'PUT')
     request(realm+'/clients', {'clientId': 'reports', 'enabled': True, 'bearerOnly': True})
     reports_id = request(realm+'/clients?clientId=reports')[0]['id']
-    for role in ['reports-admin','reports-member','reports-analyst','reports-project-manager','reports-team-lead','reports-qa-lead']:
+    for role in ['reports-admin','reports-member','reports-analyst','reports-project-manager','reports-team-lead','reports-qa-lead','cost.read']:
         request(realm+'/clients/'+reports_id+'/roles', {'name': role})
-    client = {'clientId': 'reports-superset', 'enabled': True, 'publicClient': False, 'standardFlowEnabled': True,
+    client = {'clientId': 'reports-superset', 'enabled': True, 'publicClient': False, 'standardFlowEnabled': True, 'fullScopeAllowed': False,
               'secret': os.environ['REPORTS_SUPERSET_CLIENT_SECRET'],
               'redirectUris': ['http://localhost:8088/oauth-authorized/keycloak'], 'webOrigins': ['http://localhost:8088'],
               'protocolMappers': [{'name': 'reports-audience', 'protocol': 'openid-connect', 'protocolMapper': 'oidc-audience-mapper',
@@ -79,7 +81,7 @@ def main():
     superset_id = request(realm+'/clients?clientId=reports-superset')[0]['id']
     request(realm+'/clients/'+superset_id, client, 'PUT')
     ui_client = {'clientId': 'reports-ui', 'enabled': True, 'publicClient': True,
-                 'standardFlowEnabled': True, 'directAccessGrantsEnabled': False,
+                 'standardFlowEnabled': True, 'directAccessGrantsEnabled': False, 'fullScopeAllowed': False,
                  'attributes': {'pkce.code.challenge.method': 'S256', 'post.logout.redirect.uris': 'http://localhost:8081/ui/'},
                  'redirectUris': ['http://localhost:8081/ui/callback'], 'webOrigins': ['http://localhost:8081'],
                  'protocolMappers': client['protocolMappers']}
@@ -88,18 +90,44 @@ def main():
     request(realm+'/clients/'+ui_id, ui_client, 'PUT')
     subjects = {}
     roles = {r['name']: r for r in request(realm+'/clients/'+reports_id+'/roles')}
+    cost_scope = {'name': 'cost.read', 'protocol': 'openid-connect',
+                  'attributes': {'include.in.token.scope': 'true'}}
+    request(realm+'/client-scopes', cost_scope)
+    cost_id = next(scope['id'] for scope in request(realm+'/client-scopes') if scope['name'] == 'cost.read')
+    request(realm+'/client-scopes/'+cost_id+'/scope-mappings/clients/'+reports_id, [roles['cost.read']])
+    for client_id in (superset_id, ui_id):
+        request(realm+'/clients/'+client_id+'/scope-mappings/clients/'+reports_id, list(roles.values()))
+        request(realm+'/clients/'+client_id+'/default-client-scopes/'+cost_id, method='PUT')
+
+    directory = {'clientId': 'reports-directory', 'enabled': True, 'publicClient': False,
+                 'serviceAccountsEnabled': True, 'standardFlowEnabled': False, 'fullScopeAllowed': False,
+                 'directAccessGrantsEnabled': False, 'secret': os.environ['REPORTS_DIRECTORY_CLIENT_SECRET']}
+    created = not request(realm+'/clients?clientId=reports-directory')
+    request(realm+'/clients', directory)
+    directory_id = request(realm+'/clients?clientId=reports-directory')[0]['id']
+    request(realm+'/clients/'+directory_id, directory, 'PUT')
+    management_id = request(realm+'/clients?clientId=realm-management')[0]['id']
+    view_roles = [role for role in request(realm+'/clients/'+management_id+'/roles')
+                  if role['name'] in {'view-users', 'view-clients'}]
+    request(realm+'/clients/'+directory_id+'/scope-mappings/clients/'+management_id, view_roles)
+    if created:
+        service_user = request(realm+'/clients/'+directory_id+'/service-account-user')
+        request(realm+'/users/'+service_user['id']+'/role-mappings/clients/'+management_id, view_roles)
+
     for name in ['member1', 'member2', 'admin', 'analyst', 'noaccess']:
-        request(realm+'/users', {'username': name, 'enabled': True, 'emailVerified': True,
-                                'firstName': 'Synthetic', 'lastName': name, 'email': name+'@example.invalid'})
-        user_id = request(realm+'/users?username='+name+'&exact=true')[0]['id']
-        password_key = 'REPORTS_DEMO_ADMIN_PASSWORD' if name == 'admin' else 'REPORTS_DEMO_MEMBER_PASSWORD'
-        request(realm+'/users/'+user_id+'/reset-password', {'type': 'password', 'temporary': False, 'value': os.environ[password_key]}, 'PUT')
-        if name != 'noaccess':
-            role = {'admin': 'reports-admin', 'analyst': 'reports-analyst'}.get(name, 'reports-member')
-            request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles[role]])
-        if name == 'admin':
-            request(realm+'/users/'+user_id+'/role-mappings/clients/'+reports_id, [roles['reports-analyst']])
-        subjects[name] = user_id
+        found = request(realm+'/users?username='+name+'&exact=true')
+        if not found:
+            password_key = 'REPORTS_DEMO_ADMIN_PASSWORD' if name == 'admin' else 'REPORTS_DEMO_MEMBER_PASSWORD'
+            request(realm+'/users', {'username': name, 'enabled': True, 'emailVerified': True,
+                                    'firstName': 'Synthetic', 'lastName': name, 'email': name+'@example.invalid',
+                                    'credentials': [{'type': 'password', 'temporary': False, 'value': os.environ[password_key]}]})
+            found = request(realm+'/users?username='+name+'&exact=true')
+            assigned = {'admin': ['reports-admin', 'reports-analyst'], 'analyst': ['reports-analyst'],
+                        'noaccess': []}.get(name, ['reports-member'])
+            if assigned:
+                request(realm+'/users/'+found[0]['id']+'/role-mappings/clients/'+reports_id,
+                        [roles[role] for role in assigned])
+        subjects[name] = found[0]['id']
     # The synthetic Tracker fixture deliberately uses these returned IDs.
     # Never derive identity bindings from HR names. Tracker ids are Keycloak subs by the tracker's
     # contract (ADR-021) and the ETL binds them too; the demo binds its two members up front.

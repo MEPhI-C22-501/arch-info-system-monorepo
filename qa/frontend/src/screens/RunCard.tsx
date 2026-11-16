@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { getPlan } from '../api/plans';
@@ -11,7 +12,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { RESULT_STATUSES, formatDateTime, statusLabel } from '../labels';
 import { canDeleteRun, canRecordResult, runActions } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 
@@ -31,6 +32,7 @@ export function RunCard() {
   const { values, page, setFilter, setPage } = useListParams();
   const run = useLoad(() => getRun(id), [id]);
   const results = useLoad(() => listRunResults(id, { status: values.status, page }), [id, values.status, page]);
+  const person = usePeople([run.data?.startedBy, ...(results.data?.items.flatMap(row => [row.executedBy, row.assignee]) ?? [])]);
   const suite = useLoad(async () => (run.data?.suiteId ? getSuite(run.data.suiteId) : null), [run.data?.suiteId]);
   const plan = useLoad(async () => (run.data?.planId ? getPlan(run.data.planId) : null), [run.data?.planId]);
   const [error, setError] = useState<unknown>(null);
@@ -77,7 +79,7 @@ export function RunCard() {
   const columns: Column<RunResult>[] = [
     { header: 'Кейс', render: (row) => <>{row.testCaseKey}<div className="muted">{row.title}</div></> },
     { header: 'Версия', render: (row) => row.caseVersion },
-    { header: 'Исполнитель', render: (row) => row.executedBy ?? row.assignee ?? '—' },
+    { header: 'Исполнитель', render: (row) => person(row.executedBy ?? row.assignee) },
     { header: 'Результат', render: (row) => <><StatusBadge status={row.status} />{row.failedStepPosition ? <div className="muted">шаг {row.failedStepPosition}</div> : null}</> },
     { header: 'Фактический результат', render: (row) => row.actualResult ?? '' },
     { header: 'Дефект', render: (row) => (row.defect ? <Link to={`/defects/${row.defect.id}`}>{row.defect.key}</Link> : '') },
@@ -100,7 +102,7 @@ export function RunCard() {
       <div className="bar"><Link className="btn" to="/runs">← К списку</Link></div>
       <h2>{current.key} · {current.environment} <StatusBadge status={current.status} /></h2>
       <p className="muted">
-        {source} · запустил {current.startedBy} · создан {formatDateTime(current.createdAt)}
+        {source} · запустил {person(current.startedBy)} · создан {formatDateTime(current.createdAt)}
         {current.finishedAt ? ` · завершён ${formatDateTime(current.finishedAt)}` : ''}
       </p>
       <div className="grid">
@@ -112,10 +114,10 @@ export function RunCard() {
         <div className="stat"><b className="SKIPPED">{summary.skipped}</b>Пропущено</div>
       </div>
       <div className="bar">
-        {runActions(session.role, current.status).map((action) => (
+        {runActions(sessionRoles(session), current.status).map((action) => (
           <button key={action} type="button" className={action === 'start' ? 'primary' : undefined} onClick={() => act(action)}>{ACTION_LABELS[action]}</button>
         ))}
-        {canDeleteRun(session.role, current) && <button type="button" onClick={remove}>Удалить</button>}
+        {canDeleteRun(sessionRoles(session), current) && <button type="button" onClick={remove}>Удалить</button>}
         {suite.data?.purpose === 'SMOKE' && current.smokeVerdict && <span>Вердикт: <StatusBadge status={current.smokeVerdict} /></span>}
         {current.verdict && <span>Вердикт приёмки: <StatusBadge status={current.verdict} /></span>}
       </div>

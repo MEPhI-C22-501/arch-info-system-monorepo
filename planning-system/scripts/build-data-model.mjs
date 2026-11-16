@@ -24,6 +24,7 @@ table('Program','programs',[
 table('Project','projects',[
  ['portfolio_id','uuid','NN, FK portfolios','portfolioId'],['program_id','uuid','NULL, FK (program_id,portfolio_id) → programs(id,portfolio_id)','programId — программа того же портфеля'],
  ['code','text','NN','code'],['name','text','NN','name'],['goal','text','NN','goal'],['manager_subject','text','NN','managerSubject'],
+ ['hour_budget','numeric(12,2)','NULL, CHECK >= 0','hourBudget; в записи проекта хранятся сотые часа целым JSON-числом. Миграция 003 заполняет отсутствующие значения null без изменения редакции.'],
  ['priority','integer','NN, CHECK >= 1','priority'],['status','text','NN, CHECK DRAFT/ACTIVE/ON_HOLD/COMPLETED/ARCHIVED','status'],
  ['active_plan_version_id','uuid','NULL, deferred FK (id,active_plan_version_id) → plan_versions(project_id,id)','activePlanVersionId']],
  'Project и первый DRAFT создаются одной транзакцией. Указатель обязан вести на ACTIVE этого проекта; deferred trigger проверяет статус в конце транзакции.',

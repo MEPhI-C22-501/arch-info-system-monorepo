@@ -9,13 +9,19 @@ import java.util.*;
 public class AdminService {
     private final JdbcTemplate db;private final AccessService access;
     public AdminService(JdbcTemplate db,AccessService access){this.db=db;this.access=access;}
-    public List<Map<String,Object>> statuses(){access.role();return db.queryForList("SELECT id,name,board_order AS \"boardOrder\",active,board_visible AS \"boardVisible\",category FROM status ORDER BY board_order,name");}
-    public List<Map<String,Object>> priorities(){access.role();return db.queryForList("SELECT id,name,sort_order AS \"sortOrder\",active,code FROM priority ORDER BY sort_order,name");}
-    public List<Map<String,Object>> types(){access.role();return db.queryForList("SELECT type,enabled FROM type_setting ORDER BY type");}
-    public List<Map<String,Object>> users(){access.role();return db.queryForList("SELECT external_user_id AS \"id\",display_name AS \"name\",team_external_id AS \"teamId\",department_external_id AS \"departmentId\",active FROM user_cache ORDER BY display_name");}
-    public List<Map<String,Object>> accessRows(){access.require("access.admin");return db.queryForList("SELECT external_user_id AS \"userId\",role,allowed FROM local_access ORDER BY external_user_id");}
+    public List<Map<String,Object>> statuses(){access.roles();return db.queryForList("SELECT id,name,board_order AS \"boardOrder\",active,board_visible AS \"boardVisible\",category FROM status ORDER BY board_order,name");}
+    public List<Map<String,Object>> priorities(){access.roles();return db.queryForList("SELECT id,name,sort_order AS \"sortOrder\",active,code FROM priority ORDER BY sort_order,name");}
+    public List<Map<String,Object>> types(){access.roles();return db.queryForList("SELECT type,enabled FROM type_setting ORDER BY type");}
+    public List<Map<String,Object>> users(){access.roles();return db.queryForList("SELECT external_user_id AS \"id\",display_name AS \"name\",team_external_id AS \"teamId\",department_external_id AS \"departmentId\",active FROM user_cache ORDER BY display_name");}
     public List<Map<String,Object>> permissions(){access.require("access.admin");return db.queryForList("SELECT role,permission,allowed FROM role_permission ORDER BY role,permission");}
-    public List<String> grantedPermissions(){return db.queryForList("SELECT permission FROM role_permission WHERE role=? AND allowed=true ORDER BY permission",String.class,access.role());}
+    public List<String> grantedPermissions(){
+        Set<String> permissions = new TreeSet<>();
+        for (String role : access.roles()) {
+            permissions.addAll(db.queryForList("SELECT permission FROM role_permission WHERE role=? AND allowed=true",
+                String.class, role));
+        }
+        return List.copyOf(permissions);
+    }
     public List<Map<String,Object>> severityMapping(){access.require("priority.admin");return db.queryForList("SELECT severity,priority_id AS \"priorityId\" FROM severity_priority ORDER BY severity");}
     @Transactional public void mapSeverity(String severity,UUID priorityId){
         access.require("priority.admin");if(!Set.of("critical","high","medium","low").contains(severity))throw ApiException.invalid("severity","invalid");
@@ -41,11 +47,6 @@ public class AdminService {
         boolean active=bool(body,"active",(Boolean)old.get("active"));if(!active&&db.queryForObject("SELECT count(*) FROM priority WHERE active=true AND id<>?",Integer.class,id)==0)throw ApiException.conflict("priority","last_active_priority");
         db.update("UPDATE priority SET name=?,sort_order=?,active=? WHERE id=?",name,integer(body,"sortOrder",((Number)old.get("sortOrder")).intValue()),active,id);return priority(id);}
     @Transactional public void type(String type,Map<String,Object> body){access.require("type.admin");Values.type(type);db.update("UPDATE type_setting SET enabled=? WHERE type=?",bool(body,"enabled",true),type);}
-    @Transactional public void localAccess(String userId,Map<String,Object> body){access.require("access.admin");
-        String role=Values.str(body,"role",true);if(!Set.of("MEMBER","LEAD","ADMIN").contains(role))throw ApiException.invalid("role","invalid_role");
-        if(db.queryForObject("SELECT count(*) FROM user_cache WHERE external_user_id=?",Integer.class,userId)==0)throw ApiException.invalid("userId","unknown_user");
-        db.update("INSERT INTO local_access(external_user_id,role,allowed) VALUES(?,?,?) ON CONFLICT(external_user_id) DO UPDATE SET role=EXCLUDED.role,allowed=EXCLUDED.allowed",userId,role,bool(body,"allowed",true));
-    }
     @Transactional public void permission(String role,String permission,Map<String,Object> body){access.require("access.admin");
         if(!Set.of("MEMBER","LEAD","ADMIN").contains(role)||!permission.matches("[a-z]+\\.[a-z]+"))throw ApiException.invalid("permission","invalid");
         boolean allowed=bool(body,"allowed",false);

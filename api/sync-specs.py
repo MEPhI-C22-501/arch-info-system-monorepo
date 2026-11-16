@@ -24,6 +24,7 @@ for resource in (
     "health",
     "org_unit",
     "position",
+    "profile",
     "project_role",
     "salary",
 ):

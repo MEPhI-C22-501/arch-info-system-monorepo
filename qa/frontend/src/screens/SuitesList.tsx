@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Suite, changeSuiteStatus, listSuites } from '../api/suites';
@@ -9,7 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { KIND_LABELS, PURPOSE_LABELS } from '../labels';
 import { canArchiveSuite, canCreateRun, canManageSuites } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 
@@ -25,6 +26,7 @@ export function SuitesList() {
   const toast = useToast();
   const { values, page, setFilter, setPage, reset } = useListParams();
   const suites = useLoad(() => listSuites({ ...values, page }), [values, page]);
+  const person = usePeople(suites.data?.items.map(row => row.owner) ?? []);
   const [error, setError] = useState<unknown>(null);
 
   const change = async (suite: Suite, action: 'archive' | 'restore') => {
@@ -51,13 +53,13 @@ export function SuitesList() {
     { header: 'Вид', render: (row) => KIND_LABELS[row.kind] },
     { header: 'Назначение', render: (row) => PURPOSE_LABELS[row.purpose] },
     { header: 'Кейсов', render: (row) => row.caseCount },
-    { header: 'Владелец', render: (row) => row.owner },
+    { header: 'Владелец', render: (row) => person(row.owner) },
     { header: 'Статус', render: (row) => <StatusBadge status={row.status} /> },
     {
       header: 'Действия',
       render: (row) => (
         <div className="bar" style={{ marginBottom: 0 }}>
-          {row.status === 'ACTIVE' && canCreateRun(session.role) && <Link className="btn" to={`/runs/new?suiteId=${row.id}`}>Создать прогон</Link>}
+          {row.status === 'ACTIVE' && canCreateRun(sessionRoles(session)) && <Link className="btn" to={`/runs/new?suiteId=${row.id}`}>Создать прогон</Link>}
           {canArchiveSuite(session, row) && (row.status === 'ACTIVE'
             ? <button type="button" onClick={() => change(row, 'archive')}>В архив</button>
             : <button type="button" onClick={() => change(row, 'restore')}>Вернуть</button>)}
@@ -79,7 +81,7 @@ export function SuitesList() {
         onChange={setFilter}
         onReset={reset}
       />
-      {canManageSuites(session.role) && <div className="bar"><Link className="btn primary" to="/suites/new">Создать набор</Link></div>}
+      {canManageSuites(sessionRoles(session)) && <div className="bar"><Link className="btn primary" to="/suites/new">Создать набор</Link></div>}
       <ErrorMessage error={error} />
       <div className="panel">
         <DataTable

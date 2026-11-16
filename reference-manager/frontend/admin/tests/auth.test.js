@@ -35,10 +35,10 @@ test('the PKCE challenge matches the RFC 7636 example', async () => {
   assert.match(auth.randomString(48), /^[A-Za-z0-9_-]{64}$/);
 });
 
-test('the user comes from the token: name, realm roles and the roles of the audience client', () => {
+test('the user comes from the token: name and roles of the audience client', () => {
   const claims = auth.decodeJwt(jwt({ sub: 'u-1', preferred_username: 'hr-admin', realm_access: { roles: ['reference-hr-admin', 'offline_access'] }, resource_access: { 'reference-manager': { roles: ['reference-reader'] }, other: { roles: ['x'] } } }));
   assert.equal(claims.preferred_username, 'hr-admin');
-  assert.deepEqual(auth.rolesOf(claims, 'reference-manager'), ['offline_access', 'reference-hr-admin', 'reference-reader']);
+  assert.deepEqual(auth.rolesOf(claims, 'reference-manager'), ['reference-reader']);
   assert.equal(auth.decodeJwt('not-a-token'), null);
 });
 
@@ -65,7 +65,7 @@ test('the return from Keycloak exchanges the code with the verifier, then the to
   const fetchImpl = async (url, options) => {
     const form = new URLSearchParams(options.body);
     calls.push({ url, form: Object.fromEntries(form) });
-    const access = jwt({ sub: 'u-1', preferred_username: 'admin', realm_access: { roles: ['reference-admin'] }, exp: 1 });
+    const access = jwt({ sub: 'u-1', preferred_username: 'admin', resource_access: { 'reference-manager': { roles: ['reference-admin'] } }, exp: 1 });
     const expiresIn = form.get('grant_type') === 'refresh_token' ? 300 : 10;
     return { ok: true, status: 200, json: async () => ({ access_token: access, refresh_token: 'r1', id_token: 'id1', expires_in: expiresIn }) };
   };

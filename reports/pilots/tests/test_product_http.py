@@ -19,15 +19,17 @@ from product_service import tick
 from test_product import seed,claims,QUERY,ADMIN,AN,AD,MB
 
 
+from unittest.mock import patch
+
 class ProductHTTP(unittest.TestCase):
     def test_catalog_reports_views_exports_subscriptions_notifications_and_audit(self):
         key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
         public=json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key()));public.update(kid='product',alg='RS256',use='sig')
         with tempfile.TemporaryDirectory() as directory,source_server(dataset(),public) as (base,_,_):
             dsn='sqlite:'+str(Path(directory)/'product.sqlite');db=Database(dsn);db.initialize();seed(db)
-            def bearer(c): return jwt.encode(dict(c,iat=int(time.time()),iss=base,aud='reports'),key,algorithm='RS256',headers={'kid':'product'})
+            def bearer(c): return jwt.encode(dict(c,typ='Bearer',iat=int(time.time()),iss=base,aud='reports'),key,algorithm='RS256',headers={'kid':'product'})
             admin=bearer(claims());member=bearer(claims(MEMBER_1,[MB]))
-            with report_server(dsn,base,base+'/jwks') as api:
+            with patch('product_http.directory', return_value=lambda subject: claims(subject, [AN, AD] if subject == ADMIN else [MB])), report_server(dsn,base,base+'/jwks') as api:
                 def call(path,method='GET',body=None,token=admin,headers=None):
                     head={'Content-Type':'application/json',**(headers or {})}
                     if token: head['Authorization']='Bearer '+token

@@ -29,7 +29,7 @@ public class ViewIteration {
 
         Map<String, Object> baseline = iterations.findBaselineSnapshot(id).orElse(Map.of());
         Map<String, Object> result = iterations.findResultSnapshot(id).orElse(Map.of());
-        if ("MEMBER".equals(permissions.currentRole())) {
+        if (permissions.ownOnly("iteration.read")) {
             out.put("items", visibleItems(out.get("items")));
             baseline = visibleSnapshot(baseline);
             result = visibleSnapshot(result);

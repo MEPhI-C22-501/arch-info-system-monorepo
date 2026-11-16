@@ -739,6 +739,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAuthConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolveProfiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listEligibleAssignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/{resource}": {
         parameters: {
             query?: never;
@@ -748,7 +812,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader) */
+        /** Read-only paginated data for the reporting service (role qa-reports-reader) */
         get: operations["listReportData"];
         put?: never;
         post?: never;
@@ -796,6 +860,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UserProfile: {
+            accountUserId: string;
+            displayName: string;
+        };
         /** @enum {string} */
         TestCaseStatus: "DRAFT" | "ACTUAL" | "NEEDS_UPDATE" | "ARCHIVED";
         /** @enum {string} */
@@ -2814,6 +2882,109 @@ export interface operations {
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    getAuthConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Browser OIDC configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        mode: "demo" | "keycloak";
+                        issuer: string;
+                        clientId: string;
+                    };
+                };
+            };
+        };
+    };
+    getProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user's cached profile, or null until available */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfile"] | null;
+                };
+            };
+            403: components["responses"]["Error"];
+        };
+    };
+    resolveProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    subjects: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Cached names for visible QA subjects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfile"][];
+                };
+            };
+            403: components["responses"]["Error"];
+        };
+    };
+    listEligibleAssignees: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active employees with a fresh profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["UserProfile"][];
+                        page: number;
+                        pageSize: number;
+                        totalPages: number;
+                    };
+                };
+            };
+            403: components["responses"]["Error"];
         };
     };
     listReportData: {

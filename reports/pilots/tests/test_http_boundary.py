@@ -37,7 +37,7 @@ class HttpBoundary(unittest.TestCase):
             with db.transaction(): db.execute('UPDATE dwh.fact_time_log SET project_id=?', (payload,))
             db.close()
             def token(access):
-                return jwt.encode({'sub': MEMBER_1, 'iss': base, 'aud': 'reports', 'iat': int(time.time()),
+                return jwt.encode({'sub': MEMBER_1, 'iss': base, 'aud': 'reports', 'typ': 'Bearer', 'iat': int(time.time()),
                                    'exp': int(time.time())+120, 'resource_access': access}, key,
                                   algorithm='RS256', headers={'kid': 'acceptance'})
             valid = token({'reports': {'roles': ['reports-member']}})

@@ -19,10 +19,11 @@ spring:
 app:
   audience: ${OIDC_AUDIENCE:task-tracker}
   jwks-uri: ${OIDC_JWKS_URI:}
-  bootstrap-admin-subject: ${BOOTSTRAP_ADMIN_SUBJECT:}
   directory-url: ${DIRECTORY_URL:}
-  directory-token: ${DIRECTORY_TOKEN:}
-  directory-cron: ${DIRECTORY_CRON:0 0 */2 * * *}
+  directory-token-url: ${DIRECTORY_TOKEN_URL:}
+  directory-client-id: ${DIRECTORY_CLIENT_ID:tracker-directory}
+  directory-client-secret: ${DIRECTORY_CLIENT_SECRET:}
+  directory-cron: ${DIRECTORY_CRON:0 */15 * * * *}
   attachment-max-bytes: ${ATTACHMENT_MAX_BYTES:10485760}
   dev-directory: ${DEV_DIRECTORY:false}
 management:

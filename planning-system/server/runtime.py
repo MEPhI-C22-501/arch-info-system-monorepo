@@ -38,21 +38,31 @@ def register(app):
     @app.get('/api/v1/me')
     def identity(req:Request):
         a=actor(req)
-        return {'subject':a.subject,'roles':sorted(a.roles),'portfolios':sorted(a.portfolios),'projects':sorted(a.projects),'scopes':sorted(a.scopes)}
+        from .ui_features import person_name
+        from .reference_manager import hr_required
+        allowed(a, ['R-01','R-02','R-03','R-04','R-05','R-06'])
+        with db.engine.begin() as c:
+            name = person_name(c,a.subject,not hr_required())
+        return {'displayName':name,'subject':a.subject,'roles':sorted(a.roles),'portfolios':sorted(a.portfolios),'projects':sorted(a.projects),'scopes':sorted(a.scopes)}
 
     @app.get('/api/v1/workspace')
     def workspace(req:Request):
         a=actor(req)
+        allowed(a,['R-01','R-02','R-03','R-04','R-05','R-06'])
         with db.engine.begin() as c:
             pid=req.query_params.get('projectId',DEMO_PROJECT)
             p=get(c,'project',pid,a)
-            if 'R-05' in a.roles:
+            main_roles = a.roles & {'R-01','R-02','R-03','R-04'}
+            view = req.query_params.get('view')
+            if 'R-05' in a.roles and (view == 'calendar' or not (main_roles or 'R-06' in a.roles)):
                 v=get(c,'plan',p['activePlanVersionId'],a) if p['activePlanVersionId'] else None
                 allocations=[x for x in v['allocations'] if x['employeeId'] in a.employees and x['status']=='CONFIRMED'] if v else []
+                people={row['id']:row['data']['displayName'] for row in db.all_rows(c,'employee') if 'displayName' in row['data']}
+                allocations=[{**x,'employeeName':people.get(x['employeeId'],'Профиль не найден (' + x['employeeId'] + ')')} for x in allocations]
                 if v and not allocations:fail(404,'Нет собственных назначений')
-                return {'projectId':pid,'name':p['name'],'goal':p['goal'],'role':next(iter(a.roles)),'allocations':allocations,'status':v['status'] if v else 'DRAFT','version':v['versionNumber'] if v else 0,'baseline':None,'attachment':False,'events':[]}
+                return {'projectId':pid,'name':p['name'],'goal':p['goal'],'role':'R-05','allocations':allocations,'status':v['status'] if v else 'DRAFT','version':v['versionNumber'] if v else 0,'baseline':None,'attachment':False,'events':[]}
             pubs=[r['data'] for r in db.all_rows(c,'publication',project=pid)]
-            if 'R-06' in a.roles:
+            if 'R-06' in a.roles and (view == 'exchange' or not main_roles):
                 return {'projectId':pid,'name':'Журнал обмена','role':'R-06','status':'ACTIVE','version':0,'publication':pubs[-1]['status'] if pubs else 'PENDING',
                         'publicationId':pubs[-1]['id'] if pubs else None,'baseline':{'version':0} if pubs else None,'events':[f"{x['publicationId']} · {x['status']}" for x in pubs],'attachment':False}
             allowed(a,['R-01','R-02','R-03','R-04'])
@@ -75,7 +85,7 @@ def register(app):
                 key=(x['employeeId'],x['date']);assigned[key]=assigned.get(key,0)+x['hours']
             per_demand={}
             for x in allocations:per_demand[x['demandId']]=per_demand.get(x['demandId'],0)+x['hours']
-            response={'projectStatus':p['status'],'projectId':pid,'portfolioId':p['portfolioId'],'projectRevision':p['revision'],'finalApprover':get(c,'portfolio',p['portfolioId'],a).get('ownerSubject'),'name':p['name'],'goal':p['goal'],'role':next(iter(a.roles)),
+            response={'projectStatus':p['status'],'projectId':pid,'portfolioId':p['portfolioId'],'projectRevision':p['revision'],'finalApprover':get(c,'portfolio',p['portfolioId'],a).get('ownerSubject'),'name':p['name'],'goal':p['goal'],'role':sorted(main_roles)[0],
                 'versionId':v['id'] if v else None,'version':v['versionNumber'] if v else 0,'revision':v['revision'] if v else 0,
                 'contentRevision':v['contentRevision'] if v else 0,'reviewRound':v['reviewRound'] if v else 0,'status':v['status'] if v else 'DRAFT',
                 'scenario':v['kind']=='SCENARIO' if v else False,'demand':sum(x['hours'] for x in v['demands']) if v else 0,
@@ -90,7 +100,7 @@ def register(app):
                 'actualHours':sum(x['actualHours'] for x in tasks if not x['isDeleted']),
                 'forecast':max([f for f in fcs if v and f['planVersionId']==v['id']],key=lambda x:x['calculatedAt'],default=None),
                 'availabilityId':availability.get('id'),'allocationId':allocation.get('id')}
-            if 'R-04' in a.roles:
+            if main_roles == {'R-04'}:
                 response['attachments']=[];response['attachment']=False;response['forecast']=None;response['actualHours']=None;response['events']=[]
             return money_filter(response,a)
 

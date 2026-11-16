@@ -1,0 +1,114 @@
+openapi: 3.0.3
+info: {title: Reference Manager Profiles, version: 1.0.0}
+security:
+  - bearerAuth: []
+paths:
+  /v1/profiles/me:
+    get:
+      operationId: getMyProfile
+      responses:
+        '200':
+          description: Current user's profile, including work email when present
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Profile'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: Profile not found}
+  /v1/profiles:
+    get:
+      operationId: listProfiles
+      parameters:
+        - {in: query, name: q, schema: {type: string, maxLength: 120}}
+        - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {in: query, name: pageToken, schema: {type: string}}
+        - {in: query, name: includeInactive, schema: {type: boolean, default: false}}
+      responses:
+        '200':
+          description: Profiles excluding work email; employee and external profiles use separate identifiers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Profile'}
+                  nextPageToken: {type: string}
+        '400': {description: Invalid search or pagination}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/profiles/resolve:
+    post:
+      operationId: resolveProfiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keys]
+              properties:
+                keys:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: {$ref: '#/components/schemas/ProfileKey'}
+      responses:
+        '200':
+          description: One result per key in request order; missing profiles are null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, profile]
+                      properties:
+                        key: {$ref: '#/components/schemas/ProfileKey'}
+                        profile:
+                          type: object
+                          nullable: true
+                          allOf:
+                            - {$ref: '#/components/schemas/Profile'}
+        '400': {description: Invalid keys}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  responses:
+    Unauthorized: {description: Invalid or missing access token}
+    Forbidden: {description: Missing Reference Manager profile access}
+  schemas:
+    ProfileKey:
+      type: object
+      required: [kind, id]
+      properties:
+        kind: {type: string, enum: [userId, employeeId]}
+        id: {type: string, description: Canonical UUID or decimal employee identifier depending on kind}
+    Profile:
+      type: object
+      required: [issuer, employeeId, userId, displayName, orgUnitId, orgUnitName, positionId, positionName,
+                 employmentState, accountState, isDeleted, isTechnical, isActive, updatedAt]
+      properties:
+        issuer: {type: string, format: uri}
+        employeeId: {type: integer, format: int64, nullable: true}
+        userId: {type: string, format: uuid, nullable: true}
+        displayName: {type: string}
+        workEmail: {type: string, format: email}
+        orgUnitId: {type: integer, format: int64, nullable: true}
+        orgUnitName: {type: string, nullable: true}
+        positionId: {type: integer, format: int64, nullable: true}
+        positionName: {type: string, nullable: true}
+        employmentState: {type: string, nullable: true}
+        accountState: {type: string, nullable: true}
+        isDeleted: {type: boolean}
+        isTechnical: {type: boolean}
+        isActive: {type: boolean}
+        updatedAt: {type: string, format: date-time, nullable: true}

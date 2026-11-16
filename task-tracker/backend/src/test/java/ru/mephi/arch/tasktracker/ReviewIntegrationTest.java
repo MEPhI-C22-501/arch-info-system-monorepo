@@ -80,13 +80,18 @@ class ReviewIntegrationTest {
     @Test void failedSecondDirectoryPagePreservesPreviousUsers() throws Exception {
         db.update("INSERT INTO user_cache(external_user_id,display_name,active,synced_at) VALUES('existing','Existing',true,now())");
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
-        server.createContext("/v1/employees/",exchange->{
+        server.createContext("/token",exchange->{
+            byte[] body="{\"access_token\":\"test\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,body.length);exchange.getResponseBody().write(body);exchange.close();
+        });
+        server.createContext("/v1/profiles",exchange->{
             boolean second=exchange.getRequestURI().getQuery().contains("pageToken");
-            byte[] body=(second?"{}":"{\"employees\":[],\"nextPageToken\":\"next\"}").getBytes(StandardCharsets.UTF_8);
+            byte[] body=(second?"{}":"{\"items\":[],\"nextPageToken\":\"next\"}").getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(second?500:200,body.length);exchange.getResponseBody().write(body);exchange.close();
         });server.start();
         try {
-            var service=new DirectoryService(db,tx,"http://127.0.0.1:"+server.getAddress().getPort(),"",false);
+            String origin="http://127.0.0.1:"+server.getAddress().getPort();
+            var service=new DirectoryService(db,tx,origin,origin+"/token","test","test",false);
             assertThrows(ApiException.class,service::sync);
             assertEquals(1,db.queryForObject("SELECT count(*) FROM user_cache WHERE external_user_id='existing' AND active",Integer.class));
         } finally { server.stop(0); }

@@ -33,7 +33,7 @@ async function rewrite(query, { securityContext: c }, resolve=lookup) {
     const window=(query.timeDimensions||[]).find(t=>t.dimension==='TimeLogs.loggedDate')?.dateRange;
     if(!Array.isArray(window)||window.length!==2||!window.every(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(d))||Date.parse(window[1].slice(0,10))-Date.parse(window[0].slice(0,10))!==27*86400000)throw Error('Velocity requires an explicit four week scope');
   }
-  if(roles.includes('reports-bi-service')) {
+  if(roles.includes('reports-bi-service') && c.iss === undefined && c.aud === undefined && c.exp === undefined) {
     // Superset applies end-user access: TimeLogs with member RLS, WorkItems only to analysts (R-06).
     if(!['TimeLogs','WorkItems'].includes(cube))throw Error('Reports SQL scope denied');
     return query;
@@ -45,7 +45,7 @@ async function rewrite(query, { securityContext: c }, resolve=lookup) {
   if(cube==='WorkItems'&&!accepted.some(r=>[PM,MB,AN].includes(r))&&refs.some(r=>/\.(estimateErrorPercent|correctionCoefficient)/.test(r))&&(query.dimensions||[]).includes('WorkItems.userId'))throw Error('Reports employee evaluation scope denied');
   if(cube==='WorkItems' && accepted.every(r=>r===MB || r===QA) && refs.some(r=>/\.(cycle|lead|throughput|averageWip|overrun)/.test(r)))throw Error('Reports scope denied');
   if(cube==='Forecasts'&&refs.some(r=>/\.(budgetAdjustment|estimatedTotalCost)/.test(r))) {
-    if(!accepted.some(r=>r===PM||r===AN)||!String(c.scope||'').split(' ').includes('cost.read')||!(query.dimensions||[]).includes('Forecasts.currency'))throw Error('Reports cost scope denied');
+    if(!accepted.some(r=>r===PM||r===AN)||!roles.includes('cost.read')||!String(c.scope||'').split(' ').includes('cost.read')||!(query.dimensions||[]).includes('Forecasts.currency'))throw Error('Reports cost scope denied');
   }
   const state=await resolve(c.sub);
   if(state.disabled)throw Error('Reports scope is disabled');

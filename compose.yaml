@@ -82,6 +82,9 @@ services:
       KC_PLANNING_SERVICE_SECRET: ${KC_PLANNING_SERVICE_SECRET:-localdemoplan}
       KC_QA_CI_SECRET: ${KC_QA_CI_SECRET:-localdemoqaci}
       KC_QA_EXECUTOR_SECRET: ${KC_QA_EXECUTOR_SECRET:-localdemoqaexec}
+      KC_TRACKER_DIRECTORY_SECRET: ${KC_TRACKER_DIRECTORY_SECRET:-localdemotrackerdirectory}
+      KC_TRACKER_PLANNING_SECRET: ${KC_TRACKER_PLANNING_SECRET:-localdemotrackerplanning}
+      KC_REPORTS_DIRECTORY_SECRET: ${KC_REPORTS_DIRECTORY_SECRET:-localdemoreportsdirectory}
       KC_EXAMPLE_API_SECRET: ${KC_EXAMPLE_API_SECRET:-localdemoexampleapi}
       KC_EXAMPLE_CALLER_SECRET: ${KC_EXAMPLE_CALLER_SECRET:-localdemoexamplecaller}
       KC_EXAMPLE_STRANGER_SECRET: ${KC_EXAMPLE_STRANGER_SECRET:-localdemoexamplestranger}

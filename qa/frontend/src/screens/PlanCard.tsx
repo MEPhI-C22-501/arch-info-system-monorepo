@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { PlanAction, PlanSummary, addPlanCases, changePlanStatus, getPlan, getPlanSummary, removePlanCase } from '../api/plans';
@@ -12,7 +13,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { SCOPE_LABELS } from '../labels';
 import { canCreateRun, canManagePlans, isPlanOpen, planActions } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useLoad } from '../useLoad';
 import { useClassifiers } from '../useReferenceData';
 
@@ -103,10 +104,11 @@ function AddCases({ planId, caseCount, onAdded }: { planId: string; caseCount: n
 
 export function PlanCard() {
   const { id = '' } = useParams();
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const toast = useToast();
   const plan = useLoad(() => getPlan(id), [id]);
+  const person = usePeople([plan.data?.owner]);
   const summary = useLoad(() => getPlanSummary(id), [id]);
   const runs = useLoad(() => listRuns({ planId: id }), [id]);
   const [error, setError] = useState<unknown>(null);
@@ -162,7 +164,7 @@ export function PlanCard() {
       <div className="panel">
         <dl className="props">
           <Prop name="Область">{SCOPE_LABELS[current.scopeKind]}{current.scopeRef ? `: ${current.scopeRef}` : ''}</Prop>
-          <Prop name="Ответственный">{current.owner}</Prop>
+          <Prop name="Ответственный">{person(current.owner)}</Prop>
           <Prop name="Команда">{current.teamRef}</Prop>
           <Prop name="Сроки">{current.startDate} — {current.endDate}</Prop>
           <Prop name="Проект">{current.planningProjectId}</Prop>

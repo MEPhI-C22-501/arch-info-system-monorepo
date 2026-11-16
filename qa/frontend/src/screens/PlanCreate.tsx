@@ -1,3 +1,6 @@
+import { request, type Page } from '../api/client';
+import type { Person } from '../usePeople';
+import { useLoad } from '../useLoad';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ApiError } from '../api/client';
@@ -7,7 +10,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { Field } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { SCOPE_LABELS } from '../labels';
-import { useSession } from '../session';
+import { useSession, sessionSubject } from '../session';
 
 type Scope = TestPlanInput['scopeKind'];
 const TEXT_REFS = [
@@ -33,10 +36,14 @@ export function validatePlan(values: Pick<TestPlanInput, 'name' | 'owner' | 'sta
 
 export function PlanCreate() {
   const session = useSession();
+  const directory = 'accessToken' in session;
+  const [query, setQuery] = useState('');
+  const people = useLoad(() => directory ? request<Page<Person>>('GET',
+    '/profiles/assignees?pageSize=50&q=' + encodeURIComponent(query)) : Promise.resolve(null), [directory, query]);
   const navigate = useNavigate();
   const toast = useToast();
   const [values, setValues] = useState({
-    name: '', scopeKind: 'RELEASE' as Scope, owner: session.name, startDate: '', endDate: '',
+    name: '', scopeKind: 'RELEASE' as Scope, owner: directory ? '' : sessionSubject(session), startDate: '', endDate: '',
     planningProjectId: '', planningReleaseId: '', planningMilestoneId: '', trackerIterationId: '', scopeRef: '', teamRef: '',
   });
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -75,7 +82,17 @@ export function PlanCreate() {
               {Object.entries(SCOPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </Field>
-          <Field label="Ответственный" error={errors.owner}><input type="text" value={values.owner} onChange={(event) => set('owner', event.target.value)} /></Field>
+          <Field label="Ответственный" error={errors.owner}>
+            {directory ? (
+              <>
+                <input type="search" aria-label="Поиск сотрудника" value={query} onChange={event => setQuery(event.target.value)} />
+                <select value={values.owner} onChange={event => set('owner', event.target.value)}>
+                  <option value="">Выберите сотрудника</option>
+                  {people.data?.items.map(p => <option value={p.accountUserId} key={p.accountUserId}>{p.displayName}</option>)}
+                </select>
+              </>
+            ) : <input type="text" value={values.owner} onChange={event => set('owner', event.target.value)} />}
+          </Field>
           <Field label="Начало" error={errors.startDate}><input type="date" value={values.startDate} onChange={(event) => set('startDate', event.target.value)} /></Field>
           <Field label="Окончание" error={errors.endDate}><input type="date" value={values.endDate} onChange={(event) => set('endDate', event.target.value)} /></Field>
         </div>

@@ -37,7 +37,11 @@ public class SecurityConfig {
         OAuth2TokenValidator<Jwt> validator = token -> {
             var issuerResult = JwtValidators.createDefaultWithIssuer(issuer).validate(token);
             if (issuerResult.hasErrors()) return issuerResult;
-            return token.getAudience().contains(audience)
+            if (token.getExpiresAt() == null || token.getSubject() == null || token.getSubject().isBlank()
+                || !"Bearer".equals(token.getClaimAsString("typ"))) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "invalid_access_token", null));
+            }
+            return token.getAudience() != null && token.getAudience().contains(audience)
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "invalid_audience", null));
         };

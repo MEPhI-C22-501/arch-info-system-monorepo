@@ -22,10 +22,23 @@ import java.util.*;
 @Service
 public class DirectoryService {
     private final JdbcTemplate db;private final TransactionTemplate tx;private final ObjectMapper json=new ObjectMapper();
-    private final String url,token;private final boolean dev;
+    private final String url, tokenUrl, clientId, secret;
+    private final boolean dev;
     private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
-    public DirectoryService(JdbcTemplate db,TransactionTemplate tx,@Value("${app.directory-url:}") String url,@Value("${app.directory-token:}") String token,@Value("${app.dev-directory:false}") boolean dev){
-        this.db=db;this.tx=tx;this.url=url;this.token=token;this.dev=dev;
+
+    public DirectoryService(JdbcTemplate db, TransactionTemplate tx,
+                            @Value("${app.directory-url:}") String url,
+                            @Value("${app.directory-token-url:}") String tokenUrl,
+                            @Value("${app.directory-client-id:tracker-directory}") String clientId,
+                            @Value("${app.directory-client-secret:}") String secret,
+                            @Value("${app.dev-directory:false}") boolean dev) {
+        this.db = db;
+        this.tx = tx;
+        this.url = url;
+        this.tokenUrl = tokenUrl;
+        this.clientId = clientId;
+        this.secret = secret;
+        this.dev = dev;
     }
     public Map<String,Object> status(){var meta=db.queryForMap("SELECT version,last_success_at AS \"lastSuccessAt\" FROM directory_meta WHERE singleton=true");
         Map<String,Object> out=new LinkedHashMap<>(meta);out.put("logs",db.queryForList("SELECT id,occurred_at AS \"occurredAt\",duration_ms AS \"durationMs\",success,correlation_id AS \"correlationId\",message FROM sync_log ORDER BY occurred_at DESC LIMIT 50"));
@@ -35,11 +48,13 @@ public class DirectoryService {
     @Scheduled(cron="${app.directory-cron}")
     public void scheduled(){if(!url.isBlank())try{sync();}catch(Exception ignored){/* failure is recorded in sync_log */}}
     @SuppressWarnings("unchecked")
-    public Map<String,Object> sync(){
+    public synchronized Map<String,Object> sync(){
         long start=System.nanoTime();String correlation=ApiAdvice.correlationId();
         try {
             if(url.isBlank())throw new IllegalStateException("directory_url_not_configured");
-            List<Map<String,Object>> employees=pages("employees"), units=pages("org_units");
+            String token = serviceToken();
+            List<Map<String,Object>> employees=pages("profiles", "items", "includeInactive=true", token);
+            List<Map<String,Object>> units=pages("org_units/", "org_units", "allowDeleted=true", token);
             List<Map<String,Object>> users=new ArrayList<>(), teams=new ArrayList<>(), departments=new ArrayList<>();
             Set<String> subjects=new HashSet<>();
             Map<String,Map<String,Object>> org=new HashMap<>();
@@ -49,13 +64,14 @@ public class DirectoryService {
                 if("TEAM".equals(unit.get("kind"))) teams.add(entry); else departments.add(entry);
             }
             for(var employee:employees) {
-                String sub=Objects.toString(employee.get("account_user_id"),"");
-                if(sub.isBlank()) continue;
+                String sub=Objects.toString(employee.get("userId"),"");
+                if(sub.isBlank() || Boolean.TRUE.equals(employee.get("isTechnical"))) continue;
                 if(!subjects.add(sub)) throw new IllegalArgumentException("duplicate_account_user_id");
                 Map<String,Object> entry=new HashMap<>(); entry.put("id",sub);
-                entry.put("name",(Objects.toString(employee.get("family_name"),"")+" "+Objects.toString(employee.get("given_name"),"")+" "+Objects.toString(employee.get("middle_name"),"")).trim());
-                entry.put("active","EMPLOYED".equals(employee.get("employment_state")) && "ENABLED".equals(employee.get("account_state")) && !Boolean.TRUE.equals(employee.get("is_deleted")));
-                String cursor=Objects.toString(employee.get("org_unit_id"),""); Set<String> visited=new HashSet<>();
+                entry.put("name", required(employee,"displayName"));
+                entry.put("active","EMPLOYED".equals(employee.get("employmentState"))
+                    && "ENABLED".equals(employee.get("accountState")) && Boolean.TRUE.equals(employee.get("isActive")));
+                String cursor=Objects.toString(employee.get("orgUnitId"),""); Set<String> visited=new HashSet<>();
                 while(org.containsKey(cursor)) {
                     if(!visited.add(cursor)) throw new IllegalArgumentException("org_cycle");
                     var unit=org.get(cursor);
@@ -77,11 +93,11 @@ public class DirectoryService {
         }catch(Exception e){log(false,e.getMessage()==null?"directory_error":e.getMessage(),start,correlation);throw new ApiException(503,"directory","sync_failed");}
     }
     @SuppressWarnings("unchecked")
-    private List<Map<String,Object>> pages(String resource) throws Exception {
+    private List<Map<String,Object>> pages(String resource, String field, String filter, String token) throws Exception {
         List<Map<String,Object>> all=new ArrayList<>(); Set<String> seen=new HashSet<>(); String page="";
         do {
             if(!seen.add(page)) throw new IllegalArgumentException("page_token_cycle");
-            String endpoint=url.replaceAll("/+$", "")+"/v1/"+resource+"/?allowDeleted=true&pageSize=100"+(page.isEmpty()?"":"&pageToken="+URLEncoder.encode(page,StandardCharsets.UTF_8));
+            String endpoint=url.replaceAll("/+$", "")+"/v1/"+resource+"?"+filter+"&pageSize=100"+(page.isEmpty()?"":"&pageToken="+URLEncoder.encode(page,StandardCharsets.UTF_8));
             HttpResponse<String> response=null;
             for(int attempt=0;attempt<3;attempt++) {
                 var builder=HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(6)).header("Accept","application/json").header("X-Correlation-ID",ApiAdvice.correlationId()).GET();
@@ -93,7 +109,7 @@ public class DirectoryService {
             }
             if(response==null || response.statusCode()!=200) throw new IllegalStateException("directory_http_"+(response==null?"unavailable":response.statusCode()));
             Map<String,Object> body=json.readValue(response.body(),Map.class);
-            Object collection=body.get(resource);
+            Object collection=body.get(field);
             if(!(collection instanceof List<?>)) throw new IllegalArgumentException("missing_"+resource);
             for(Object row:(List<?>)collection) {
                 if(!(row instanceof Map<?,?>)) throw new IllegalArgumentException("invalid_"+resource);
@@ -103,24 +119,41 @@ public class DirectoryService {
         } while(!page.isEmpty());
         return all;
     }
-    private String required(Map<String,Object> entry,String key){Object v=entry.get(key);if(v==null||v.toString().isBlank())throw new IllegalArgumentException("missing_"+key);return v.toString();}
-    @SuppressWarnings("unchecked") private List<Map<String,Object>> entries(Map<String,Object> snapshot,String key){
-        Object value=snapshot.get(key);if(!(value instanceof List<?> list))throw new IllegalArgumentException("missing_"+key);
-        List<Map<String,Object>> result=new ArrayList<>();
-        for(Object row:list){if(!(row instanceof Map<?,?> raw))throw new IllegalArgumentException("invalid_"+key);Map<String,Object> entry=(Map<String,Object>)raw;
-            required(entry,"id");required(entry,"name");if(!(entry.get("active") instanceof Boolean))throw new IllegalArgumentException("invalid_active");result.add(entry);}
-        return result;
+    private String serviceToken() throws Exception {
+        if (tokenUrl.isBlank() || clientId.isBlank() || secret.isBlank()) {
+            throw new IllegalStateException("directory_oauth_not_configured");
+        }
+        String body = "grant_type=client_credentials&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+            + "&client_secret=" + URLEncoder.encode(secret, StandardCharsets.UTF_8);
+        var request = HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(6))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new IllegalStateException("directory_token_refused");
+        String token = json.readTree(response.body()).path("access_token").asText();
+        if (token.isBlank()) throw new IllegalStateException("directory_token_missing");
+        return token;
+    }
+
+    private String required(Map<String,Object> entry,String key){
+        Object value=entry.get(key);
+        if (!(value instanceof String text) || text.isBlank()) throw new IllegalArgumentException("missing_"+key);
+        return text;
     }
     private void log(boolean success,String message,long start,String correlation){
         db.update("INSERT INTO sync_log(id,occurred_at,duration_ms,success,correlation_id,message) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),OffsetDateTime.now(ZoneOffset.UTC),(System.nanoTime()-start)/1_000_000,success,correlation,message);
     }
     @Bean ApplicationRunner devDirectorySeeder(){return args->{
+        if (!url.isBlank()) {
+            scheduled();
+            return;
+        }
         if(!dev)return;
         var now=OffsetDateTime.now(ZoneOffset.UTC);
-        String[][] people={{"11111111-1111-1111-1111-111111111111","Демо участник","MEMBER"},{"22222222-2222-2222-2222-222222222222","Демо руководитель","LEAD"},{"33333333-3333-3333-3333-333333333333","Демо администратор","ADMIN"}};
+        String[][] people={{"11111111-1111-1111-1111-111111111111","Демо участник"},{"22222222-2222-2222-2222-222222222222","Демо руководитель"},{"33333333-3333-3333-3333-333333333333","Демо администратор"}};
         for(String[] p:people){
             db.update("INSERT INTO user_cache(external_user_id,display_name,active,synced_at) VALUES(?,?,true,?) ON CONFLICT(external_user_id) DO NOTHING",p[0],p[1],now);
-            db.update("INSERT INTO local_access(external_user_id,role,allowed) VALUES(?,?,true) ON CONFLICT(external_user_id) DO NOTHING",p[0],p[2]);
         }
+        db.update("UPDATE directory_meta SET last_success_at=now() WHERE singleton=true");
     };}
 }

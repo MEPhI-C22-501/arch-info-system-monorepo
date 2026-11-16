@@ -26,7 +26,7 @@ test('project and team scopes apply to every supported model without granting fo
 });
 test('money requires cost.read, manager/analyst role and separate currency grouping',async()=>{
  for(const [roles,scope,dimensions]of [[['reports-analyst'],'',[]],[['reports-analyst'],'cost.read',[]],[['reports-team-lead'],'cost.read',['Forecasts.currency']]])await assert.rejects(run({measures:['Forecasts.budgetAdjustment'],dimensions},claims(roles,'a',scope)),/cost/);
- await run({measures:['Forecasts.budgetAdjustment'],dimensions:['Forecasts.currency']},claims(['reports-analyst'],'a','cost.read'));
+ await run({measures:['Forecasts.budgetAdjustment'],dimensions:['Forecasts.currency']},claims(['reports-analyst','cost.read'],'a','cost.read'));
 });
 test('BI SQL identity reads only hours and the plan side; mixed cubes are rejected',async()=>{
  assert.deepEqual(await run(query(),claims(['reports-bi-service'])),query());

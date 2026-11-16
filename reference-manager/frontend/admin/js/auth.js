@@ -41,10 +41,8 @@
   }
 
   function rolesOf(claims, rolesClient) {
-    const roles = new Set((claims && claims.realm_access && claims.realm_access.roles) || []);
-    const resource = claims && claims.resource_access && claims.resource_access[rolesClient];
-    for (const role of (resource && resource.roles) || []) roles.add(role);
-    return [...roles].sort();
+    const roles = claims?.resource_access?.[rolesClient]?.roles;
+    return Array.isArray(roles) && roles.every(role => typeof role === 'string') ? [...new Set(roles)].sort() : [];
   }
 
   // storage: sessionStorage-like object, win: window-like object with location, history, fetch

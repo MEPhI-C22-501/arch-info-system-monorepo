@@ -1,6 +1,7 @@
 package ru.mephi.arch.tasktracker;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import static ru.mephi.arch.tasktracker.infrastructure.persistence.JdbcUserDirectoryRepository.ACTIVE_SUBJECT;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -33,7 +34,7 @@ public class WorkItemService {
     }
     private void assignee(String id) {
         if (id==null) return;
-        Integer found=db.query("SELECT 1 FROM user_cache WHERE external_user_id=? AND active=true",rs->rs.next()?1:null,id);
+        Integer found=db.query(ACTIVE_SUBJECT,rs->rs.next()?1:null,id);
         if (found==null) throw ApiException.invalid("assigneeId","unknown_or_inactive");
     }
     private void parent(UUID id, String type, UUID parentId) {
@@ -86,7 +87,7 @@ public class WorkItemService {
         UUID id=input.get("id")==null?UUID.randomUUID():Values.uuid(input.get("id"),"id");
         parent(id,type,parentId);
         String assignee=nullableString(input.get("assigneeId"));
-        if(source==null && actor.equals(access.subject()) && "MEMBER".equals(access.role()) && assignee==null) assignee=actor;
+        if(source==null && actor.equals(access.subject()) && access.ownOnly("item.create") && assignee==null) assignee=actor;
         assignee(assignee);
         LocalDate start=Values.date(input.get("startDate"),"startDate");
         LocalDate due=Values.date(input.get("dueDate"),"dueDate");
@@ -191,7 +192,7 @@ public class WorkItemService {
             String value=filters.get(e.getKey());if(value!=null&&!value.isBlank()){where.append(" AND ").append(e.getValue()).append("=?");args.add(e.getKey().endsWith("Id")&&!e.getKey().equals("assigneeId")?Values.uuid(value,e.getKey()):value);}
         }
         if(filters.get("iterationId")!=null&&!filters.get("iterationId").isBlank()) {where.append(" AND EXISTS (SELECT 1 FROM work_item_iteration wi WHERE wi.work_item_id=w.id AND wi.iteration_id=? AND wi.removed_at IS NULL)");args.add(Values.uuid(filters.get("iterationId"),"iterationId"));}
-        if("MEMBER".equals(access.role())) {where.append(" AND w.assignee_external_id=?");args.add(access.subject());}
+        if(access.ownOnly("item.read")) {where.append(" AND w.assignee_external_id=?");args.add(access.subject());}
         if(filters.get("search")!=null&&!filters.get("search").isBlank()){where.append(" AND lower(w.title) LIKE ?");args.add("%"+filters.get("search").toLowerCase()+"%");}
         String base=" FROM work_item w JOIN status s ON s.id=w.status_id JOIN priority p ON p.id=w.priority_id"+where;
         long total=db.queryForObject("SELECT count(*)"+base,Long.class,args.toArray());

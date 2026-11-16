@@ -21,6 +21,20 @@ tags:
   - name: health
   - name: audit
 paths:
+  /profile:
+    get:
+      tags: [Profile]
+      operationId: readMyProfile
+      responses:
+        '200':
+          description: Current user's name from the Reference Manager projection
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [displayName]
+                properties:
+                  displayName: {type: string, nullable: true}
   /reports:
     get:
       tags: [reports]

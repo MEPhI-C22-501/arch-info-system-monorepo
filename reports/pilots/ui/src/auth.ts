@@ -2,8 +2,8 @@
 // The access token stays in memory only; sessionStorage holds just the one-time
 // state/verifier and the page to return to, removed right after the callback.
 
-export const ISSUER = 'http://localhost:8180/realms/reports-pilot';
-export const CLIENT_ID = 'reports-ui';
+export const ISSUER = import.meta.env.VITE_OIDC_ISSUER || 'http://localhost:8180/realms/reports-pilot';
+export const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || 'reports-ui';
 const PENDING = 'reports.pkce';
 
 export const ROLES = {
@@ -21,6 +21,7 @@ export interface Session {
   name: string;
   roles: Set<string>;
   expiresAt: number;
+  refreshToken?: string;
 }
 
 function randomHex(): string {
@@ -56,7 +57,7 @@ export function decodeSession(token: string): Session {
     token,
     subject: String(claims.sub),
     name: String(claims.preferred_username ?? claims.name ?? claims.sub),
-    roles: new Set(Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : []),
+    roles: new Set(Array.isArray(roles) && roles.every(role => typeof role === 'string') ? roles : []),
     expiresAt: Number(claims.exp) * 1000,
   };
 }
@@ -80,9 +81,22 @@ export async function completeLogin(): Promise<{ session: Session; returnTo: str
     }),
   });
   if (!response.ok) throw new Error('Вход не выполнен.');
-  const token = (await response.json()).access_token as string;
+  const value = await response.json();
   const returnTo = typeof saved.returnTo === 'string' && saved.returnTo.startsWith('/') ? saved.returnTo : '/';
-  return { session: decodeSession(token), returnTo };
+  return { session: { ...decodeSession(value.access_token), refreshToken: value.refresh_token }, returnTo };
+}
+
+export async function renewSession(session: Session): Promise<Session> {
+  const response = await fetch(ISSUER + '/protocol/openid-connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: session.refreshToken ?? '',
+    }),
+  });
+  if (!response.ok) throw new Error('Сеанс завершён.');
+  const value = await response.json();
+  return { ...decodeSession(value.access_token), refreshToken: value.refresh_token };
 }
 
 export function logout(): void {

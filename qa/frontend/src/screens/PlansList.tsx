@@ -6,7 +6,7 @@ import { Pagination } from '../components/Pagination';
 import { StatusBadge } from '../components/StatusBadge';
 import { PLAN_STATUSES, SCOPE_LABELS, statusLabel } from '../labels';
 import { canManagePlans } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 
@@ -22,7 +22,7 @@ const COLUMNS: Column<TestPlan>[] = [
 ];
 
 export function PlansList() {
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const { values, page, setFilter, setPage, reset } = useListParams();
   const plans = useLoad(() => listPlans({ ...values, page }), [values, page]);

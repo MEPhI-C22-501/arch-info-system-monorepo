@@ -48,7 +48,7 @@ class IntegrationControllerTest {
     }
 
     private IntegrationController controller() {
-        AccessService access = new AccessService(db, "");
+        AccessService access = new AccessService(db);
         ChangeRecorder changes = new ChangeRecorder(db);
         WorkItemService items = new WorkItemService(db, access, changes);
         var workItems = new JdbcWorkItemRepository(db);

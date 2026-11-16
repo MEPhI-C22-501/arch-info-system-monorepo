@@ -18,10 +18,10 @@ services:
   api:
     environment:
       AUTH_MODE: oidc
-      OIDC_ISSUER: http://localhost:8081/realms/planning
-      OIDC_DISCOVERY_URL: http://keycloak:8080/realms/planning/.well-known/openid-configuration
-      OIDC_JWKS_URL: http://keycloak:8080/realms/planning/protocol/openid-connect/certs
-      OIDC_AUDIENCE: planning-api
+      OIDC_ISSUER: http://localhost:8081/realms/arch-info-system
+      OIDC_DISCOVERY_URL: http://keycloak:8080/realms/arch-info-system/.well-known/openid-configuration
+      OIDC_JWKS_URL: http://keycloak:8080/realms/arch-info-system/protocol/openid-connect/certs
+      OIDC_AUDIENCE: planning-system
       OIDC_CLIENT_ID: planning-web
       OIDC_LOCAL_HTTP: "true"
     depends_on:

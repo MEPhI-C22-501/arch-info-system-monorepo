@@ -21,14 +21,13 @@ class AccessServiceTest {
             when(row.next()).thenReturn(true);
             when(row.getBoolean(1)).thenReturn(true);
         } catch (java.sql.SQLException e) { throw new AssertionError(e); }
-        when(db.queryForList("SELECT role, allowed FROM local_access WHERE external_user_id=?", "member"))
-            .thenReturn(java.util.List.of(Map.of("role", "MEMBER", "allowed", true)));
         doAnswer(call -> ((org.springframework.jdbc.core.ResultSetExtractor<?>) call.getArgument(1)).extractData(row))
             .when(db).query(eq("SELECT allowed FROM role_permission WHERE role=? AND permission=?"),
                 any(org.springframework.jdbc.core.ResultSetExtractor.class), eq("MEMBER"), anyString());
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject("member").build();
+        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject("member")
+            .claim("resource_access", Map.of("task-tracker", Map.of("roles", java.util.List.of("MEMBER")))).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
-        AccessService access = new AccessService(db, "");
+        AccessService access = new AccessService(db);
         var other = Map.<String,Object>of("assignee_external_id", "other");
         assertEquals(403, assertThrows(ApiException.class, () -> access.itemRead(other)).status);
         assertEquals(403, assertThrows(ApiException.class, () -> access.itemWrite(other)).status);
@@ -41,7 +40,7 @@ class AccessServiceTest {
             .claim("resource_access", Map.of("task-tracker", Map.of("roles", java.util.List.of("qa-tracker-reader"))))
             .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
-        AccessService access = new AccessService(db, "");
+        AccessService access = new AccessService(db);
         var someonesItem = Map.<String,Object>of("assignee_external_id", "someone-else");
         assertDoesNotThrow(() -> access.itemReadOrQa(someonesItem));
         verifyNoInteractions(db);

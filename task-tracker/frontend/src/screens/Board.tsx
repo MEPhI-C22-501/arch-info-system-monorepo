@@ -2,7 +2,7 @@ import { CardLinks } from '../components/Links';
 import { useState, useEffect } from 'react';
 import { overdue, date, hours, json, request, typeName } from '../api';
 import type { Item, Iteration, Page } from '../api';
-import { can, selectName } from '../context';
+import { can, selectName, selectPerson } from '../context';
 import type { Context } from '../context';
 import { Badge } from '../components/Badge';
 import { Empty } from '../components/Empty';
@@ -65,7 +65,7 @@ export function Board({ context, revision, open, refresh }:
           onClick={() => open(item.id)}>
           <div className="card-top"><small>{typeName(item.type)} · {item.id.slice(0, 8)}</small><span>⋮</span></div>
           <strong>{item.title}</strong><CardLinks id={item.id} open={open} />{item.parentId && <small>Родитель: {item.parentId.slice(0,8)}</small>}
-          <div className="card-bottom"><span>{selectName(context.users, item.assigneeId)}</span><Badge>{selectName(context.priorities, item.priorityId)}</Badge></div>
+          <div className="card-bottom"><span>{selectPerson(context.users, item.assigneeId)}</span><Badge>{selectName(context.priorities, item.priorityId)}</Badge></div>
           <div className="card-bottom"><small>{item.dueDate ? date(item.dueDate) : 'Без срока'}</small><small className={item.remainingHours < 0 ? 'negative' : ''}>{hours(item.remainingHours)}</small></div>
         </div>)}
       </div>)}

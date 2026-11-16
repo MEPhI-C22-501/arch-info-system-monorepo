@@ -1,13 +1,21 @@
 """HTTP adapter for /api/v1. Authentication is shared with the legacy pilot."""
+from functools import cache
 import json
 import os
 import uuid
 from urllib.parse import parse_qs, urlsplit
 import jwt
 from db import Database
+from oidc import claims_for
 from product_service import Service
-from product_store import audit, remember
+from product_store import audit
+from product_jobs import KeycloakDirectory
 from report_engine import Problem
+
+
+@cache
+def directory():
+    return KeycloakDirectory()
 
 
 def handle(handler):
@@ -27,9 +35,7 @@ def handle(handler):
         else:
             token=handler.headers.get('Authorization','')
             if not token.startswith('Bearer '): raise Problem(401,'UNAUTHENTICATED')
-            key=handler.jwks.get_signing_key_from_jwt(token[7:]).key
-            claims=jwt.decode(token[7:],key,algorithms=['RS256'],audience='reports',issuer=os.environ['REPORTS_OIDC_ISSUER'],
-                options={'require':['exp','iat','sub','iss','aud']})
+            claims=claims_for(token[7:], handler.jwks)
             parsed=parse_qs(path.query,keep_blank_values=True)
             if any(len(v)!=1 for v in parsed.values()): raise Problem(422,'INVALID_PARAMETER')
             params={k:v[0] for k,v in parsed.items()}
@@ -43,8 +49,9 @@ def handle(handler):
                 except (ValueError,UnicodeDecodeError): raise Problem(400,'MALFORMED_REQUEST') from None
             db=Database(os.environ['REPORTS_DATABASE_URL'])
             with db.transaction():
-                service=Service(db,claims,correlation)
-                remember(db,claims)
+                is_download = path.path.endswith('/file') and path.path.startswith('/api/v1/exports/')
+                resolver = directory() if is_download else None
+                service=Service(db,claims,correlation,resolver=resolver)
                 status,body,extra=service.route(handler.command,path.path[len('/api/v1/'):],payload,params,dict(handler.headers))
                 if body is not None and not isinstance(body,bytes):
                     if len(json.dumps(body,ensure_ascii=False,allow_nan=False).encode())>16*1024*1024: raise Problem(422,'RESULT_TOO_LARGE')

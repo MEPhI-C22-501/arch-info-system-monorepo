@@ -1,19 +1,21 @@
 package ru.mephi.arch.tasktracker;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Service
 public class AccessService {
     private final JdbcTemplate db;
-    private final String bootstrapAdmin;
-    public AccessService(JdbcTemplate db, @Value("${app.bootstrap-admin-subject:}") String bootstrapAdmin) {
-        this.db = db; this.bootstrapAdmin = bootstrapAdmin;
+    private static final Set<String> HUMAN_ROLES = Set.of("MEMBER", "LEAD", "ADMIN");
+
+    public AccessService(JdbcTemplate db) {
+        this.db = db;
     }
     JwtAuthenticationToken token() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -21,30 +23,47 @@ public class AccessService {
         return jwt;
     }
     public String subject() { return token().getToken().getSubject(); }
-    @SuppressWarnings("unchecked")
-    private boolean clientRole(String role) {
+    private Set<String> clientRoles() {
         Object access = token().getToken().getClaims().get("resource_access");
-        if (!(access instanceof Map<?,?> clients)) return false;
-        Object app = clients.get("task-tracker");
-        return app instanceof Map<?,?> entry && entry.get("roles") instanceof List<?> roles && roles.contains(role);
+        if (!(access instanceof Map<?, ?> clients) || !(clients.get("task-tracker") instanceof Map<?, ?> entry)
+            || !(entry.get("roles") instanceof List<?> roles) || !roles.stream().allMatch(String.class::isInstance)) {
+            return Set.of();
+        }
+        var result = new TreeSet<String>();
+        for (Object role : roles) result.add((String) role);
+        return result;
     }
+
+    public boolean clientRole(String role) { return clientRoles().contains(role); }
+
     public void testing() { if (!clientRole("testing-service")) throw new ApiException(403,"scope","insufficient_scope"); }
     public void reports() { if (!clientRole("reports-service")) throw new ApiException(403,"scope","insufficient_scope"); }
-    public String role() {
-        if (clientRole("testing-service") || clientRole("reports-service")) throw new ApiException(403,"scope","service_client_only");
-        if (!bootstrapAdmin.isBlank() && bootstrapAdmin.equals(subject())) return "ADMIN";
-        var rows = db.queryForList("SELECT role, allowed FROM local_access WHERE external_user_id=?", subject());
-        if (rows.isEmpty() || !Boolean.TRUE.equals(rows.getFirst().get("allowed"))) throw new ApiException(403,"access","local_access_denied");
-        return (String) rows.getFirst().get("role");
+
+    public Set<String> roles() {
+        Set<String> roles = new TreeSet<>(clientRoles());
+        roles.retainAll(HUMAN_ROLES);
+        if (roles.isEmpty()) throw new ApiException(403, "access", "forbidden");
+        return roles;
     }
+
+    private boolean grants(String role, String permission) {
+        return Boolean.TRUE.equals(db.query("SELECT allowed FROM role_permission WHERE role=? AND permission=?",
+            rs -> rs.next() ? rs.getBoolean(1) : null, role, permission));
+    }
+
+    public boolean ownOnly(String permission) {
+        return roles().stream().filter(role -> !"MEMBER".equals(role)).noneMatch(role -> grants(role, permission));
+    }
+
     public void require(String permission) {
-        String role = role();
-        Boolean allowed = db.query("SELECT allowed FROM role_permission WHERE role=? AND permission=?", rs -> rs.next() ? rs.getBoolean(1) : null, role, permission);
-        if (!Boolean.TRUE.equals(allowed)) throw new ApiException(403,"permission","forbidden");
+        if (roles().stream().noneMatch(role -> grants(role, permission))) {
+            throw new ApiException(403, "permission", "forbidden");
+        }
     }
+
     public void itemRead(Map<String,Object> item) {
         require("item.read");
-        if (role().equals("MEMBER") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");
+        if (ownOnly("item.read") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");
     }
     /** QA's read-only account (Q-09): single-item + comment reads only, never list/search or
      * write — those still go through {@link #itemRead}/{@link #require} unmodified. */
@@ -54,6 +73,6 @@ public class AccessService {
     }
     public void itemWrite(Map<String,Object> item) {
         require("item.update");
-        if (role().equals("MEMBER") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");
+        if (ownOnly("item.update") && !subject().equals(item.get("assignee_external_id"))) throw new ApiException(403,"item","forbidden");
     }
 }

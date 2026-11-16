@@ -14,7 +14,8 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from . import storage as db
 from .auth import actor
 from .domain import fail, validate_draft
-from .reference_manager import cache_status, hr_required, validate_new_allocations
+from .hour_budget import BUDGET_ROLES, comparison, summary_version, summary_versions
+from .reference_manager import active_manager_profiles, cache_status, hr_required, validate_new_allocations
 
 PROJECT_STATUSES = {'DRAFT', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED'}
 ALLOCATION_STATUSES = {'PROPOSED', 'CONFIRMED', 'CANCELLED'}
@@ -39,10 +40,9 @@ def filters(req, assignment=False):
     return values
 
 
-def latest_plans(c):
+def latest_plans(c, all_plans=None):
     result = {}
-    for row in db.all_rows(c, 'plan'):
-        plan = row['data']
+    for plan in (all_plans if all_plans is not None else (r['data'] for r in db.all_rows(c, 'plan'))):
         if plan['projectId'] not in result or plan['versionNumber'] > result[plan['projectId']]['versionNumber']:
             result[plan['projectId']] = plan
     return result
@@ -61,7 +61,9 @@ def visible_projects(c, a, plans):
 
 
 def project_rows(c, a, f):
-    plans = latest_plans(c)
+    all_plans = [row['data'] for row in db.all_rows(c, 'plan')]
+    plans = latest_plans(c, all_plans)
+    versions = summary_versions(all_plans)
     rows = []
     for p in visible_projects(c, a, plans):
         v = plans.get(p['id'])
@@ -72,12 +74,22 @@ def project_rows(c, a, f):
         if f.get('q', '').casefold() not in (p['code']+' '+p['name']).casefold():continue
         if f.get('dateFrom') and (not v or v['horizonEnd'] < f['dateFrom']):continue
         if f.get('dateTo') and (not v or v['horizonStart'] > f['dateTo']):continue
-        rows.append({'id':p['id'], 'code':p['code'], 'name':p['name'], 'status':p['status'],
+        row = {'id':p['id'], 'code':p['code'], 'name':p['name'], 'status':p['status'],
                      'goal':p['goal'] if a.roles & {'R-01','R-02','R-03'} else '',
                      'portfolioId':p['portfolioId'], 'managerSubject':p['managerSubject'],
                      'versionNumber':v['versionNumber'] if v else None, 'planStatus':v['status'] if v else None,
-                     'start':v['horizonStart'] if v else None, 'finish':v['horizonEnd'] if v else None})
+                     'start':v['horizonStart'] if v else None, 'finish':v['horizonEnd'] if v else None}
+        row['managerName'] = person_name(c,p['managerSubject'], not hr_required())
+        if a.roles & BUDGET_ROLES:
+            row['hourBudgetComparison'] = comparison(p, summary_version(p, versions))
+        rows.append(row)
     return rows
+
+
+def person_name(c, subject, demo=False):
+    row = db.find(c,'profile',subject)
+    if row:return row['data']['displayName']
+    return subject if demo else 'Профиль не найден (' + subject + ')'
 
 
 def employee_options(c, a, portfolio):
@@ -88,7 +100,7 @@ def employee_options(c, a, portfolio):
     names = {identifier: person.get('displayName',identifier) for identifier,person in people.items()}
     required = hr_required()
     local_names = {} if required else {'employees/demo-1':'Демо-сотрудник 1', 'employees/demo-2':'Демо-сотрудник 2'}
-    return [{'id':identifier, 'name':names.get(identifier, local_names.get(identifier, identifier)),
+    return [{'id':identifier, 'name':names.get(identifier, local_names.get(identifier, 'Профиль не найден (' + identifier + ')')),
              'eligibleForAssignment':people.get(identifier,{}).get('eligibleForAssignment',not required)}
             for identifier in sorted(identifiers)]
 
@@ -132,7 +144,7 @@ def fill_sheet(sheet, columns, rows):
             if isinstance(value,str):cell.data_type='s'
             if key in {'date','start','finish'} and value:
                 cell.value=date.fromisoformat(value);cell.number_format='DD.MM.YYYY'
-            if key=='hours':cell.number_format='0.00'
+            if key in {'hours','hourBudget','plannedHours','remainingHours','exceededHours','usagePercent'}:cell.number_format='0.00'
             cells.append(cell)
         sheet.append(cells)
     sheet.sheet_view.showGridLines=False
@@ -211,14 +223,17 @@ def register(app, command_tx):
         with db.engine.begin() as c:
             portfolio=req.query_params.get('portfolioId','')
             get(c,'portfolio',portfolio,a)
-            managers={r['data']['managerSubject']:r['data']['managerSubject'] for r in db.all_rows(c,'project',portfolio)}
+            managers={r['data']['managerSubject']:person_name(c,r['data']['managerSubject'],not hr_required()) for r in db.all_rows(c,'project',portfolio)}
             for r in db.all_rows(c,'manager',portfolio):
-                managers[r['data']['subject']]=r['data']['displayName']
-            if os.environ.get('APP_ENV')=='development':
+                managers[r['data']['subject']]=r['data']['displayName'] if not hr_required() else person_name(c,r['data']['subject'])
+            if not hr_required():
                 managers['demo-R-03']='Руководитель проекта · manager (учебная учётная запись)'
-            if 'R-03' in a.roles:managers[a.subject]=managers.get(a.subject,'Моя учётная запись')
+            if 'R-03' in a.roles:managers[a.subject]=managers.get(a.subject,person_name(c,a.subject,not hr_required()))
             if 'R-03' in a.roles and not a.roles & {'R-01','R-02'}:
                 managers={a.subject:managers[a.subject]}
+            if hr_required():
+                active=active_manager_profiles(c)
+                managers={subject:active[subject] for subject in managers if subject in active}
             return {'managers':[{'id':k,'name':v} for k,v in sorted(managers.items(),key=lambda x:x[1])],
                     'specialties':[{'id':k,'name':v} for k,v in [
                         ('developer','Разработчик'),('analyst','Аналитик'),('tester','Тестировщик'),
@@ -240,7 +255,8 @@ def register(app, command_tx):
         except ValueError:fail(422,'Неверная дата')
         with command_tx(req,a,b) as (c,cached,complete):
             if cached:return cached
-            v=get(c,'plan',req.path_params['versionId'],a);p=get(c,'project',v['projectId'],a)
+            v=get(c,'plan',req.path_params['versionId'],a,['R-02','R-04'])
+            p=get(c,'project',v['projectId'],a,['R-02','R-04'])
             if v['status']!='DRAFT' or p['status']=='ARCHIVED':fail(409,'Сроки изменяются только в черновике действующего проекта')
             previous=copy.deepcopy(v['allocations'])
             try:v,moved=reschedule(v,b['itemId'],b['start'],b['finish'])
@@ -351,8 +367,17 @@ def register(app, command_tx):
                     ('workName','Работа'),('workType','Тип работы'),('start','Начало работы'),('finish','Окончание работы'),
                     ('roleCode','Специализация'),('gradeCode','Грейд'),('employeeName','Сотрудник'),('employeeId','ID сотрудника'),
                     ('date','Дата назначения'),('hours','Назначено часов'),('status','Статус назначения')]
+            for row in rows:
+                budget = row['hourBudgetComparison']
+                row.update({k:v for k,v in budget.items() if k != 'status'})
+                row['budgetStatus'] = budget['status'] if budget['planVersionId'] else 'План отсутствует'
+                row['budgetNotSet'] = budget['hourBudget'] is None
             return workbook_response('Проекты',[('code','Код'),('name','Проект'),('status','Статус проекта'),('goal','Цель'),
-                ('managerSubject','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание')],rows,f,'projects',[
+                ('managerName','Руководитель'),('versionNumber','Версия плана'),('planStatus','Статус плана'),('start','Начало'),('finish','Окончание'),
+                ('hourBudget','Текущий бюджет, чел.-ч'),('budgetNotSet','Бюджет не задан'),('plannedHours','Потребность выбранной версии, чел.-ч'),
+                ('remainingHours','Остаток, чел.-ч'),('exceededHours','Превышение, чел.-ч'),('usagePercent','Использование, %'),('budgetStatus','Статус сравнения'),
+                ('planVersionId','ID выбранной версии'),('planVersionNumber','Номер выбранной версии'),('planVersionName','Название выбранной версии'),
+                ('planVersionStatus','Статус выбранной версии')],rows,f,'projects',[
                     ('Работы и сотрудники',common,detail),('Назначения',common,assignments),
                     ('Сотрудники',[('employeeName','Сотрудник'),('employeeId','ID сотрудника'),('projects','Проекты'),('workCount','Количество работ'),
                                   ('hours','Часы без отменённых'),('cancelledHours','Отменённые часы')],employees)])

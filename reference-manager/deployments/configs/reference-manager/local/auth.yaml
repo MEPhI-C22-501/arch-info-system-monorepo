@@ -20,5 +20,3 @@ auth:
     provisioner:
       client_id: reference-manager-provisioner
       request_timeout: 5s
-      # realm roles of a new account: a new employee reads the shared classifiers and HR references
-      default_realm_roles: [ reference-reader ]

@@ -1,4 +1,5 @@
 """Idempotent synthetic fixture, never writes HR or real accounts."""
+import os
 import uuid
 from . import storage as db
 from .auth import DEMO_PORTFOLIO as PORT, DEMO_PROJECT as PROJECT
@@ -7,9 +8,11 @@ def stable(name):return str(uuid.uuid5(uuid.NAMESPACE_URL,'planning-demo:'+name)
 def seed():
     with db.engine.begin() as c:
         if db.find(c,'project',PROJECT):return
-        db.put(c,'portfolio',{'id':PORT,'code':'DEMO','name':'Портфель ERP','status':'ACTIVE','ownerSubject':'demo-R-01'},PORT)
+        owner = os.getenv('DEMO_PORTFOLIO_OWNER_SUBJECT','demo-R-01')
+        manager = os.getenv('DEMO_PROJECT_MANAGER_SUBJECT','demo-R-03')
+        db.put(c,'portfolio',{'id':PORT,'code':'DEMO','name':'Портфель ERP','status':'ACTIVE','ownerSubject':owner},PORT)
         db.put(c,'project',{'id':PROJECT,'portfolioId':PORT,'programId':None,'code':'ERP-A','name':'ERP · планирование ресурсов',
-            'goal':'Демонстрация планирования','managerSubject':'demo-R-03','revision':1,'priority':1,'status':'DRAFT','activePlanVersionId':None},PORT,PROJECT)
+            'goal':'Демонстрация планирования','managerSubject':manager,'revision':1,'priority':1,'status':'DRAFT','activePlanVersionId':None},PORT,PROJECT)
         items=[]
         for n,kind,parent,start,finish,h in [('release','RELEASE',None,'2026-10-05','2026-10-09',6),('epic','EPIC','release','2026-10-05','2026-10-09',6),
             ('feature','FEATURE','epic','2026-10-05','2026-10-05',6),('milestone','MILESTONE','release','2026-10-09','2026-10-09',0)]:
@@ -22,7 +25,11 @@ def seed():
             'allocations':[{'id':stable('allocation'),'demandId':stable('demand'),'employeeId':'employees/demo-1','date':'2026-10-05','hours':6,'status':'PROPOSED'}],
             'revision':1,'contentRevision':1,'reviewRound':0,'kind':'PLAN','baseVersionId':None,'versionNumber':1,'status':'DRAFT','dataAsOf':None,
             'baselineBudget':18000,'currencyCode':'RUB','reviewers':[],'decisions':[]}
+        if os.environ.get('HR_MODE') == 'real':
+            plan['allocations'] = []
         db.put(c,'plan',plan,PORT,PROJECT)
+        if os.environ.get('HR_MODE') == 'real':
+            return
         for employee in ['employees/demo-1','employees/demo-2']:
             for day in range(5,10):
                 identifier=stable(employee+str(day));absence=4 if employee.endswith('1') and day==5 else 0

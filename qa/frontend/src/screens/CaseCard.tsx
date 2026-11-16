@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client';
@@ -9,7 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { formatDateTime, statusLabel } from '../labels';
 import { canDeleteCase, canEditAutotest, canEditCase, caseTransitions, isCaseReadOnly } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useLoad } from '../useLoad';
 import { useClassifiers } from '../useReferenceData';
 import { CaseFields } from './CaseFields';
@@ -56,7 +57,7 @@ type FormProps = {
 };
 
 function CaseEditor({ testCase, onSaved, onOpenLatest }: FormProps) {
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const toast = useToast();
   const classifiers = useClassifiers();
   const [values, setValues] = useState<CaseFormValues>(() => caseFormOf(testCase));
@@ -111,13 +112,14 @@ function CaseEditor({ testCase, onSaved, onOpenLatest }: FormProps) {
 export function CaseCard() {
   const { id = '' } = useParams();
   const session = useSession();
-  const { role } = session;
+  const role = sessionRoles(session);
   const navigate = useNavigate();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const requested = Number(params.get('version')) || undefined;
   const testCase = useLoad(() => getCase(id, requested), [id, requested]);
   const versions = useLoad(() => listCaseVersions(id), [id]);
+  const person = usePeople([testCase.data?.createdBy, ...(versions.data?.items.map(row => row.author) ?? [])]);
   const [actionError, setActionError] = useState<unknown>(null);
 
   if (!testCase.data) {
@@ -199,7 +201,7 @@ export function CaseCard() {
       <div className="panel">
         <h3>История версий</h3>
         <DataTable
-          columns={VERSION_COLUMNS}
+          columns={VERSION_COLUMNS.map(column => column.header === 'Автор' ? { ...column, render: (row: TestCaseVersionInfo) => person(row.author) } : column)}
           rows={versions.data?.items}
           rowKey={(row) => String(row.version)}
           onOpen={(row) => showVersion(row.version)}

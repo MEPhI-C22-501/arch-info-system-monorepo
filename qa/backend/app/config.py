@@ -3,6 +3,7 @@
 import os
 from dataclasses import dataclass
 from functools import cache
+from urllib.parse import urlsplit
 
 DEMO_AUTH_ENVS = {"development", "test"}
 
@@ -16,6 +17,8 @@ class Settings:
     tracker_sync_enabled: bool = True
     # Адрес интерфейса для ссылок testRunUrl и testCaseUrl в «Ошибке» (130, раздел 6.1).
     ui_base_url: str = "http://localhost:8090"
+    oidc_issuer: str = ""
+    oidc_jwks_url: str = ""
 
 
 @cache
@@ -24,13 +27,32 @@ def get_settings() -> Settings:
         database_url=os.getenv(
             "DATABASE_URL", "postgresql+psycopg://qa:qa-local@localhost:5435/qa"
         ),
-        app_env=os.getenv("APP_ENV", "development"),
-        auth_mode=os.getenv("AUTH_MODE", "demo"),
+        app_env=os.getenv("APP_ENV", "production"),
+        auth_mode=os.getenv("AUTH_MODE", "keycloak"),
         tracker_sync_enabled=os.getenv("TRACKER_SYNC_ENABLED", "true").lower() != "false",
         ui_base_url=os.getenv("UI_BASE_URL", "http://localhost:8090"),
+        oidc_issuer=os.getenv("OIDC_ISSUER", "").rstrip("/"),
+        oidc_jwks_url=os.getenv("OIDC_JWKS_URL", ""),
     )
     if settings.auth_mode == "keycloak":
-        raise RuntimeError("AUTH_MODE=keycloak ещё не реализован (TECH-09)")
+        urls = [settings.oidc_issuer]
+        if settings.oidc_jwks_url:
+            urls.append(settings.oidc_jwks_url)
+        for value in urls:
+            url = urlsplit(value)
+            local = (
+                settings.app_env in DEMO_AUTH_ENVS
+                and url.hostname in {"localhost", "127.0.0.1", "keycloak"}
+                and url.scheme == "http"
+            )
+            if (
+                not url.hostname
+                or url.username
+                or url.password
+                or not (url.scheme == "https" or local)
+            ):
+                raise RuntimeError("Нужен корректный OIDC URL")
+        return settings
     if settings.auth_mode != "demo":
         raise RuntimeError(f"Неизвестный AUTH_MODE: {settings.auth_mode}")
     if settings.app_env not in DEMO_AUTH_ENVS:

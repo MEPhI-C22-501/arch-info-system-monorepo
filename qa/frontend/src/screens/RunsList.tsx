@@ -1,3 +1,4 @@
+import { usePeople } from '../usePeople';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { listAllPlans } from '../api/plans';
@@ -11,12 +12,12 @@ import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { RUN_STATUSES, statusLabel } from '../labels';
 import { canCreateRun, canDeleteRun, canDeleteRuns } from '../permissions';
-import { useSession } from '../session';
+import { useSession, sessionRoles } from '../session';
 import { useListParams } from '../useListParams';
 import { useLoad } from '../useLoad';
 
 export function RunsList() {
-  const { role } = useSession();
+  const role = sessionRoles(useSession());
   const navigate = useNavigate();
   const toast = useToast();
   const { values, page, setFilter, setPage, reset } = useListParams();
@@ -24,6 +25,7 @@ export function RunsList() {
   const [deleteError, setDeleteError] = useState<unknown>(null);
   const [deleting, setDeleting] = useState(false);
   const runs = useLoad(() => listRuns({ ...values, page }), [values, page]);
+  const person = usePeople(runs.data?.items.map(row => row.startedBy) ?? []);
   // В прогоне только идентификаторы источника; названия берутся из списков наборов и планов.
   const suites = useLoad(() => listAllSuites(), ['suites']);
   const plans = useLoad(() => listAllPlans(), ['plans']);
@@ -58,7 +60,7 @@ export function RunsList() {
     { header: 'Ключ', render: (row) => row.key },
     { header: 'Источник', render: sourceOf },
     { header: 'Окружение', render: (row) => row.environment },
-    { header: 'Запуск', render: (row) => `${row.trigger} · ${row.startedBy}` },
+    { header: 'Запуск', render: (row) => `${row.trigger} · ${person(row.startedBy)}` },
     { header: 'Пройдено', render: (row) => row.summary.passed },
     { header: 'Провалено', render: (row) => row.summary.failed },
     { header: 'Осталось', render: (row) => row.summary.notRun },

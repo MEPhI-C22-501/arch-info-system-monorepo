@@ -5,12 +5,30 @@
   "sslRequired": "none",
   "accessTokenLifespan": 300,
   "roles": {
-    "realm": [
-      { "name": "reference-reader", "description": "Reads and exports shared classifiers and HR references (R-01)" },
-      { "name": "reference-admin", "description": "Maintains shared classifiers, reads HR references (R-02)" },
-      { "name": "reference-hr-admin", "description": "Maintains HR references, salaries and absences (R-04)" },
-      { "name": "reference-hr-reader", "description": "Reads all references including salaries and absences (R-05)" }
-    ]
+    "realm": [],
+    "client": {
+      "reference-manager": [
+        {
+          "name": "reference-reader",
+          "description": "Reads and exports shared classifiers and HR references (R-01)"
+        },
+        {
+          "name": "reference-admin",
+          "description": "Maintains shared classifiers, reads HR references (R-02)"
+        },
+        {
+          "name": "reference-hr-admin",
+          "description": "Maintains HR references, salaries and absences (R-04)"
+        },
+        {
+          "name": "reference-hr-reader",
+          "description": "Reads all references including salaries and absences (R-05)"
+        },
+        {
+          "name": "reference-profile-reader"
+        }
+      ]
+    }
   },
   "clients": [
     {
@@ -24,7 +42,8 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "secret": "__PROVISIONER_SECRET__",
-      "protocol": "openid-connect"
+      "protocol": "openid-connect",
+      "fullScopeAllowed": false
     },
     {
       "clientId": "reference-manager",
@@ -37,7 +56,8 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "protocol": "openid-connect"
+      "protocol": "openid-connect",
+      "fullScopeAllowed": false
     },
     {
       "clientId": "reference-manager-ui",
@@ -49,8 +69,14 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:8084/*", "http://localhost:8089/*"],
-      "webOrigins": ["http://localhost:8084", "http://localhost:8089"],
+      "redirectUris": [
+        "http://localhost:8084/*",
+        "http://localhost:8089/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8084",
+        "http://localhost:8089"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:8084/*"
@@ -69,7 +95,8 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     },
     {
       "clientId": "foreign-app",
@@ -81,7 +108,8 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "protocol": "openid-connect"
+      "protocol": "openid-connect",
+      "fullScopeAllowed": false
     },
     {
       "clientId": "reports-client",
@@ -108,7 +136,8 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     },
     {
       "clientId": "planning-service",
@@ -135,7 +164,8 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     },
     {
       "clientId": "task-tracker-service",
@@ -162,7 +192,8 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     },
     {
       "clientId": "qa-service",
@@ -189,7 +220,8 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false
     }
   ],
   "users": [
@@ -198,32 +230,57 @@
       "enabled": true,
       "serviceAccountClientId": "reference-manager-provisioner",
       "clientRoles": {
-        "realm-management": [ "manage-users", "view-users", "query-users", "view-realm" ]
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-realm"
+        ]
       }
     },
     {
       "username": "service-account-reports-client",
       "enabled": true,
       "serviceAccountClientId": "reports-client",
-      "realmRoles": ["reference-reader"]
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-reader"
+        ]
+      }
     },
     {
       "username": "service-account-planning-service",
       "enabled": true,
       "serviceAccountClientId": "planning-service",
-      "realmRoles": ["reference-hr-reader"]
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-hr-reader"
+        ]
+      }
     },
     {
       "username": "service-account-task-tracker-service",
       "enabled": true,
       "serviceAccountClientId": "task-tracker-service",
-      "realmRoles": ["reference-reader"]
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-reader"
+        ]
+      }
     },
     {
       "username": "service-account-qa-service",
       "enabled": true,
       "serviceAccountClientId": "qa-service",
-      "realmRoles": ["reference-reader"]
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-reader"
+        ]
+      }
     },
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -233,8 +290,19 @@
       "lastName": "Admin",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
-      "realmRoles": ["reference-admin"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-admin"
+        ]
+      }
     },
     {
       "id": "9b2e4c1a-7d3f-4e8a-b5c6-1f0a2d3e4b5c",
@@ -244,8 +312,19 @@
       "lastName": "Admin",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "second-admin", "temporary": false }],
-      "realmRoles": ["reference-admin"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "second-admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-admin"
+        ]
+      }
     },
     {
       "id": "c5a7e2d0-3b4f-4a19-8e6d-2f1b0c9d8e7a",
@@ -255,8 +334,19 @@
       "lastName": "Reader",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "reader", "temporary": false }],
-      "realmRoles": ["reference-reader"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "reader",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-reader"
+        ]
+      }
     },
     {
       "id": "d81f4b6c-2e9a-4c35-b7d0-6a5e4f3c2b1d",
@@ -266,8 +356,19 @@
       "lastName": "Admin",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "hr-admin", "temporary": false }],
-      "realmRoles": ["reference-hr-admin"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "hr-admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-hr-admin"
+        ]
+      }
     },
     {
       "id": "e2b9c8a7-6d5f-4e3a-9b1c-0f8e7d6c5b4a",
@@ -277,8 +378,19 @@
       "lastName": "Reader",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "hr-reader", "temporary": false }],
-      "realmRoles": ["reference-hr-reader"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "hr-reader",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {
+        "reference-manager": [
+          "reference-hr-reader"
+        ]
+      }
     },
     {
       "id": "f7a6b5c4-d3e2-4f1a-8b9c-1d2e3f4a5b6c",
@@ -288,8 +400,63 @@
       "lastName": "Roles",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "outsider", "temporary": false }],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "outsider",
+          "temporary": false
+        }
+      ],
       "realmRoles": []
     }
-  ]
+  ],
+  "clientScopeMappings": {
+    "reference-manager": [
+      {
+        "client": "reports-client",
+        "roles": [
+          "reference-reader"
+        ]
+      },
+      {
+        "client": "planning-service",
+        "roles": [
+          "reference-hr-reader"
+        ]
+      },
+      {
+        "client": "task-tracker-service",
+        "roles": [
+          "reference-reader"
+        ]
+      },
+      {
+        "client": "qa-service",
+        "roles": [
+          "reference-reader"
+        ]
+      },
+      {
+        "client": "reference-manager-ui",
+        "roles": [
+          "reference-reader",
+          "reference-admin",
+          "reference-hr-admin",
+          "reference-hr-reader",
+          "reference-profile-reader"
+        ]
+      }
+    ],
+    "realm-management": [
+      {
+        "client": "reference-manager-provisioner",
+        "roles": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-realm"
+        ]
+      }
+    ]
+  }
 }

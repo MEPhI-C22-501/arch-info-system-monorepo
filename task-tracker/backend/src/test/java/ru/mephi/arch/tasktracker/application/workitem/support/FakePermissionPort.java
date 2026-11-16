@@ -12,7 +12,7 @@ public class FakePermissionPort implements PermissionPort {
     public Set<String> granted = Set.of("item.create", "item.update", "item.status", "item.delete", "item.read");
 
     @Override public String currentSubject() { return subject; }
-    @Override public String currentRole() { return role; }
+    @Override public boolean ownOnly(String permission) { return "MEMBER".equals(role); }
 
     @Override public void require(String permission) {
         if (!granted.contains(permission)) throw new ApiException(403, "permission", "forbidden");

@@ -4,7 +4,7 @@ import { SavedViews } from '../SavedViews';
 import { useState } from 'react';
 import { date, hours, json, request, typeName } from '../api';
 import type { Item, Iteration, Json, Page } from '../api';
-import { can, selectName } from '../context';
+import { can, selectName, selectPerson } from '../context';
 import type { Context } from '../context';
 import { Badge } from '../components/Badge';
 import { Empty } from '../components/Empty';
@@ -95,7 +95,7 @@ export function Backlog({ context, revision, open, refresh }:
               <td>{typeName(item.type)}</td>
               <td><Badge tone={context.statuses.find(row => row.id === item.statusId)?.category === 'COMPLETED' ? 'green' : ''}>{selectName(context.statuses, item.statusId)}</Badge></td>
               <td>{selectName(context.priorities, item.priorityId)}</td>
-              <td>{selectName(context.users, item.assigneeId)}</td>
+              <td>{selectPerson(context.users, item.assigneeId)}</td>
               <td>{item.dueDate ? date(item.dueDate) : '—'}</td>
               <td className={item.remainingHours < 0 ? 'negative' : ''}>{hours(item.plannedHours)} / {hours(item.actualHours)} / {hours(item.remainingHours)}</td>
             </tr>)}</tbody>

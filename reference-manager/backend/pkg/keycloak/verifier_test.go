@@ -189,7 +189,7 @@ func TestVerifierAuthenticate(t *testing.T) {
 			token: key.sign(t, accessTokenClaims()),
 			want: &actor.Actor{
 				UserID: userID,
-				Roles:  []string{"default-roles-arch-info-system", "reference-admin", "reference-reader"},
+				Roles:  []string{"reference-admin", "reference-reader"},
 			},
 		},
 		"expired": {
@@ -334,7 +334,11 @@ func TestVerifierWithoutClientRoles(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = v.Shutdown(context.Background()) })
 
-	got, err := v.Authenticate(context.Background(), key.sign(t, accessTokenClaims()))
+	got, err := v.Authenticate(context.Background(), key.sign(t, func() jwt.MapClaims {
+		claims := accessTokenClaims()
+		delete(claims, "resource_access")
+		return claims
+	}()))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"default-roles-arch-info-system", "reference-reader"}, got.Roles)
+	assert.Empty(t, got.Roles)
 }

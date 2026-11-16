@@ -154,6 +154,35 @@ def reference(client, resource):
     raise Rejected("PAGE_LIMIT")
 
 
+def reference_profiles(client):
+    rows, seen = [], set()
+    cursor = None
+    for _ in range(10000):
+        params = {"pageSize": 100, "includeInactive": "true"}
+        if cursor:
+            params["pageToken"] = cursor
+        page = client.request("/v1/profiles", params)
+        if not isinstance(page, dict) or not isinstance(page.get("items"), list):
+            raise Rejected("INVALID_PROFILE_PAGE")
+        for row in page["items"]:
+            if not isinstance(row, dict) or not isinstance(row.get("displayName"), str) or not row["displayName"].strip():
+                raise Rejected("INVALID_PROFILE")
+            employee, user = row.get("employeeId"), row.get("userId")
+            if employee and type(employee) is int and employee > 0:
+                identifier = f"employees/{employee}"
+            elif user and isinstance(user, str):
+                identifier = f"users/{user}"
+            else:
+                raise Rejected("INVALID_PROFILE_ID")
+            rows.append(dict(row, id=identifier))
+        cursor = page.get("nextPageToken")
+        if not cursor:
+            return unique(rows)
+        if not isinstance(cursor, str) or cursor in seen or not page["items"]:
+            raise Rejected("REPEATED_PROFILE_CURSOR")
+        seen.add(cursor)
+    raise Rejected("PROFILE_PAGE_LIMIT")
+
 def export_slot(moment=None):
     """One UTC hour: at most one new Planning batch per portfolio per slot."""
     return (moment or datetime.now(timezone.utc)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H")

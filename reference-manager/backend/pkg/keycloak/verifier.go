@@ -3,6 +3,7 @@ package keycloak
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,8 +46,8 @@ func NewVerifier(cfg *Config, log *slog.Logger) (*Verifier, error) {
 		return nil, errors.New("issuer URL is required")
 	}
 
-	if len(cfg.Algorithms) == 0 {
-		return nil, errors.New("at least one signing algorithm is required")
+	if len(cfg.Algorithms) != 1 || cfg.Algorithms[0] != "RS256" {
+		return nil, errors.New("RS256 signing is required")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,13 +81,19 @@ func NewVerifier(cfg *Config, log *slog.Logger) (*Verifier, error) {
 		jwt.WithExpirationRequired(),
 		jwt.WithIssuedAt(),
 	}
-	if cfg.Audience != "" {
-		options = append(options, jwt.WithAudience(cfg.Audience))
+	audience := cfg.Audience
+	if audience == "" {
+		audience = "reference-manager"
+	}
+	options = append(options, jwt.WithAudience(audience))
+	clientID := cfg.ClientID
+	if clientID == "" {
+		clientID = "reference-manager"
 	}
 
 	return &Verifier{
 		log:      log,
-		clientID: cfg.ClientID,
+		clientID: clientID,
 		keyfunc:  kf,
 		parser:   jwt.NewParser(options...),
 		cancel:   cancel,
@@ -94,19 +101,18 @@ func NewVerifier(cfg *Config, log *slog.Logger) (*Verifier, error) {
 }
 
 type roles struct {
-	Roles []string `json:"roles"`
+	Roles []any `json:"roles"`
 }
 
 type claims struct {
 	jwt.RegisteredClaims
 
-	Type           string           `json:"typ"`
-	RealmAccess    roles            `json:"realm_access"`
-	ResourceAccess map[string]roles `json:"resource_access"`
+	Type           string          `json:"typ"`
+	ResourceAccess json.RawMessage `json:"resource_access"`
 }
 
 // Authenticate verifies the access token and returns its actor: the user ID from the "sub" claim
-// and the realm roles together with the roles of the configured client.
+// and the roles of the configured client.
 func (v *Verifier) Authenticate(ctx context.Context, token string) (*actor.Actor, error) {
 	var c claims
 	if _, err := v.parser.ParseWithClaims(token, &c, v.keyfunc.KeyfuncCtx(ctx)); err != nil {
@@ -122,9 +128,19 @@ func (v *Verifier) Authenticate(ctx context.Context, token string) (*actor.Actor
 		return nil, fmt.Errorf("%w: subject is not a user ID: %w", ErrInvalidToken, err)
 	}
 
-	tokenRoles := slices.Clone(c.RealmAccess.Roles)
-	if v.clientID != "" {
-		tokenRoles = append(tokenRoles, c.ResourceAccess[v.clientID].Roles...)
+	var clients map[string]json.RawMessage
+	var entry roles
+	var tokenRoles []string
+	if json.Unmarshal(c.ResourceAccess, &clients) == nil &&
+		json.Unmarshal(clients[v.clientID], &entry) == nil {
+		for _, raw := range entry.Roles {
+			role, ok := raw.(string)
+			if !ok {
+				tokenRoles = nil
+				break
+			}
+			tokenRoles = append(tokenRoles, role)
+		}
 	}
 
 	slices.Sort(tokenRoles)

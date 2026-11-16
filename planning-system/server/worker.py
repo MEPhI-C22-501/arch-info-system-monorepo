@@ -61,7 +61,15 @@ def tick():
 
 if __name__=='__main__':
     logging.basicConfig(level=logging.INFO);db.migrate()
+    next_refresh = 0
     while True:
+        if os.environ.get('RM_BASE_URL') and time.monotonic() >= next_refresh:
+            from .reference_manager import ReferenceManagerClient, refresh_cache
+            try:
+                refresh_cache(ReferenceManagerClient.from_env())
+            except Exception:
+                log.warning('Reference Manager refresh failed; keeping previous snapshot')
+            next_refresh = time.monotonic() + 900
         try:tick()
         except Exception:log.exception('worker tick failed')
         time.sleep(2)

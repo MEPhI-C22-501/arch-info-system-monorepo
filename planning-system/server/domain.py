@@ -41,7 +41,7 @@ def validate_draft(d):
     if len(demands)!=len(d['demands']):fail(422,'Дубли потребностей')
     for v in demands.values():
         i=items.get(v['planItemId'])
-        if not i or i['id'] in tree:fail(422,'Потребность задаётся листу этой версии')
+        if not i or i['id'] in tree or i['type']=='MILESTONE':fail(422,'Потребность задаётся листу этой версии')
         if not i['start']<=v['periodStart']<=v['periodEnd']<=i['finish']:fail(422,'Потребность вне дат работы')
     if len({a['id'] for a in d['allocations']})!=len(d['allocations']):fail(422,'Дубли назначений')
     for a in d['allocations']:

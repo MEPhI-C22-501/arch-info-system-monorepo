@@ -197,11 +197,11 @@ def test_oidc_signature_issuer_audience_expiry(client,monkeypatch):
     monkeypatch.setattr(app.state,'jwks',Keys(),raising=False)
     monkeypatch.setenv('AUTH_MODE','oidc');monkeypatch.setenv('OIDC_ISSUER','https://issuer.test/realm');monkeypatch.setenv('OIDC_AUDIENCE','planning-api')
     claims={'sub':'test-planner','iat':int(time.time()),'exp':int(time.time())+60,'iss':'https://issuer.test/realm','aud':'planning-api',
-            'realm_access':{'roles':['PLANNER']},'portfolio_ids':[PORT],'project_ids':[PID]}
+            'typ':'Bearer','realm_access':{'roles':['PLANNER']},'resource_access':{'planning-system':{'roles':['PLANNER']}},'portfolio_ids':[PORT],'project_ids':[PID]}
     def request(value,key=private):
         token=jwt.encode(value,key,algorithm='RS256');return client.get('/api/v1/projects/'+PID,headers={'Authorization':'Bearer '+token})
     assert request(claims).status_code==200
-    assert request({**claims,'realm_access':{'roles':[]}}).status_code==403
+    assert request({**claims,'resource_access':{'reports':{'roles':['PLANNER']}}}).status_code==403
     monkeypatch.setenv('OIDC_ISSUER','https://issuer.test/realm/')
     assert request(claims).status_code==200
     for field,value in [('iss','https://other.test'),('aud','other-api'),('exp',int(time.time())-60)]:assert request({**claims,field:value}).status_code==401

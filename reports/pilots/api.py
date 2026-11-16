@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import jwt
 from db import Database
+from oidc import claims_for
 
 GROUPS = {"project": "project_id", "employee": "user_id", "month": "substr(logged_date,1,7)", "record": "id"}
 
@@ -119,10 +120,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not token.startswith("Bearer "):
                     raise jwt.InvalidTokenError()
                 token = token[7:]
-                key = self.jwks.get_signing_key_from_jwt(token).key
-                claims = jwt.decode(token, key, algorithms=["RS256"], audience="reports",
-                                    issuer=os.environ["REPORTS_OIDC_ISSUER"],
-                                    options={"require": ["exp", "iat", "sub", "iss", "aud"]})
+                claims = claims_for(token, self.jwks)
                 # The legacy helper predates 070. Never expose its historical
                 # admin shortcut through HTTP; business-wide access is analyst.
                 from report_engine import roles as client_roles

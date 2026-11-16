@@ -1050,6 +1050,72 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+  /auth/config:
+    get:
+      operationId: getAuthConfig
+      security: []
+      responses:
+        '200':
+          description: Browser OIDC configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, issuer, clientId]
+                properties:
+                  mode: { type: string, enum: [demo, keycloak] }
+                  issuer: { type: string }
+                  clientId: { type: string }
+  /profile:
+    get:
+      operationId: getProfile
+      responses:
+        '200':
+          description: Current user's cached profile, or null until available
+          content:
+            application/json:
+              schema: {nullable: true, allOf: [{$ref: '#/components/schemas/UserProfile'}]}
+        '403': {$ref: '#/components/responses/Error'}
+  /profiles/resolve:
+    post:
+      operationId: resolveProfiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subjects]
+              properties:
+                subjects: {type: array, minItems: 1, maxItems: 100, items: {type: string}}
+      responses:
+        '200':
+          description: Cached names for visible QA subjects
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/UserProfile'}}
+        '403': {$ref: '#/components/responses/Error'}
+  /profiles/assignees:
+    get:
+      operationId: listEligibleAssignees
+      parameters:
+        - {name: q, in: query, schema: {type: string, maxLength: 120}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Active employees with a fresh profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, totalPages]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/UserProfile'}}
+                  page: {type: integer}
+                  pageSize: {type: integer}
+                  totalPages: {type: integer}
+        '403': {$ref: '#/components/responses/Error'}
   /reports/{resource}:
     parameters:
       - name: resource
@@ -1059,7 +1125,7 @@ paths:
     get:
       tags: [reports]
       operationId: listReportData
-      summary: Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+      summary: Read-only paginated data for the reporting service (role qa-reports-reader)
       parameters:
         - { name: updatedSince, in: query, schema: { type: string, format: date-time } }
         - { $ref: '#/components/parameters/Page' }
@@ -1115,6 +1181,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    UserProfile:
+      type: object
+      required: [accountUserId, displayName]
+      properties:
+        accountUserId: {type: string}
+        displayName: {type: string}
     TestCaseStatus: { type: string, enum: [DRAFT, ACTUAL, NEEDS_UPDATE, ARCHIVED] }
     TestPlanStatus: { type: string, enum: [DRAFT, ACTIVE, COMPLETED, CANCELLED] }
     RunStatus: { type: string, enum: [CREATED, IN_PROGRESS, COMPLETED, ABORTED] }

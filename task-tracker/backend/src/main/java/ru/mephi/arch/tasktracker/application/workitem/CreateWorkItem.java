@@ -62,7 +62,7 @@ public class CreateWorkItem {
         WorkItem parent = parentId == null ? null : workItems.getById(parentId);
 
         String assignee = nullableString(input.get("assigneeId"));
-        if (source == null && "MEMBER".equals(permissions.currentRole()) && assignee == null) assignee = actor;
+        if (source == null && permissions.ownOnly("item.create") && assignee == null) assignee = actor;
         if (assignee != null && !directory.isActive(assignee)) throw ApiException.invalid("assigneeId", "unknown_or_inactive");
 
         LocalDate start = Values.date(input.get("startDate"), "startDate");

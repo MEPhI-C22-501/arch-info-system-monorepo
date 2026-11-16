@@ -1,5 +1,6 @@
 import { ReactElement } from 'react';
-import { Role } from './session';
+import { hasRole } from './session';
+import type { Role, RoleSelection } from './session';
 import { Admin } from './screens/Admin';
 import { CaseCard } from './screens/CaseCard';
 import { CaseCreate } from './screens/CaseCreate';
@@ -50,17 +51,17 @@ export const routes: AppRoute[] = [
   { path: '/admin', element: <Admin />, menu: 'Администрирование', roles: ['qa-admin'] },
 ];
 
-export function isRouteAllowed(route: Pick<AppRoute, 'roles'>, role: Role): boolean {
-  return !route.roles || route.roles.includes(role);
+export function isRouteAllowed(route: Pick<AppRoute, 'roles'>, role: RoleSelection): boolean {
+  return !route.roles || hasRole(role, ...route.roles);
 }
 
-export function menuFor(role: Role): { path: string; label: string }[] {
+export function menuFor(role: RoleSelection): { path: string; label: string }[] {
   return routes.flatMap((route) => (route.menu && isRouteAllowed(route, role) ? [{ path: route.path, label: route.menu }] : []));
 }
 
 // Стартовый экран по роли (110, раздел 3); экрана «мои кейсы» тестировщика нет, ему — выполняющиеся прогоны.
-export function startPath(role: Role): string {
-  if (role === 'qa-lead') return '/overview';
-  if (role === 'qa-tester') return '/runs?status=IN_PROGRESS';
+export function startPath(role: RoleSelection): string {
+  if (hasRole(role, 'qa-lead')) return '/overview';
+  if (hasRole(role, 'qa-tester')) return '/runs?status=IN_PROGRESS';
   return '/test-cases';
 }
