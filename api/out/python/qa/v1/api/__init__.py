@@ -2,6 +2,7 @@
 
 # import apis into api package
 from qa.v1.api.admin_api import AdminApi
+from qa.v1.api.default_api import DefaultApi
 from qa.v1.api.defects_api import DefectsApi
 from qa.v1.api.health_api import HealthApi
 from qa.v1.api.reports_api import ReportsApi

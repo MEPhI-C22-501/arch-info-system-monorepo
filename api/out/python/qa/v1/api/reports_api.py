@@ -59,7 +59,7 @@ class ReportsApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> ListReportData200Response:
-        """Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+        """Read-only paginated data for the reporting service (role qa-reports-reader)
 
 
         :param resource: (required)
@@ -138,7 +138,7 @@ class ReportsApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> ApiResponse[ListReportData200Response]:
-        """Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+        """Read-only paginated data for the reporting service (role qa-reports-reader)
 
 
         :param resource: (required)
@@ -217,7 +217,7 @@ class ReportsApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+        """Read-only paginated data for the reporting service (role qa-reports-reader)
 
 
         :param resource: (required)

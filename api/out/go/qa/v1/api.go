@@ -31,6 +31,16 @@ type AdminAPIRouter interface {
 	ReplaceTrackerStatusMapping(http.ResponseWriter, *http.Request)
 }
 
+// DefaultAPIRouter defines the required methods for binding the api requests to a responses for the DefaultAPI
+// The DefaultAPIRouter implementation should parse necessary information from the http request,
+// pass the data to a DefaultAPIServicer to perform the required actions, then write the service results to the http response.
+type DefaultAPIRouter interface {
+	GetAuthConfig(http.ResponseWriter, *http.Request)
+	GetProfile(http.ResponseWriter, *http.Request)
+	ResolveProfiles(http.ResponseWriter, *http.Request)
+	ListEligibleAssignees(http.ResponseWriter, *http.Request)
+}
+
 // DefectsAPIRouter defines the required methods for binding the api requests to a responses for the DefectsAPI
 // The DefectsAPIRouter implementation should parse necessary information from the http request,
 // pass the data to a DefectsAPIServicer to perform the required actions, then write the service results to the http response.
@@ -138,6 +148,17 @@ type AdminAPIServicer interface {
 	UpdateEnvironment(context.Context, string, EnvironmentUpdate) (ImplResponse, error)
 	GetTrackerStatusMapping(context.Context) (ImplResponse, error)
 	ReplaceTrackerStatusMapping(context.Context, TrackerStatusMappingInput) (ImplResponse, error)
+}
+
+// DefaultAPIServicer defines the api actions for the DefaultAPI service
+// This interface intended to stay up to date with the openapi yaml used to generate it,
+// while the service implementation can be ignored with the .openapi-generator-ignore file
+// and updated with the logic required for the API.
+type DefaultAPIServicer interface {
+	GetAuthConfig(context.Context) (ImplResponse, error)
+	GetProfile(context.Context) (ImplResponse, error)
+	ResolveProfiles(context.Context, ResolveProfilesRequest) (ImplResponse, error)
+	ListEligibleAssignees(context.Context, string, int32, int32) (ImplResponse, error)
 }
 
 // DefectsAPIServicer defines the api actions for the DefectsAPI service

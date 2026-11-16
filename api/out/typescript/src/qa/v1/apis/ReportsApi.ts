@@ -92,7 +92,7 @@ export class ReportsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+     * Read-only paginated data for the reporting service (role qa-reports-reader)
      */
     async listReportDataRaw(requestParameters: ListReportDataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ListReportData200Response>> {
         const requestOptions = await this.listReportDataRequestOpts(requestParameters);
@@ -102,7 +102,7 @@ export class ReportsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+     * Read-only paginated data for the reporting service (role qa-reports-reader)
      */
     async listReportData(requestParameters: ListReportDataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ListReportData200Response> {
         const response = await this.listReportDataRaw(requestParameters, initOverrides);

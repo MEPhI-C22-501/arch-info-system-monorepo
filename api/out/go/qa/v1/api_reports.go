@@ -72,7 +72,7 @@ func (c *ReportsAPIController) OrderedRoutes() []Route {
 	}
 }
 
-// ListReportData - Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+// ListReportData - Read-only paginated data for the reporting service (role qa-reports-reader)
 func (c *ReportsAPIController) ListReportData(w http.ResponseWriter, r *http.Request) {
 	query, err := parseQuery(r.URL.RawQuery)
 	if err != nil {

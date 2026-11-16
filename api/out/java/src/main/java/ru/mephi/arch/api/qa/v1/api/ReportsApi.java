@@ -165,7 +165,7 @@ public class ReportsApi {
   }
 
   /**
-   * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+   * Read-only paginated data for the reporting service (role qa-reports-reader)
    * 
    * @param resource  (required)
    * @param updatedSince  (optional)
@@ -179,7 +179,7 @@ public class ReportsApi {
   }
 
   /**
-   * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+   * Read-only paginated data for the reporting service (role qa-reports-reader)
    * 
    * @param resource  (required)
    * @param updatedSince  (optional)
@@ -195,7 +195,7 @@ public class ReportsApi {
   }
 
   /**
-   * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+   * Read-only paginated data for the reporting service (role qa-reports-reader)
    * 
    * @param resource  (required)
    * @param updatedSince  (optional)
@@ -209,7 +209,7 @@ public class ReportsApi {
   }
 
   /**
-   * Planned, not implemented yet - read-only paginated data for the reporting service (role qa-reports-reader)
+   * Read-only paginated data for the reporting service (role qa-reports-reader)
    * 
    * @param resource  (required)
    * @param updatedSince  (optional)

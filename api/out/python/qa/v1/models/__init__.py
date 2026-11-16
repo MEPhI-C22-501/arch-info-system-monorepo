@@ -41,10 +41,12 @@ from qa.v1.models.environment_update import EnvironmentUpdate
 from qa.v1.models.error import Error
 from qa.v1.models.error_errors_inner import ErrorErrorsInner
 from qa.v1.models.export_test_cases_request import ExportTestCasesRequest
+from qa.v1.models.get_auth_config200_response import GetAuthConfig200Response
 from qa.v1.models.import_report import ImportReport
 from qa.v1.models.import_report_errors_inner import ImportReportErrorsInner
 from qa.v1.models.last_result import LastResult
 from qa.v1.models.list_defect_history200_response import ListDefectHistory200Response
+from qa.v1.models.list_eligible_assignees200_response import ListEligibleAssignees200Response
 from qa.v1.models.list_report_data200_response import ListReportData200Response
 from qa.v1.models.list_test_case_versions200_response import ListTestCaseVersions200Response
 from qa.v1.models.plan_cases_input import PlanCasesInput
@@ -52,6 +54,7 @@ from qa.v1.models.plan_summary import PlanSummary
 from qa.v1.models.plan_summary_cases_inner import PlanSummaryCasesInner
 from qa.v1.models.plan_summary_counters import PlanSummaryCounters
 from qa.v1.models.plan_summary_open_defects_inner import PlanSummaryOpenDefectsInner
+from qa.v1.models.resolve_profiles_request import ResolveProfilesRequest
 from qa.v1.models.result_input import ResultInput
 from qa.v1.models.result_input_steps_inner import ResultInputStepsInner
 from qa.v1.models.result_status import ResultStatus
@@ -89,4 +92,5 @@ from qa.v1.models.tracker_status_mapping_input import TrackerStatusMappingInput
 from qa.v1.models.tracker_status_mapping_item import TrackerStatusMappingItem
 from qa.v1.models.tracker_status_mapping_row import TrackerStatusMappingRow
 from qa.v1.models.transition_defect_request import TransitionDefectRequest
+from qa.v1.models.user_profile import UserProfile
 
