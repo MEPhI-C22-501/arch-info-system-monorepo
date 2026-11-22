@@ -45,6 +45,13 @@ class UpdateWorkItemTest {
         assertTrue(events.published.isEmpty());
     }
 
+    @Test void formattingAnUnchangedEstimateDoesNotAddAnAuditEvent() {
+        repo.getById(itemId).plannedHours = new java.math.BigDecimal("4.00");
+        updateWorkItem.execute(itemId, java.util.Map.of("plannedHours", "4"), "member-1", null);
+        assertEquals(0L, repo.getById(itemId).version);
+        assertTrue(events.published.isEmpty());
+    }
+
     @Test void changingStatusWithoutItemStatusPermissionIsRejected() {
         permissions.granted = java.util.Set.of("item.update");
         var input = new LinkedHashMap<String, Object>();

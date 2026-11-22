@@ -62,6 +62,7 @@ public class IterationService {
     private Map<String,Object> metrics(UUID id) {
         var selected=memberIds(id);
         Set<UUID> leafIds=new LinkedHashSet<>();
+        Set<UUID> allIds=new LinkedHashSet<>();
         List<Map<String,Object>> itemViews=new ArrayList<>();
         Map<String,Integer> statusCounts=new TreeMap<>();int completeCount=0;List<String> warnings=new ArrayList<>();
         LocalDate start=((Date)raw(id).get("start_date")).toLocalDate(),end=((Date)raw(id).get("end_date")).toLocalDate();
@@ -74,6 +75,7 @@ public class IterationService {
             if(view.get("dueDate")!=null){LocalDate due=((Date)view.get("dueDate")).toLocalDate();if(due.isBefore(start)||due.isAfter(end))warnings.add("Срок вне итерации: "+itemId);}
             var leaves=db.queryForList("WITH RECURSIVE d AS (SELECT id FROM work_item WHERE id=? UNION ALL SELECT w.id FROM work_item w JOIN d ON w.parent_id=d.id) SELECT d.id FROM d WHERE NOT EXISTS(SELECT 1 FROM work_item c WHERE c.parent_id=d.id)",UUID.class,itemId);
             leafIds.addAll(leaves);
+            allIds.addAll(db.queryForList("WITH RECURSIVE d AS (SELECT id FROM work_item WHERE id=? UNION ALL SELECT w.id FROM work_item w JOIN d ON w.parent_id=d.id) SELECT id FROM d",UUID.class,itemId));
         }
         BigDecimal planned=BigDecimal.ZERO,actual=BigDecimal.ZERO;
         Map<String,BigDecimal> load=new TreeMap<>(), spentByAssignee=new TreeMap<>();
@@ -82,12 +84,15 @@ public class IterationService {
             if(hours==null)warnings.add("Нет оценки: "+leaf);else planned=planned.add(hours);
             String assignee=(String)item.get("assignee_external_id");
             if(assignee==null)warnings.add("Нет исполнителя: "+leaf);else load.merge(assignee,hours==null?BigDecimal.ZERO:hours,BigDecimal::add);
-            BigDecimal spent=db.queryForObject("SELECT COALESCE(SUM(hours),0) FROM time_log_entry WHERE work_item_id=?",BigDecimal.class,leaf);actual=actual.add(spent);
-            if(assignee!=null)spentByAssignee.merge(assignee,spent,BigDecimal::add);
+
+        }
+        for(UUID itemId:allIds) for(var entry:db.queryForList("SELECT external_user_id,hours FROM time_log_entry WHERE work_item_id=?",itemId)) {
+            BigDecimal spent=(BigDecimal)entry.get("hours");actual=actual.add(spent);
+            spentByAssignee.merge((String)entry.get("external_user_id"),spent,BigDecimal::add);
         }
         List<Map<String,Object>> capacity=new ArrayList<>();BigDecimal totalCapacity=BigDecimal.ZERO;
         var capacities=db.queryForList("SELECT external_user_id,available_hours FROM capacity_entry WHERE iteration_id=? ORDER BY external_user_id",id);
-        Set<String> users=new TreeSet<>(load.keySet());for(var c:capacities)users.add((String)c.get("external_user_id"));
+        Set<String> users=new TreeSet<>(load.keySet());users.addAll(spentByAssignee.keySet());for(var c:capacities)users.add((String)c.get("external_user_id"));
         for(String user:users){
             BigDecimal available=capacities.stream().filter(c->user.equals(c.get("external_user_id"))).map(c->(BigDecimal)c.get("available_hours")).findFirst().orElse(BigDecimal.ZERO);
             totalCapacity=totalCapacity.add(available);BigDecimal assigned=load.getOrDefault(user,BigDecimal.ZERO);

@@ -21,6 +21,8 @@ public class InMemoryWorkItemRepository implements WorkItemRepository {
     @Override public void update(WorkItem item) { items.put(item.id, item); }
     @Override public void delete(UUID id) { items.remove(id); }
 
+    @Override public List<LinkReference> findLinks(UUID id) { return List.of(); }
+
     @Override public boolean hasChildren(UUID id) { return items.values().stream().anyMatch(w -> id.equals(w.parentId)); }
 
     @Override public List<WorkItem.ChildSummary> findChildren(UUID id) {

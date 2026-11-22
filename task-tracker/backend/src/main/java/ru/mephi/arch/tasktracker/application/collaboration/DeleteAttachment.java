@@ -34,6 +34,6 @@ public class DeleteAttachment {
         attachments.delete(attachmentId);
         workItems.touch(workItemId);
         events.publish(new AttachmentChanged(workItemId, permissions.currentSubject(), null,
-            Map.of("attachmentRemoved", false), Map.of("attachmentRemoved", attachmentId.toString()), "Удалён файл"));
+            Map.of("attachmentRemoved", false), Map.of("attachmentRemoved", attachmentId.toString(), "attachmentName", attachment.fileName), "Удалён файл"));
     }
 }

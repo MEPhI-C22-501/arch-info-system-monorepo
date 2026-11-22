@@ -29,7 +29,7 @@ class IntegrationControllerTest {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         db = new JdbcTemplate(source);
         try (var connection = source.getConnection(); var statement = connection.createStatement()) {
-            for (String file : List.of("001-initial.sql", "002-review.sql"))
+            for (String file : List.of("001-initial.sql", "002-review.sql", "003-planning.sql"))
                 statement.execute(new ClassPathResource("db/changelog/" + file).getContentAsString(StandardCharsets.UTF_8));
         }
     }
@@ -64,6 +64,52 @@ class IntegrationControllerTest {
         db.update("INSERT INTO work_item(id,type,title,description,status_id,priority_id,created_at,updated_at) VALUES(?,'TASK',?,'',"
             + "'00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000201',now(),now())", id, title);
         return id;
+    }
+
+    @Test void singleTaskExcelCanBeEditedAndImportedWithoutChangingOtherTasks() throws Exception {
+        UUID selected = seedWorkItem("Selected task"), other = seedWorkItem("Other task");
+        authAs("lead", "LEAD");
+        var access = new AccessService(db);
+        var changes = new ChangeRecorder(db);
+        var items = new WorkItemService(db, access, changes);
+        var excel = new ExcelService(db, access, items, new IterationService(db, access, items, changes));
+        byte[] exported = excel.export(Map.of("ids", List.of(selected.toString())));
+        byte[] edited;
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(exported));
+             var bytes = new java.io.ByteArrayOutputStream()) {
+            var sheet = book.getSheet("WorkItems");
+            assertEquals(1, sheet.getLastRowNum());
+            assertEquals(selected.toString(), sheet.getRow(1).getCell(0).getStringCellValue());
+            sheet.getRow(1).getCell(3).setCellValue("Updated from Excel");
+            book.write(bytes);
+            edited = bytes.toByteArray();
+        }
+        var report = excel.importFile(new org.springframework.mock.web.MockMultipartFile("file", "task.xlsx", "application/octet-stream", edited));
+        assertEquals(1, report.get("updated"));
+        assertEquals(0, report.get("created"));
+        assertEquals(0, report.get("rejected"));
+        assertEquals("Updated from Excel", items.raw(selected).get("title"));
+        assertEquals("Other task", items.raw(other).get("title"));
+        assertThrows(ApiException.class, () -> excel.export(Map.of("ids", List.of())));
+        assertThrows(ApiException.class, () -> excel.export(Map.of("ids", "invalid")));
+        assertEquals(404, assertThrows(ApiException.class, () -> excel.export(Map.of("ids", List.of(UUID.randomUUID())))).status);
+    }
+
+    @Test void allDatedReportsRejectReversedPeriods() {
+        authAs("reports-account", "reports-service");
+        var filters = Map.of("periodFrom", "2026-11-20", "periodTo", "2026-11-01");
+        assertThrows(ApiException.class, () -> controller().reportItems(filters));
+        assertThrows(ApiException.class, () -> controller().reportIterations(filters));
+        assertThrows(ApiException.class, () -> controller().reportTimeLogs(filters));
+        assertThrows(ApiException.class, () -> controller().reportHistory(filters));
+    }
+
+    @Test void aVeryLargePageIsEmptyRatherThanOverflowing() {
+        seedWorkItem("Task");
+        authAs("reports-account", "reports-service");
+        var result = (Map<?, ?>) controller().reportItems(Map.of("page", "2147483647", "pageSize", "500"));
+        assertEquals(List.of(), result.get("items"));
+        assertEquals(1L, ((Number) result.get("total")).longValue());
     }
 
     @Test void reportPagesIncludeTheirRealTotalNotJustTheSlicePage() {

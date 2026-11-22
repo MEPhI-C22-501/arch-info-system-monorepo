@@ -11,7 +11,7 @@ import java.util.*;
 @Service
 public class ChangeRecorder {
     private final JdbcTemplate db;
-    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     public ChangeRecorder(JdbcTemplate db) { this.db = db; }
     public String json(Object value) {
         try { return json.writeValueAsString(value); }

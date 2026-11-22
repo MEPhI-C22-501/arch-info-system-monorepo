@@ -1,6 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
-import { auth, date, request } from './api';
+import { auth, request } from './api';
 import type { Status, Priority, User } from './api';
 import { can, emptyContext, selectPerson } from './context';
 import type { Context } from './context';
@@ -83,12 +83,16 @@ export function App() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-icon">T</span><div><strong>Task Tracker</strong><small>Рабочее пространство</small></div></div>
       <nav aria-label="Основная навигация">{nav.filter(visible).map(([key, icon]) =>
-        <button key={key} className={`nav-link ${screen === key ? 'active' : ''}`} onClick={() => { setScreen(key); }}><span>{icon}</span>{titles[key]}</button>)}</nav>
+        <button key={key} className={`nav-link ${screen === key ? 'active' : ''}`}
+          aria-label={titles[key]} aria-current={screen === key ? 'page' : undefined} title={titles[key]}
+          onClick={() => setScreen(key)}>
+          <span className="nav-icon" aria-hidden="true">{icon}</span>
+          <span className="nav-label">{titles[key]}</span>
+        </button>)}</nav>
       <div className="sidebar-footer"><div className="avatar">{context.roles[0]?.charAt(0)}</div><div><strong>{selectPerson(context.users, context.userId)}</strong><small>{context.roles.join(", ")}</small></div>
         <button title="Выйти" onClick={() => void auth.signoutRedirect()}>↗</button></div>
     </aside>
     <main className="main">
-      <header className="topbar"><div><span className="eyebrow">КОМАНДНАЯ РАБОТА</span><h1>{titles[screen]}</h1></div><span className="today">{date(new Date().toISOString())}</span></header>
       {screen === 'backlog' && <Backlog context={context} revision={revision} open={select} refresh={refresh} />}
       {screen === 'board' && <Board context={context} revision={revision} open={select} refresh={refresh} />}
       {screen === 'iterations' && <Iterations key={location.pathname} context={context} revision={revision} open={select} refresh={refresh} />}

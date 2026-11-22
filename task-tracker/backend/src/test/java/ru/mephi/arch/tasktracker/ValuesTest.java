@@ -8,6 +8,13 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ValuesTest {
+    @Test void invalidVersionsAreValidationErrors() {
+        assertEquals(0, Values.version("0"));
+        for (Object value : new Object[] {"bad", "1.5", "-1", "9223372036854775808", true}) {
+            assertEquals("invalid_integer", assertThrows(ApiException.class, () -> Values.version(value)).getMessage());
+        }
+        assertThrows(ApiException.class, () -> Values.version(null));
+    }
     @Test void requiredTextIsTrimmedAndBlankRejected() {
         assertEquals("Задача", Values.str(Map.of("title", "  Задача  "), "title", true));
         assertEquals("required", assertThrows(ApiException.class,

@@ -35,6 +35,7 @@ public class IterationMetricsCalculator {
         Iteration iteration = iterations.getById(iterationId);
         List<UUID> selected = iterations.findActiveMemberIds(iterationId);
         Set<UUID> leafIds = new LinkedHashSet<>();
+        Set<UUID> allIds = new LinkedHashSet<>();
         List<Map<String, Object>> itemViews = new ArrayList<>();
         Map<String, Integer> statusCounts = new TreeMap<>();
         int completeCount = 0;
@@ -48,9 +49,10 @@ public class IterationMetricsCalculator {
             if ("COMPLETED".equals(status.category())) completeCount++;
             Object dueDate = view.get("dueDate");
             if (dueDate instanceof LocalDate due && (due.isBefore(iteration.startDate) || due.isAfter(iteration.endDate))) {
-                warnings.add("Срок вне итерации: " + itemId);
+                warnings.add("Срок вне итерации: «" + view.get("title") + "»");
             }
             leafIds.addAll(workItems.findLeafDescendantIds(itemId));
+            allIds.addAll(workItems.findDescendantIds(itemId));
         }
 
         BigDecimal planned = BigDecimal.ZERO;
@@ -60,19 +62,23 @@ public class IterationMetricsCalculator {
         for (UUID leaf : leafIds) {
             var item = workItems.getById(leaf);
             BigDecimal hours = item.plannedHours;
-            if (hours == null) warnings.add("Нет оценки: " + leaf); else planned = planned.add(hours);
+            if (hours == null) warnings.add("Нет оценки: «" + item.title + "»"); else planned = planned.add(hours);
             String assignee = item.assigneeId;
-            if (assignee == null) warnings.add("Нет исполнителя: " + leaf);
+            if (assignee == null) warnings.add("Нет исполнителя: «" + item.title + "»");
             else load.merge(assignee, hours == null ? BigDecimal.ZERO : hours, BigDecimal::add);
-            BigDecimal spent = timeLogs.sumHoursForWorkItem(leaf);
-            actual = actual.add(spent);
-            if (assignee != null) spentByAssignee.merge(assignee, spent, BigDecimal::add);
+        }
+        for (UUID itemId : allIds) {
+            for (var entry : timeLogs.findByWorkItem(itemId)) {
+                actual = actual.add(entry.hours);
+                spentByAssignee.merge(entry.externalUserId, entry.hours, BigDecimal::add);
+            }
         }
 
         List<Map<String, Object>> capacityOut = new ArrayList<>();
         BigDecimal totalCapacity = BigDecimal.ZERO;
         var capacities = iterations.findCapacity(iterationId);
         Set<String> users = new TreeSet<>(load.keySet());
+        users.addAll(spentByAssignee.keySet());
         capacities.forEach(c -> users.add(c.externalUserId()));
         for (String user : users) {
             BigDecimal available = capacities.stream().filter(c -> c.externalUserId().equals(user))

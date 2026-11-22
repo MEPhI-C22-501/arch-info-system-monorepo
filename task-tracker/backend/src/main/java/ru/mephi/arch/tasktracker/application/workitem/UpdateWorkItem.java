@@ -44,7 +44,7 @@ public class UpdateWorkItem {
     @Transactional
     public Map<String, Object> execute(UUID id, Map<String, Object> input, String actor, String source) {
         WorkItem before = workItems.getById(id);
-        if (input.containsKey("version") && Long.parseLong(input.get("version").toString()) != before.version) {
+        if (input.containsKey("version") && Values.version(input.get("version")) != before.version) {
             throw ApiException.conflict("version", "stale_work_item");
         }
         String title = nullableString(field(input, "title", before.title));
@@ -58,14 +58,16 @@ public class UpdateWorkItem {
         UUID statusId = before.statusId;
         if (input.containsKey("statusId")) {
             UUID requested = Values.uuid(input.get("statusId"), "statusId");
-            if (!statusId.equals(requested)) permissions.require("item.status");
-            if (!statuses.isActive(requested)) throw ApiException.invalid("statusId", "unknown_or_inactive");
+            if (!statusId.equals(requested)) {
+                permissions.require("item.status");
+                if (!statuses.isActive(requested)) throw ApiException.invalid("statusId", "unknown_or_inactive");
+            }
             statusId = requested;
         }
         UUID priorityId = before.priorityId;
         if (input.containsKey("priorityId")) {
             priorityId = Values.uuid(input.get("priorityId"), "priorityId");
-            if (!priorities.isActive(priorityId)) throw ApiException.invalid("priorityId", "unknown_or_inactive");
+            if (!before.priorityId.equals(priorityId) && !priorities.isActive(priorityId)) throw ApiException.invalid("priorityId", "unknown_or_inactive");
         }
 
         UUID parentId = input.containsKey("parentId") ? Values.uuid(input.get("parentId"), "parentId") : before.parentId;
@@ -81,6 +83,9 @@ public class UpdateWorkItem {
         LocalDate due = Values.date(field(input, "dueDate", before.dueDate), "dueDate");
         WorkItemFactory.validateDates(start, due);
         BigDecimal planned = Values.hours(field(input, "plannedHours", before.plannedHours), "plannedHours", false);
+        if (planned != null && before.plannedHours != null && planned.compareTo(before.plannedHours) == 0) {
+            planned = before.plannedHours;
+        }
         WorkItemFactory.validatePlannedHoursAllowed(before.type, planned);
         if (planned != null && workItems.hasChildren(id)) throw ApiException.invalid("plannedHours", "parent_is_computed");
         String description = Objects.toString(field(input, "description", before.description), "");

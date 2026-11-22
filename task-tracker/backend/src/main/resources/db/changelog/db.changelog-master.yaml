@@ -13,3 +13,10 @@ databaseChangeLog:
         - sqlFile:
             path: db/changelog/002-review.sql
             splitStatements: false
+  - changeSet:
+      id: 003-planning
+      author: task-tracker
+      changes:
+        - sqlFile:
+            path: db/changelog/003-planning.sql
+            splitStatements: false

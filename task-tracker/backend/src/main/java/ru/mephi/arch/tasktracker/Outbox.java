@@ -17,19 +17,24 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class Outbox {
     private final JdbcTemplate db;
-    private final ObjectMapper json=new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json=new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final KafkaProducer<String,String> producer;
+    public Outbox(JdbcTemplate db, String bootstrap, String protocol, String jaas, String truststore, String password) {
+        this(db, bootstrap, protocol, jaas, truststore, password, "PLAIN");
+    }
+    @org.springframework.beans.factory.annotation.Autowired
     public Outbox(JdbcTemplate db,@Value("${KAFKA_BOOTSTRAP_SERVERS:}") String bootstrap,
             @Value("${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}") String protocol,
             @Value("${KAFKA_SASL_JAAS_CONFIG:}") String jaas,
             @Value("${KAFKA_SSL_TRUSTSTORE_LOCATION:}") String truststore,
-            @Value("${KAFKA_SSL_TRUSTSTORE_PASSWORD:}") String password) {
+            @Value("${KAFKA_SSL_TRUSTSTORE_PASSWORD:}") String password,
+            @Value("${KAFKA_SASL_MECHANISM:PLAIN}") String saslMechanism) {
         this.db=db;
         if(bootstrap.isBlank()) { producer=null; return; }
         Properties p=new Properties(); p.put("bootstrap.servers",bootstrap); p.put("key.serializer","org.apache.kafka.common.serialization.StringSerializer");
         p.put("value.serializer","org.apache.kafka.common.serialization.StringSerializer"); p.put("acks","all"); p.put("enable.idempotence","true");
         p.put("security.protocol",protocol); p.put("delivery.timeout.ms",10000); p.put("request.timeout.ms",5000); p.put("max.block.ms",5000);
-        if(!jaas.isBlank()) { p.put("sasl.mechanism","SCRAM-SHA-512"); p.put("sasl.jaas.config",jaas); }
+        if(!jaas.isBlank()) { p.put("sasl.mechanism",saslMechanism); p.put("sasl.jaas.config",jaas); }
         if(!truststore.isBlank()) { p.put("ssl.truststore.location",truststore); p.put("ssl.truststore.password",password); }
         producer=new KafkaProducer<>(p);
     }
@@ -39,7 +44,10 @@ public class Outbox {
             Object aggregate=payload.getOrDefault("workItemId",payload.getOrDefault("iterationId",payload.getOrDefault("workItemPublicId","system")));
             String eventType=event.getClass().getSimpleName();
             if(event instanceof RecordableChange change) {
-                if(event instanceof WorkItemCreated) payload=new LinkedHashMap<>(change.newValues());
+                if(event instanceof WorkItemCreated) {
+                    payload=new LinkedHashMap<>(change.newValues());
+                    payload.keySet().retainAll(Set.of("type","title","statusId","priorityId","assigneeId","externalSource","externalDefectId"));
+                }
                 else if(event instanceof TimeLogged) {
                     UUID timeId=UUID.fromString(change.newValues().get("timeLogAdded").toString());
                     var row=db.queryForMap("SELECT * FROM time_log_entry WHERE id=?",timeId);
@@ -47,7 +55,12 @@ public class Outbox {
                 } else {
                     eventType="WorkItemFieldsChanged"; payload=new LinkedHashMap<>();
                     Map<String,Object> oldDiff=new LinkedHashMap<>(),newDiff=new LinkedHashMap<>();
-                    for(String field:change.newValues().keySet()) if(!Objects.equals(change.oldValues().get(field),change.newValues().get(field))) {oldDiff.put(field,change.oldValues().get(field));newDiff.put(field,change.newValues().get(field));}
+                    for(String field:change.newValues().keySet()) {
+                        if ("attachmentName".equals(field) || "linkType".equals(field)) continue;
+                        if(!Objects.equals(change.oldValues().get(field),change.newValues().get(field))) {
+                            oldDiff.put(field,change.oldValues().get(field));newDiff.put(field,change.newValues().get(field));
+                        }
+                    }
                     if(newDiff.isEmpty()) return;
                     payload.put("changedFields",new ArrayList<>(newDiff.keySet()));payload.put("oldValues",oldDiff);payload.put("newValues",newDiff);
                     payload.put("version",db.queryForObject("SELECT version FROM work_item WHERE id=?",Long.class,change.workItemId()));

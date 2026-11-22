@@ -9,6 +9,8 @@ import { Empty } from '../../components/Empty';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { WorkItemPicker } from '../../components/WorkItemPicker';
 import { CreateItem } from './CreateItem';
+import { ItemHistory } from './ItemHistory';
+import type { HistoryEntry } from './historyDiff';
 import { can, selectPerson } from '../../context';
 import type { Context } from '../../context';
 
@@ -24,7 +26,7 @@ export function ItemDialog({ id, context, close, open, refresh }:
   const [logs, setLogs] = useState<Array<Json>>([]);
   const [attachments, setAttachments] = useState<Array<Json>>([]);
   const [preview, setPreview] = useState<{ name: string; url: string; type: string } | null>(null);
-  const [history, setHistory] = useState<Array<Json>>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [tab, setTab] = useState<'discussion' | 'time' | 'files' | 'history'>('discussion');
   const [error, setError] = useState('');
   const [comment, setComment] = useState('');
@@ -39,7 +41,7 @@ export function ItemDialog({ id, context, close, open, refresh }:
     Promise.all([
       request<Item>(`/work-items/${id}`), request<Array<Json>>(`/work-items/${id}/comments`),
       request<Array<Json>>(`/work-items/${id}/time-logs`), request<Array<Json>>(`/work-items/${id}/attachments`),
-      request<Array<Json>>(`/work-items/${id}/history`),
+      request<HistoryEntry[]>(`/work-items/${id}/history`),
     ]).then(([data, discussion, time, files, audit]) => {
       if (!active) return;
       setItem(data); setComments(discussion); setLogs(time); setAttachments(files); setHistory(audit);
@@ -68,8 +70,10 @@ export function ItemDialog({ id, context, close, open, refresh }:
     if (Object.keys(invalid).length) { setError(Object.values(invalid).join('; ')); return; }
     if (!item) return;
     try {
-      await request(`/work-items/${id}`, json('PATCH', { ...form, assigneeId: form.assigneeId || null, parentId: form.parentId || null,
-        startDate: form.startDate || null, dueDate: form.dueDate || null, plannedHours: form.plannedHours || null, version: item.version }));
+      const values = item.planningManaged
+        ? { description: form.description, statusId: form.statusId, priorityId: form.priorityId, version: item.version }
+        : { ...form, assigneeId: form.assigneeId || null, parentId: form.parentId || null, startDate: form.startDate || null, dueDate: form.dueDate || null, plannedHours: form.plannedHours || null, version: item.version };
+      await request(`/work-items/${id}`, json('PATCH', values));
       localStorage.removeItem(`description:${id}`); bump(); refresh();
     } catch (e) { setError(getError(e)); }
   };
@@ -79,6 +83,17 @@ export function ItemDialog({ id, context, close, open, refresh }:
     if (!confirm(`Безвозвратно удалить «${item.title}»?`)) return;
     try { await request(`/work-items/${id}`, { method: 'DELETE', headers: { 'X-Confirm-Hard-Delete': id } }); close(); refresh(); }
     catch (e) { setError(getError(e)); }
+  };
+  const exportItem = async () => {
+    try {
+      const blob = await request<Blob>('/exports/work-items', json('POST', { ids: [id] }));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `task-${id.slice(0, 8)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setError(getError(e)); }
   };
   const sendComment = async () => {
     if (!comment.trim()) return;
@@ -127,6 +142,10 @@ export function ItemDialog({ id, context, close, open, refresh }:
     try { await request(`/work-items/${id}/comments/${c.id}`, json('PATCH', { body: value })); bump(); refresh(); }
     catch (e) { setError(getError(e)); }
   };
+  const planningFrame = Boolean(item?.planningManaged && ['PROJECT', 'EPIC'].includes(item.type));
+  const parentLink = item?.parentLink;
+  const canChangeParent = item && item.type !== 'PROJECT' && !item.planningManaged
+    && can(context, 'item.update') && (!item.parentId || parentLink);
   const allowedChild = item?.type === 'PROJECT' ? 'EPIC' : item?.type === 'EPIC' ? 'TASK' : ['TASK', 'BUG'].includes(item?.type || '') ? 'SUBTASK' : null;
 
   return <div className="overlay" onMouseDown={close}>
@@ -137,6 +156,7 @@ export function ItemDialog({ id, context, close, open, refresh }:
       </div>
       <ErrorBanner message={error} clear={() => setError('')} />
       {item && <div className="dialog-scroll">
+        {item.planningManaged && <p className="field-note">Плановые поля управляются Planning System. Локальные проекты и эпики редактируются в Task Tracker.</p>}
         <div className="summary-strip">
           <div><small>План</small><strong>{hours(item.plannedHours)}</strong></div>
           <div><small>Факт</small><strong>{hours(item.actualHours)}</strong></div>
@@ -144,31 +164,33 @@ export function ItemDialog({ id, context, close, open, refresh }:
           <div><small>Версия</small><strong>#{item.version}</strong></div>
         </div>
         <div className="form-grid item-fields">
-          <label>Название<input value={String(form.title ?? '')} onChange={e => set('title', e.target.value)} disabled={!can(context, 'item.update')} /></label>
-          <label>Статус<select value={String(form.statusId ?? '')} onChange={e => set('statusId', e.target.value)} disabled={!can(context, 'item.update') || !can(context, 'item.status')}>
+          <label>Название<input value={String(form.title ?? '')} onChange={e => set('title', e.target.value)} disabled={item.planningManaged || !can(context, 'item.update')} /></label>
+          <label>Статус<select value={String(form.statusId ?? '')} onChange={e => set('statusId', e.target.value)} disabled={planningFrame || !can(context, 'item.update') || !can(context, 'item.status')}>
             {context.statuses.filter(s => s.active || s.id === item.statusId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select></label>
-          <label className="span-2">Описание (Markdown)<textarea rows={5} value={String(form.description ?? '')} onChange={e => set('description', e.target.value)} disabled={!can(context, 'item.update')} />
+          <label className="span-2">Описание (Markdown)<textarea rows={5} value={String(form.description ?? '')} onChange={e => set('description', e.target.value)} disabled={planningFrame || !can(context, 'item.update')} />
             <small>Черновик сохраняется в этом браузере до нажатия «Сохранить»</small></label>
-          <label>Приоритет<select value={String(form.priorityId ?? '')} onChange={e => set('priorityId', e.target.value)} disabled={!can(context, 'item.update')}>
+          <label>Приоритет<select value={String(form.priorityId ?? '')} onChange={e => set('priorityId', e.target.value)} disabled={planningFrame || !can(context, 'item.update')}>
             {context.priorities.filter(p => p.active || p.id === item.priorityId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select></label>
-          <label>Исполнитель<select value={String(form.assigneeId ?? '')} onChange={e => set('assigneeId', e.target.value)} disabled={!can(context, 'item.update')}>
+          <label>Исполнитель<select value={String(form.assigneeId ?? '')} onChange={e => set('assigneeId', e.target.value)} disabled={item.planningManaged || !can(context, 'item.update')}>
             <option value="">Не назначен</option>
             {context.users.filter(u => u.active || u.id === item.assigneeId).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select></label>
-          <label>Дата начала<input type="date" value={String(form.startDate ?? '')} onChange={e => set('startDate', e.target.value)} disabled={!can(context, 'item.update')} /></label>
-          <label>Срок<input type="date" value={String(form.dueDate ?? '')} onChange={e => set('dueDate', e.target.value)} disabled={!can(context, 'item.update')} /></label>
+          <label>Дата начала<input type="date" value={String(form.startDate ?? '')} onChange={e => set('startDate', e.target.value)} disabled={item.planningManaged || !can(context, 'item.update')} /></label>
+          <label>Срок<input type="date" value={String(form.dueDate ?? '')} onChange={e => set('dueDate', e.target.value)} disabled={item.planningManaged || !can(context, 'item.update')} /></label>
           <label>Плановая оценка, ч<input type="number" step="0.01" min="0" value={String(form.plannedHours ?? '')} onChange={e => set('plannedHours', e.target.value)}
-            disabled={!can(context, 'item.update') || item.children.length > 0 || ['PROJECT', 'EPIC'].includes(item.type)} /></label>
-          <label>Родительский элемент
+            disabled={item.planningManaged || !can(context, 'item.update') || item.children.length > 0 || ['PROJECT', 'EPIC'].includes(item.type)} /></label>
+          {canChangeParent && <label>Родительский элемент
             <WorkItemPicker value={String(form.parentId ?? '')} onChange={value => set('parentId', value)} excludeId={id} placeholder="Начните вводить название…" />
-          </label>
+          </label>}
           <div className="span-2 field-note">Итерация: {item.iterationId || 'не назначена'}{item.unestimatedLeaves > 0 && <span className="warning"> · Есть элементы без оценки: {item.unestimatedLeaves}</span>}</div>
         </div>
         <div className="hierarchy">
           <div className="mini-head"><h3>Иерархия</h3>{allowedChild && can(context, 'item.create') && <button className="text-button" onClick={() => setChildForm(true)}>＋ Дочерний элемент</button>}</div>
-          {item.parentId && <button className="link-row" onClick={() => open(item.parentId!)}>↑ Родительский элемент · {item.parentId.slice(0, 8)}</button>}
+          {parentLink
+            ? <button className="link-row" onClick={() => open(parentLink.id)}>↑ Родительский элемент · {parentLink.title}</button>
+            : <p className="muted">{item.parentId ? 'Родительский элемент недоступен' : 'Нет родительского элемента'}</p>}
           {item.children.length ? item.children.map(child => <button className="link-row" key={child.id} onClick={() => open(child.id)}>↳ {typeName(child.type)} · {child.title}</button>) : <p className="muted">Дочерних элементов нет</p>}
         </div>
         {['TASK','BUG','SUBTASK'].includes(item.type) && <Links id={id} context={context} open={open} />}
@@ -194,16 +216,13 @@ export function ItemDialog({ id, context, close, open, refresh }:
           </div>) : <Empty text="Вложений пока нет" />}
         </div>{can(context, 'attachment.create') && <label className="button secondary file-button">＋ Прикрепить файл<input type="file" onChange={e => { const file = e.target.files?.[0]; if (file) void upload(file); e.target.value = ''; }} /></label>}
           {preview && <div className="attachment-preview"><div className="mini-head"><strong>{preview.name}</strong><button onClick={() => setPreview(null)}>Закрыть</button></div>{preview.type.startsWith('image/') ? <img src={preview.url} alt={preview.name} /> : <AttachmentFrame name={preview.name} url={preview.url} />}</div>}</div>}
-        {tab === 'history' && <div className="tab-body"><div className="stack">
-          {history.length ? history.map(entry => <details className="activity" key={String(entry.id)}>
-            <summary><strong>{String(entry.actorId || entry.externalSource || 'Система')}</strong><small>{dateTime(entry.occurredAt)}</small></summary>
-            <div className="diff-grid">{Object.entries(typeof entry.newValues === 'string' ? JSON.parse(entry.newValues) : entry.newValues as Json).map(([key, value]) =>
-              <div className="diff-row" key={key}><strong>{key}</strong><del>{String((typeof entry.oldValues === 'string' ? JSON.parse(entry.oldValues) : entry.oldValues as Json)?.[key] ?? '—')}</del><ins>{String(value ?? '—')}</ins></div>)}</div>
-          </details>) : <Empty text="Истории изменений пока нет" />}
-        </div></div>}
+        {tab === 'history' && <div className="tab-body">
+          <ItemHistory history={history} context={context} attachments={attachments} logs={logs} />
+        </div>}
         <div className="dialog-actions sticky">
-          {can(context, 'item.delete') && <button className="button danger" onClick={() => void remove()}>Безвозвратно удалить</button>}
-          {can(context, 'item.update') && <button className="button primary" onClick={() => void save()}>Сохранить изменения</button>}
+          {can(context, 'excel.export') && <button className="button secondary" onClick={() => void exportItem()}>Экспорт задачи .xlsx</button>}
+          {!item.planningManaged && can(context, 'item.delete') && <button className="button danger" onClick={() => void remove()}>Безвозвратно удалить</button>}
+          {!planningFrame && can(context, 'item.update') && <button className="button primary" onClick={() => void save()}>Сохранить изменения</button>}
           <button className="button secondary" onClick={close}>Закрыть</button>
         </div>
       </div>}

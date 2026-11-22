@@ -22,7 +22,7 @@ export function Notifications({ open, revision, refresh }: { open: (id: string) 
 
   return <section className="screen-content">
     <div className="section-heading">
-      <div><h2>Последние изменения</h2><p>Уведомления о назначениях и событиях ваших задач</p></div>
+      <h1>Уведомления</h1>
       {unread.length > 0 && <button className="button secondary" onClick={() => void markAll()}>Отметить все прочитанными ({unread.length})</button>}
     </div>
     <ErrorBanner message={error} clear={() => setError('')} />

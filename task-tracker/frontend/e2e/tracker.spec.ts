@@ -1,4 +1,70 @@
 import { test, expect } from '@playwright/test';
+
+test('iteration status distribution separates labels, counts and shares without overflow', async ({ page }, testInfo) => {
+  let empty = false;
+  await page.route(/\/api\/v1\/iterations\/[^/?]+$/, async route => {
+    const response = await route.fetch();
+    const iteration = await response.json();
+    await route.fulfill({ response, json: { ...iteration, statusCounts: empty ? {} : {
+      'Бэклог': 1, 'В работе': 2, 'Завершена': 3,
+      'Очень длинное название пользовательского статуса для проверки переноса': 1,
+    } } });
+  });
+  await page.goto('/iterations');
+  await page.locator('#username').fill(process.env.TRACKER_E2E_USER || 'lead');
+  await page.locator('#password').fill(process.env.TRACKER_E2E_PASSWORD || 'demo12345');
+  await page.locator('#kc-login').click();
+  const panel = page.locator('.iteration-statuses');
+  await expect(panel.getByText('Всего: 7')).toBeVisible();
+  const rows = panel.getByRole('listitem');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(2).locator('strong')).toHaveText('3');
+  await expect(rows.nth(2).locator('small')).toHaveText('43%');
+  await expect(rows.nth(2)).toHaveClass(/completed/);
+  const fits = await rows.evaluateAll(elements => elements.every(row => {
+    const label = row.querySelector('.status-summary-label > span:first-child')!.getBoundingClientRect();
+    const value = row.querySelector('.status-summary-value')!.getBoundingClientRect();
+    return label.right <= value.left && row.scrollWidth <= row.clientWidth;
+  }));
+  expect(fits).toBe(true);
+  await panel.screenshot({ path: testInfo.outputPath('iteration-statuses.png') });
+  empty = true;
+  await page.reload();
+  await expect(panel.getByText('В итерации пока нет элементов')).toBeVisible();
+  await expect(panel.getByRole('listitem')).toHaveCount(0);
+});
+
+test('saved backlog view restores filters and sort on the first page', async ({ page }) => {
+  await page.goto('/backlog');
+  await page.locator('#username').fill(process.env.TRACKER_E2E_USER || 'lead');
+  await page.locator('#password').fill(process.env.TRACKER_E2E_PASSWORD || 'demo12345');
+  await page.locator('#kc-login').click();
+
+  const type = page.getByRole('combobox', { name: 'Тип', exact: true });
+  const sort = page.getByRole('combobox', { name: 'Сортировка' });
+  const view = page.getByRole('combobox', { name: 'Представление' });
+  await type.selectOption('TASK');
+  await sort.selectOption('priority');
+  await page.getByRole('textbox', { name: 'Название представления' }).fill('Задачи по приоритету');
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(view).toHaveValue('Задачи по приоритету');
+
+  await page.goto('/backlog?type=BUG&sort=dueDate&page=3');
+  await expect(type).toHaveValue('BUG');
+  await Promise.all([
+    page.waitForResponse(response => {
+      const { pathname, searchParams } = new URL(response.url());
+      return pathname === '/api/v1/work-items' && response.ok() && searchParams.get('type') === 'TASK'
+        && searchParams.get('sort') === 'priority' && searchParams.getAll('page').join(',') === '1';
+    }),
+    view.selectOption('Задачи по приоритету'),
+  ]);
+  await expect(type).toHaveValue('TASK');
+  await expect(sort).toHaveValue('priority');
+  await expect(view).toHaveValue('Задачи по приоритету');
+  await expect(page.getByText(/^Страница 1 из /)).toBeVisible();
+});
+
 test('OIDC login preserves a board deep link and browser navigation',async ({page},testInfo)=>{
   await page.goto('/board');
   await page.locator('#username').fill(process.env.TRACKER_E2E_USER || 'lead');
