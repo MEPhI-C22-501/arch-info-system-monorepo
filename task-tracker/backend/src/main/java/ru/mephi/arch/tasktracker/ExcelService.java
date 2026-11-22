@@ -18,14 +18,23 @@ public class ExcelService {
     public ExcelService(JdbcTemplate db,AccessService access,WorkItemService items,IterationService iterations){this.db=db;this.access=access;this.items=items;this.iterations=iterations;}
     public byte[] export(Map<String,Object> selection) {
         access.require("excel.export");
-        Set<UUID> ids=new HashSet<>();Object rawIds=selection.get("ids");
-        if(rawIds instanceof List<?> list)for(Object v:list)ids.add(Values.uuid(v,"ids"));
+        Set<UUID> ids=new LinkedHashSet<>();Object rawIds=selection.get("ids");
+        if (selection.containsKey("ids")) {
+            if (!(rawIds instanceof List<?> list) || list.isEmpty()) throw ApiException.invalid("ids", "non_empty_array_required");
+            for (Object value : list) {
+                UUID id = Values.uuid(value, "ids");
+                if (id == null) throw ApiException.invalid("ids", "invalid_uuid");
+                access.itemRead(items.raw(id));
+                ids.add(id);
+            }
+        }
         try(XSSFWorkbook workbook=new XSSFWorkbook();ByteArrayOutputStream bytes=new ByteArrayOutputStream()){
             Sheet sheet=workbook.createSheet("WorkItems");Row header=sheet.createRow(0);for(int i=0;i<COLUMNS.size();i++)header.createCell(i).setCellValue(COLUMNS.get(i));
             int rowNumber=1;
-            for(UUID id:db.queryForList("SELECT id FROM work_item ORDER BY created_at,id",UUID.class)){
-                if(!ids.isEmpty()&&!ids.contains(id))continue;
+            Collection<UUID> selected = selection.containsKey("ids") ? ids : db.queryForList("SELECT id FROM work_item ORDER BY created_at,id",UUID.class);
+            for(UUID id:selected){
                 var raw=items.raw(id);var view=items.view(id);
+                access.itemRead(raw);
                 String status=db.queryForObject("SELECT name FROM status WHERE id=?",String.class,raw.get("status_id"));
                 String priority=db.queryForObject("SELECT name FROM priority WHERE id=?",String.class,raw.get("priority_id"));
                 String assignee=raw.get("assignee_external_id")==null?"":db.query("SELECT display_name FROM user_cache WHERE external_user_id=?",rs->rs.next()?rs.getString(1):"",raw.get("assignee_external_id"));
@@ -38,7 +47,7 @@ public class ExcelService {
     @Transactional public Map<String,Object> importFile(MultipartFile file) {
         access.require("excel.import");
         if(file.isEmpty())throw ApiException.invalid("file","empty");
-        List<Map<String,String>> rows=new ArrayList<>();List<Map<String,Object>> errors=new ArrayList<>();
+        List<WorkbookRow> rows=new ArrayList<>();List<Map<String,Object>> errors=new ArrayList<>();
         try(Workbook workbook=WorkbookFactory.create(file.getInputStream())){
             Sheet sheet=workbook.getSheet("WorkItems");if(sheet==null)throw ApiException.invalid("file","missing_WorkItems_sheet");
             Row header=sheet.getRow(0);if(header==null||header.getLastCellNum()!=COLUMNS.size())throw ApiException.invalid("file","invalid_columns");
@@ -49,14 +58,15 @@ public class ExcelService {
                 Map<String,String> row=new LinkedHashMap<>();boolean hasValue=false;
                 for(int c=0;c<COLUMNS.size();c++){
                     Cell cell=line.getCell(c);if(cell!=null&&cell.getCellType()==CellType.FORMULA)errors.add(error(r+1,COLUMNS.get(c),"formula_not_allowed"));
-                    String value=cell==null?"":format.formatCellValue(cell).trim();row.put(COLUMNS.get(c),value);if(!value.isBlank())hasValue=true;
+                    String field=COLUMNS.get(c), value=cell==null?"":format.formatCellValue(cell);
+                    row.put(field,"description".equals(field)?value:value.trim());if(!value.isBlank())hasValue=true;
                 }
-                if(hasValue)rows.add(row);
+                if(hasValue)rows.add(new WorkbookRow(r+1,row));
             }
         }catch(ApiException e){throw e;}catch(Exception e){throw ApiException.invalid("file","invalid_xlsx");}
         Set<UUID> seen=new HashSet<>();
         for(int r=0;r<rows.size();r++){
-            var row=rows.get(r);int line=r+2;
+            var row=rows.get(r).values();int line=rows.get(r).line();
             if(row.get("title").isBlank())errors.add(error(line,"title","required"));
             try{Values.type(row.get("type"));}catch(ApiException e){errors.add(error(line,"type",e.getMessage()));}
             UUID id=null;
@@ -71,29 +81,34 @@ public class ExcelService {
             if(!row.get("assigneeId").isBlank()&&db.queryForObject("SELECT count(*) FROM user_cache WHERE external_user_id=?",Integer.class,row.get("assigneeId"))==0)errors.add(error(line,"assigneeId","unknown_user"));
         }
         if(!errors.isEmpty())return report(0,0,rows.size(),errors);
-        rows.sort(Comparator.comparingInt(row->switch(row.get("type")){case "PROJECT"->0;case "EPIC"->1;case "TASK","BUG"->2;default->3;}));
+        rows.sort(Comparator.comparingInt(row->switch(row.values().get("type")){case "PROJECT"->0;case "EPIC"->1;case "TASK","BUG"->2;default->3;}));
         int created=0,updated=0;
         for(int r=0;r<rows.size();r++){
-            var row=rows.get(r);UUID id=Values.uuid(row.get("id"),"id");
+            var row=rows.get(r).values();UUID id=Values.uuid(row.get("id"),"id");
             Map<String,Object> input=new LinkedHashMap<>();
-            for(String key:List.of("type","title","description","statusId","priorityId","assigneeId","startDate","dueDate","plannedHours","parentId"))input.put(key,row.get(key).isBlank()?null:row.get(key));
+            for(String key:List.of("type","title","description","statusId","priorityId","assigneeId","startDate","dueDate","plannedHours","parentId"))input.put(key,!"description".equals(key)&&row.get(key).isBlank()?null:row.get(key));
             if(id!=null)input.put("id",id);
             try{
                 boolean exists=id!=null&&db.queryForObject("SELECT count(*) FROM work_item WHERE id=?",Integer.class,id)>0;
                 UUID actualId;
                 if(exists){input.remove("type");input.put("version",row.get("version"));items.updateAs(id,input,access.subject(),null);actualId=id;updated++;}
-                else{actualId=(UUID)items.createAs(input,access.subject(),null).get("id");created++;}
+                else{
+                    if(input.get("statusId")==null)input.remove("statusId");
+                    if(input.get("priorityId")==null)input.remove("priorityId");
+                    actualId=(UUID)items.createAs(input,access.subject(),null).get("id");created++;
+                }
                 UUID iterationId=Values.uuid(row.get("iterationId"),"iterationId");
                 var current=items.view(actualId).get("iterationId");
                 if(current!=null&&!current.equals(iterationId))iterations.remove((UUID)current,actualId);
                 if(iterationId!=null&&!iterationId.equals(current))iterations.add(iterationId,actualId);
             }catch(Exception e){TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
                 String reason=e instanceof ApiException ? e.getMessage():"invalid_reference_or_constraint";
-                return report(0,0,rows.size(),List.of(error(r+2,"row",reason)));
+                return report(0,0,rows.size(),List.of(error(rows.get(r).line(),"row",reason)));
             }
         }
         return report(created,updated,0,List.of());
     }
+    private record WorkbookRow(int line,Map<String,String> values) {}
     private Map<String,Object> error(int row,String field,String reason){return Map.of("row",row,"field",field,"reason",reason);}
     private Map<String,Object> report(int created,int updated,int rejected,List<Map<String,Object>> errors){return Map.of("created",created,"updated",updated,"rejected",rejected,"errors",errors);}
 }

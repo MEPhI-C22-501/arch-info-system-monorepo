@@ -32,7 +32,7 @@ export function Iterations({ context, revision, open, refresh }:
   const { data: iteration, error: detailError } = useApiResource<Iteration>(effectiveSelected ? `/iterations/${effectiveSelected}` : null, combinedRevision);
 
   const action = async (path: string, init: RequestInit) => {
-    try { await request(path, init); setLocalRevision(v => v + 1); refresh(); }
+    try { await request(path, init); setActionError(''); setLocalRevision(v => v + 1); refresh(); }
     catch (e) { setActionError(getError(e)); }
   };
   const create = async (event: React.FormEvent) => {
@@ -44,10 +44,11 @@ export function Iterations({ context, revision, open, refresh }:
   };
   const canEdit = can(context, 'iteration.write') && iteration?.state !== 'COMPLETED';
   const baseline = iteration?.baseline || {}; const result = iteration?.result || {};
+  const statusTotal = Object.values(iteration?.statusCounts || {}).reduce((sum, count) => sum + count, 0);
 
   return <section className="screen-content">
     <div className="section-heading">
-      <div><h2>Планирование итераций</h2><p>Ёмкость команды, состав и план-факт</p></div>
+      <h1>Итерации</h1>
       {can(context, 'iteration.write') && <button className="button primary" onClick={() => setCreating(true)}>＋ Новая итерация</button>}
     </div>
     <ErrorBanner message={listError || detailError || actionError} clear={() => setActionError('')} />
@@ -58,7 +59,7 @@ export function Iterations({ context, revision, open, refresh }:
         </button>) : <Empty text="Итераций пока нет" />}
       </div>
       <div className="iteration-detail">{iteration ? <>
-        <div className="panel iteration-hero">
+        <div className="panel iteration-summary">
           <div className="section-heading">
             <div><span className="eyebrow">{iterationStateName(iteration.state)}</span><h2>{iteration.name}</h2>{iteration.state==='COMPLETED' && <button className="button secondary" onClick={()=>void navigate(`/iterations/${iteration.id}/plan-fact`)}>План-факт</button>}<p>{date(iteration.startDate)} — {date(iteration.endDate)}</p></div>
             {can(context, 'iteration.write') && <div className="actions">
@@ -100,7 +101,17 @@ export function Iterations({ context, revision, open, refresh }:
             <button className="button secondary" onClick={() => { if (newItemId) void action(`/iterations/${iteration.id}/items/${newItemId}`, { method: 'PUT' }); setNewItemId(''); }}>Добавить</button>
           </div>}
         </div>
-        <div className="panel"><h3>Распределение по статусам</h3><div className="status-summary">{Object.entries(iteration.statusCounts).map(([status, count]) => <span key={status}><Badge>{status}</Badge> {count}</span>)}</div></div>
+        <div className="panel iteration-statuses">
+          <div className="mini-head"><h3>Распределение по статусам</h3><span className="muted">Всего: {statusTotal}</span></div>
+          {statusTotal ? <ul className="status-summary">{Object.entries(iteration.statusCounts).map(([status, count]) => {
+            const completed = context.statuses.some(row => row.name === status && row.category === 'COMPLETED');
+            const percent = Math.round(count / statusTotal * 100);
+            return <li key={status} className={`status-summary-row${completed ? ' completed' : ''}`}>
+              <div className="status-summary-label"><span>{status}</span><span className="status-summary-value"><strong>{count}</strong><small>{percent}%</small></span></div>
+              <div className="status-summary-track" aria-hidden="true"><span style={{ width: `${count / statusTotal * 100}%` }} /></div>
+            </li>;
+          })}</ul> : <Empty text="В итерации пока нет элементов" />}
+        </div>
         {iteration.state === 'COMPLETED' && <PlanFact baseline={baseline} result={result} context={context} />}
       </> : <Empty text="Выберите итерацию" />}</div>
     </div>

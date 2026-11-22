@@ -44,4 +44,11 @@ public final class Values {
         if (value == null || !java.util.Set.of("PROJECT","EPIC","TASK","BUG","SUBTASK").contains(value)) throw ApiException.invalid("type","invalid_type");
         return value;
     }
+    public static long version(Object value) {
+        try {
+            long result = Long.parseLong(String.valueOf(value));
+            if (result < 0) throw new NumberFormatException();
+            return result;
+        } catch (NumberFormatException e) { throw ApiException.invalid("version", "invalid_integer"); }
+    }
 }

@@ -88,6 +88,11 @@ public class CreateWorkItem {
         Map<String, Object> auditNew = new LinkedHashMap<>();
         auditNew.put("type", type.name()); auditNew.put("title", title); auditNew.put("statusId", statusId.toString());
         auditNew.put("priorityId", priorityId.toString()); auditNew.put("assigneeId", assignee);
+        auditNew.put("description", description);
+        auditNew.put("startDate", start == null ? null : start.toString());
+        auditNew.put("dueDate", due == null ? null : due.toString());
+        auditNew.put("plannedHours", planned);
+        auditNew.put("parentId", parentId == null ? null : parentId.toString());
         if (source != null) { auditNew.put("externalSource", source); auditNew.put("externalDefectId", input.get("externalDefectId")); }
         events.publish(new WorkItemCreated(id, actor, source, auditNew));
 

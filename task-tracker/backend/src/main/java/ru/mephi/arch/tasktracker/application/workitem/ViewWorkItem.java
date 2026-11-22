@@ -24,6 +24,7 @@ public class ViewWorkItem {
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", item.id); out.put("type", item.type.name()); out.put("title", item.title);
+        out.put("planningManaged", workItems.isPlanningManaged(id));
         out.put("description", item.description); out.put("statusId", item.statusId); out.put("priorityId", item.priorityId);
         out.put("assigneeId", item.assigneeId); out.put("startDate", item.startDate); out.put("dueDate", item.dueDate);
         out.put("plannedHours", hours.planned()); out.put("actualHours", hours.actual()); out.put("remainingHours", hours.remaining());

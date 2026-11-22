@@ -1,11 +1,14 @@
 import { UserManager } from 'oidc-client-ts';
+import { errorMessage } from './errorMessages';
 
 export type Json = Record<string, unknown>;
 export type Item = {
+  planningManaged?: boolean;
   id: string; type: string; title: string; description: string; statusId: string; priorityId: string;
   assigneeId: string | null; startDate: string | null; dueDate: string | null;
   plannedHours: number; actualHours: number; remainingHours: number; unestimatedLeaves: number;
   parentId: string | null; iterationId: string | null; version: number;
+  parentLink?: { id: string; title: string };
   children: Array<{ id: string; type: string; title: string }>;
 };
 export type Iteration = {
@@ -42,8 +45,8 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (response.status === 401) { await auth.signinRedirect(); throw new Error('Требуется вход'); }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const details = body?.errors?.map((error: { row?: number; field: string; reason: string }) => `${error.row ? `Строка ${error.row}, ` : ''}${error.field}: ${error.reason}`).join('; ');
-    throw new ApiError(details || `Ошибка запроса ${response.status}`,response.status,body?.errors || [],body?.correlationId);
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    throw new ApiError(errorMessage(response.status, errors), response.status, errors, body?.correlationId);
   }
   if (response.status === 204) return undefined as T;
   if (response.headers.get('content-type')?.includes('application/vnd.openxmlformats')) return (await response.blob()) as T;

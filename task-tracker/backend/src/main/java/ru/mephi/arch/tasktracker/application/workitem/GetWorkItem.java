@@ -1,6 +1,7 @@
 package ru.mephi.arch.tasktracker.application.workitem;
 
 import org.springframework.stereotype.Service;
+import ru.mephi.arch.tasktracker.ApiException;
 import ru.mephi.arch.tasktracker.application.port.PermissionPort;
 import ru.mephi.arch.tasktracker.application.port.WorkItemRepository;
 import ru.mephi.arch.tasktracker.domain.workitem.WorkItem;
@@ -20,6 +21,18 @@ public class GetWorkItem {
     public Map<String, Object> execute(UUID id) {
         WorkItem item = workItems.getById(id);
         permissions.requireItemReadableOrQa(item.assigneeId);
-        return view.execute(id);
+        var result = view.execute(id);
+        if (item.parentId != null) {
+            workItems.findById(item.parentId).ifPresent(parent -> {
+                try {
+                    permissions.requireItemReadableOrQa(parent.assigneeId);
+                } catch (ApiException e) {
+                    if (e.status == 403) return;
+                    throw e;
+                }
+                result.put("parentLink", Map.of("id", parent.id, "title", parent.title));
+            });
+        }
+        return result;
     }
 }

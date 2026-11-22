@@ -41,7 +41,7 @@ export function Admin({ context, refreshAll }: { context: Context; refreshAll: (
   };
 
   return <section className="screen-content">
-    <div className="section-heading"><div><h2>Настройки процесса</h2><p>Статусы, приоритеты, доступ и справочник организации</p></div></div>
+    <div className="section-heading"><h1>Администрирование</h1></div>
     <ErrorBanner message={error} clear={() => setError('')} />
     <div className="tabs admin-tabs">
       {ALL_SECTIONS.filter(key => can(context, SECTION_PERMISSION[key])).map(key =>
@@ -93,6 +93,7 @@ export function Admin({ context, refreshAll }: { context: Context; refreshAll: (
         <div><h3>Синхронизация справочника</h3><p>Последний успех: {dateTime(directory.lastSuccessAt)}</p><p>Версия: {String(directory.version || '—')}</p></div>
         <button className="button primary" onClick={() => void action('/admin/directory/sync', { method: 'POST' })}>Синхронизировать</button>
       </div>
+      <p className="directory-description muted">Обновляет имена и активность пользователей, состав команд и подразделений из Reference Manager. Эти данные используются при выборе исполнителей и отображении участников задач. Для синхронизации необходимо подключение к Reference Manager.</p>
       <h4>Журнал</h4>
       <div className="stack">{Array.isArray(directory.logs) && directory.logs.length
         ? (directory.logs as Array<Json>).map(row => <div className="activity" key={String(row.id)}>

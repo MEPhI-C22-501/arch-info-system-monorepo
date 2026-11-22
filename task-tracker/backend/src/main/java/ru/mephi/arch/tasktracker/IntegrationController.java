@@ -31,8 +31,13 @@ public class IntegrationController {
         return ResponseEntity.created(URI.create("/api/v1/work-items/"+id)).body(Map.of("id",id,"status","created","workItemUrl","/work-items/"+id));
     }
     private boolean blank(Object value){return value==null||value.toString().isBlank();}
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @GetMapping("/reports/work-items") public Object reportItems(@RequestParam Map<String,String> filters){
-        access.reports();int page=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
+        access.reports();
+        return workItemPage(filters);
+    }
+    Object workItemPage(Map<String,String> filters) {
+        int page=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
         LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
         if(from!=null&&to!=null&&to.isBefore(from))throw ApiException.invalid("periodTo","before_periodFrom");
         List<Map<String,Object>> output=new ArrayList<>();
@@ -53,18 +58,22 @@ public class IntegrationController {
     private UUID reportIterationId(UUID id){var rows=db.queryForList("SELECT iteration_id FROM work_item_iteration WHERE work_item_id=? ORDER BY added_at DESC LIMIT 1",id);return rows.isEmpty()?null:(UUID)rows.getFirst().get("iteration_id");}
     private boolean iterationMatches(String expected,UUID itemId){if(expected==null||expected.isBlank())return true;UUID id=Values.uuid(expected,"iterationId");return db.queryForObject("SELECT count(*) FROM work_item_iteration WHERE work_item_id=? AND iteration_id=?",Integer.class,itemId,id)>0;}
     private boolean match(Map<String,String> f,String key,Object value){String expected=f.get(key);return expected==null||expected.isBlank()||Objects.toString(value,"").equals(expected);}
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @GetMapping("/reports/iterations") public Object reportIterations(@RequestParam Map<String,String> filters){
         access.reports();int page=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
         LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
+        if(from!=null&&to!=null&&to.isBefore(from))throw ApiException.invalid("periodTo","before_periodFrom");
         List<Map<String,Object>> result=new ArrayList<>();for(var raw:db.queryForList("SELECT * FROM iteration ORDER BY start_date,id")){
             LocalDate start=((java.sql.Date)raw.get("start_date")).toLocalDate(),end=((java.sql.Date)raw.get("end_date")).toLocalDate();
             if(from!=null&&end.isBefore(from)||to!=null&&start.isAfter(to))continue;
             result.add(Map.of("id",raw.get("id"),"name",raw.get("name"),"startDate",start,"endDate",end,"state",raw.get("state"),"baseline",changes.parseMap(raw.get("baseline_snapshot")),"result",changes.parseMap(raw.get("result_snapshot"))));
         }return slice(result,page,size);
     }
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @GetMapping("/reports/time-logs") public Object reportTimeLogs(@RequestParam Map<String,String> filters){
         access.reports();int page=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
         LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
+        if(from!=null&&to!=null&&to.isBefore(from))throw ApiException.invalid("periodTo","before_periodFrom");
         StringBuilder sql=new StringBuilder("SELECT t.id,t.work_item_id AS \"workItemId\",t.external_user_id AS \"userId\",t.logged_date::text AS \"loggedDate\",t.hours FROM time_log_entry t WHERE 1=1");List<Object> args=new ArrayList<>();
         if(from!=null){sql.append(" AND t.logged_date>=?");args.add(java.sql.Date.valueOf(from));}if(to!=null){sql.append(" AND t.logged_date<=?");args.add(java.sql.Date.valueOf(to));}
         if(filters.get("assigneeId")!=null){sql.append(" AND t.external_user_id=?");args.add(filters.get("assigneeId"));}
@@ -77,6 +86,7 @@ public class IntegrationController {
         return slice(output,page,size);
     }
     @GetMapping("/reports/statuses") public Object reportStatuses(){access.reports();return db.queryForList("SELECT id,name,board_order AS \"boardOrder\",category,active FROM status ORDER BY board_order");}
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @GetMapping("/reports/history") public Object reportHistory(@RequestParam Map<String,String> filters) {
         access.reports(); int number=page(filters.get("page"),1),size=Math.min(500,page(filters.get("pageSize"),100));
         LocalDate from=Values.date(filters.get("periodFrom"),"periodFrom"),to=Values.date(filters.get("periodTo"),"periodTo");
@@ -94,5 +104,5 @@ public class IntegrationController {
         return Map.of("items",history,"page",number,"pageSize",size,"total",total,"totalPages",(total+size-1)/size);
     }
     private int page(String input,int fallback){try{int v=input==null?fallback:Integer.parseInt(input);if(v<1)throw new NumberFormatException();return v;}catch(NumberFormatException e){throw ApiException.invalid("page","invalid_integer");}}
-    private Map<String,Object> slice(List<?> rows,int page,int size){int from=Math.min(rows.size(),(page-1)*size),to=Math.min(rows.size(),from+size);return Map.of("items",rows.subList(from,to),"page",page,"pageSize",size,"total",rows.size(),"totalPages",(rows.size()+size-1)/size);}
+    private Map<String,Object> slice(List<?> rows,int page,int size){int from=(int)Math.min(rows.size(),((long)page-1)*size),to=(int)Math.min(rows.size(),(long)from+size);return Map.of("items",rows.subList(from,to),"page",page,"pageSize",size,"total",rows.size(),"totalPages",((long)rows.size()+size-1)/size);}
 }

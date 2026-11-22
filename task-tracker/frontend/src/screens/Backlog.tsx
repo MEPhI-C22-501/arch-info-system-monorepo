@@ -14,23 +14,46 @@ import { CreateItem } from './ItemDialog/CreateItem';
 
 const getError = (e: unknown): string => (e instanceof Error ? e.message : 'Неизвестная ошибка');
 const emptyFilters = { search: '', type: '', statusId: '', priorityId: '', assigneeId: '', iterationId: '' };
+const defaultFilters = { ...emptyFilters, sort: 'dueDate' };
+type FilterKey = keyof typeof defaultFilters;
+const filterKeys = Object.keys(defaultFilters) as FilterKey[];
 
 export function Backlog({ context, revision, open, refresh }:
   { context: Context; revision: number; open: (id: string) => void; refresh: () => void }) {
-  const [params,setParams]=useSearchParams();
-  const filters={...emptyFilters,sort:'dueDate',...Object.fromEntries(params)};
-  const setFilters=(next: typeof filters | ((current: typeof filters)=>typeof filters))=>{const value=typeof next==='function'?next(filters):next;setParams(Object.fromEntries(Object.entries({...value,page:'1'}).filter(([,v])=>v)));};
-  const pageNumber=Math.max(1,parseInt(params.get('page') || '1',10)||1);
-  const setPageNumber=(next:number|((page:number)=>number))=>{const number=typeof next==='function'?next(pageNumber):next;setParams({...Object.fromEntries(params),page:String(number)});};
+  const [params, setParams] = useSearchParams();
+  const filters = { ...defaultFilters };
+  for (const key of filterKeys) filters[key] = params.get(key) ?? defaultFilters[key];
+  const pageNumber = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
   const [selected,setSelected] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
-  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
-  const { data: page, loading, error } = useApiResource<Page<Item>>(`/work-items?page=${pageNumber}&${query}`, revision);
+  const setFilters = (next: Partial<typeof defaultFilters>) => {
+    const updated = new URLSearchParams(params);
+    for (const key of filterKeys) {
+      const value = next[key] ?? defaultFilters[key];
+      if (value) updated.set(key, value);
+      else updated.delete(key);
+    }
+    updated.set('page', '1');
+    setSelected([]);
+    setParams(updated);
+  };
+  const setPageNumber = (number: number) => {
+    const updated = new URLSearchParams(params);
+    updated.set('page', String(number));
+    setSelected([]);
+    setParams(updated);
+  };
+
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
+  query.set('page', String(pageNumber));
+  const pageSize = params.get('pageSize');
+  if (pageSize) query.set('pageSize', pageSize);
+  const { data: page, loading, error } = useApiResource<Page<Item>>(`/work-items?${query}`, revision);
   const { data: iterations } = useApiResource<Iteration[]>('/iterations', revision);
 
-  const change = (key: keyof typeof filters, value: string) => { setPageNumber(1); setSelected([]); setFilters(current => ({ ...current, [key]: value })); };
+  const change = (key: FilterKey, value: string) => setFilters({ ...filters, [key]: value });
   const activeFilterCount = Object.entries(emptyFilters).filter(([key]) => filters[key as keyof typeof emptyFilters]).length;
 
   const exportFile = async () => {
@@ -51,7 +74,7 @@ export function Backlog({ context, revision, open, refresh }:
 
   return <section className="screen-content">
     <div className="section-heading">
-      <div><h2>Все рабочие элементы</h2><p>Планируйте, назначайте и отслеживайте работу команды</p></div>
+      <h1>Бэклог</h1>
       <div className="actions">
         {can(context, 'excel.export') && <button className="button secondary" onClick={() => void exportFile()}>↓ Экспорт .xlsx</button>}
         {can(context, 'excel.import') && <label className="button secondary file-button">↑ Импорт .xlsx
@@ -78,13 +101,13 @@ export function Backlog({ context, revision, open, refresh }:
         <option value="">Все итерации</option>{(iterations ?? []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
       </select>
       <select aria-label="Сортировка" value={filters.sort} onChange={e => change('sort', e.target.value)}>
-        <option value="dueDate">По сроку</option><option value="priority">По приоритету</option><option value="status">По статусу</option><option value="createdAt">Сначала новые</option>
+        <option value="dueDate">По сроку</option><option value="priority">По приоритету</option><option value="status">По статусу</option><option value="type">По типу</option><option value="assignee">По исполнителю</option><option value="iteration">По итерации</option><option value="createdAt">Сначала новые</option>
       </select>
       {activeFilterCount > 0 && <button type="button" className="button secondary filter-reset" onClick={() => setFilters({ ...emptyFilters, sort: filters.sort })}>
         Сбросить фильтры ({activeFilterCount})
       </button>}
     </div>
-    <SavedViews userId={context.userId} filters={filters} apply={value => { setFilters({...emptyFilters,sort:'dueDate',...value}); setPageNumber(1); }} />
+    <SavedViews userId={context.userId} filters={filters} apply={setFilters} />
     {can(context,'item.update') && <BulkActions items={(page?.items || []).filter(i=>selected.includes(i.id))} context={context} iterations={iterations || []} refresh={refresh} completed={ids=>setSelected(current=>current.filter(id=>!ids.includes(id)))} />}
     <div className="panel table-panel">
       {loading ? <p className="loading">Загрузка элементов…</p> : page?.items.length
@@ -104,6 +127,6 @@ export function Backlog({ context, revision, open, refresh }:
     </div>
     {page && <p className="list-foot">Всего элементов: {page.total}</p>}
     {creating && <CreateItem context={context} close={() => setCreating(false)} created={id => { setCreating(false); refresh(); open(id); }} />}
-    <div className="actions"><button className="button secondary" disabled={pageNumber===1} onClick={()=>{setPageNumber(p=>p-1);setSelected([]);}}>Назад</button><span>Страница {pageNumber} из {page?.totalPages || 1}</span><button className="button secondary" disabled={!page || pageNumber>=page.totalPages} onClick={()=>{setPageNumber(p=>p+1);setSelected([]);}}>Далее</button></div>
+    <div className="actions"><button className="button secondary" disabled={pageNumber===1} onClick={() => setPageNumber(pageNumber - 1)}>Назад</button><span>Страница {pageNumber} из {page?.totalPages || 1}</span><button className="button secondary" disabled={!page || pageNumber>=page.totalPages} onClick={() => setPageNumber(pageNumber + 1)}>Далее</button></div>
   </section>;
 }

@@ -14,7 +14,7 @@ import java.util.UUID;
 @Repository
 public class JdbcAuditRepository implements AuditRepository {
     private final JdbcTemplate db;
-    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     public JdbcAuditRepository(JdbcTemplate db) { this.db = db; }
 
     @Override public void record(UUID workItemId, String actorId, String source, OffsetDateTime occurredAt,
@@ -26,9 +26,19 @@ public class JdbcAuditRepository implements AuditRepository {
     }
 
     @Override public List<Map<String, Object>> findByWorkItem(UUID workItemId) {
-        return db.queryForList("SELECT id,actor_external_id AS \"actorId\",external_source AS \"externalSource\"," +
+        var entries = db.queryForList("SELECT id,actor_external_id AS \"actorId\",external_source AS \"externalSource\"," +
             "occurred_at AS \"occurredAt\",changed_fields AS \"changedFields\",old_values AS \"oldValues\"," +
             "new_values AS \"newValues\" FROM audit_entry WHERE work_item_id=? ORDER BY occurred_at,id", workItemId);
+        for (var entry : entries) {
+            for (String field : List.of("changedFields", "oldValues", "newValues")) {
+                try {
+                    entry.put(field, json.readValue(entry.get(field).toString(), Object.class));
+                } catch (JsonProcessingException e) {
+                    throw new IllegalStateException("invalid_history_json", e);
+                }
+            }
+        }
+        return entries;
     }
 
     private String toJson(Object value) {

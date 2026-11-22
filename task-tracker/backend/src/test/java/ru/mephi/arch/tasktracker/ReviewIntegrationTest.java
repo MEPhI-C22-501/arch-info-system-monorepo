@@ -24,10 +24,35 @@ class ReviewIntegrationTest {
         var source=new DriverManagerDataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword());
         db=new JdbcTemplate(source);tx=new TransactionTemplate(new DataSourceTransactionManager(source));
         try(var connection=source.getConnection();var statement=connection.createStatement()) {
-            for(String file:List.of("001-initial.sql","002-review.sql")) statement.execute(new ClassPathResource("db/changelog/"+file).getContentAsString(StandardCharsets.UTF_8));
+            for(String file:List.of("001-initial.sql","002-review.sql","003-planning.sql")) statement.execute(new ClassPathResource("db/changelog/"+file).getContentAsString(StandardCharsets.UTF_8));
         }
     }
     @BeforeEach void clean() { db.update("DELETE FROM notification");db.update("DELETE FROM work_item");db.update("DELETE FROM event_outbox");db.update("DELETE FROM user_cache"); }
+    @Test void iterationSnapshotsAndOutboxSupportTaskDatesWhenStartingAndCompleting() {
+        var iterations = new ru.mephi.arch.tasktracker.infrastructure.persistence.JdbcIterationRepository(db);
+        UUID id = UUID.randomUUID();
+        var day = java.time.LocalDate.of(2026, 11, 22);
+        var now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        iterations.insert(new ru.mephi.arch.tasktracker.domain.iteration.Iteration(id, "Dates regression", "", day, day,
+            ru.mephi.arch.tasktracker.domain.iteration.IterationState.PLANNED, now));
+        var snapshot = Map.<String, Object>of("plannedHours", 8, "items", List.of(Map.of("startDate", day, "dueDate", day, "createdAt", now)));
+        var outbox = new Outbox(db, "", "PLAINTEXT", "", "", "");
+        tx.executeWithoutResult(status -> {
+            iterations.activate(id, snapshot);
+            outbox.record(new ru.mephi.arch.tasktracker.domain.event.IterationActivated(id, "lead"));
+        });
+        var saved = iterations.findBaselineSnapshot(id).orElseThrow();
+        var item = (Map<?, ?>) ((List<?>) saved.get("items")).getFirst();
+        assertEquals(day.toString(), item.get("startDate"));
+        assertInstanceOf(String.class, item.get("createdAt"));
+        tx.executeWithoutResult(status -> {
+            iterations.complete(id, Map.of("baseline", saved, "actual", snapshot));
+            outbox.record(new ru.mephi.arch.tasktracker.domain.event.IterationCompleted(id, "lead"));
+        });
+        assertEquals(ru.mephi.arch.tasktracker.domain.iteration.IterationState.COMPLETED, iterations.getById(id).state);
+        assertTrue(iterations.findResultSnapshot(id).isPresent());
+        assertEquals(2, db.queryForObject("SELECT count(*) FROM event_outbox WHERE aggregate_id=?", Integer.class, id.toString()));
+    }
     @Test void rollbackDoesNotLeakAnOutboxEventAndReplayKeepsItsIdentifier() {
         var outbox=new Outbox(db,"","PLAINTEXT","","","");
         var event=new WorkItemCreated(UUID.randomUUID(),"lead",null,Map.of("title","Task","type","TASK","statusId",UUID.randomUUID().toString(),"priorityId",UUID.randomUUID().toString()));

@@ -37,6 +37,18 @@ public interface WorkItemRepository {
     /** All leaf (childless) items in {@code rootId}'s own subtree, {@code rootId} included if it's itself a leaf. */
     List<UUID> findLeafDescendantIds(UUID rootId);
 
+    /** Includes historical time recorded before a task was decomposed. */
+    default List<UUID> findDescendantIds(UUID rootId) {
+        var result = new java.util.LinkedHashSet<UUID>();
+        var pending = new java.util.ArrayDeque<UUID>();
+        pending.add(rootId);
+        while (!pending.isEmpty()) {
+            UUID id = pending.removeFirst();
+            if (result.add(id)) findChildren(id).forEach(child -> pending.add(child.id()));
+        }
+        return List.copyOf(result);
+    }
+
     WorkItemPage search(WorkItemFilter filter);
 
     Optional<WorkItem> findByExternalReference(String source, String externalId);
@@ -50,6 +62,12 @@ public interface WorkItemRepository {
     /** Pessimistic row lock, held for the rest of the transaction — guards the "already in an
      * unfinished iteration" check in AddWorkItemToIteration against a concurrent add. */
     void lockForUpdate(UUID id);
+
+    default boolean isPlanningManaged(UUID id) { return false; }
+
+    List<LinkReference> findLinks(UUID id);
+
+    record LinkReference(UUID linkId, UUID otherItemId, String type) {}
 
     record WorkItemFilter(String type, UUID statusId, UUID priorityId, String assigneeId, UUID iterationId,
                            String search, String sort, String restrictToAssigneeId, int page, int size) {}

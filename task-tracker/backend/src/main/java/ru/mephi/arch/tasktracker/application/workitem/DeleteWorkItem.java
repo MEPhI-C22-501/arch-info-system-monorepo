@@ -8,6 +8,7 @@ import ru.mephi.arch.tasktracker.application.port.PermissionPort;
 import ru.mephi.arch.tasktracker.application.port.WorkItemRepository;
 import ru.mephi.arch.tasktracker.domain.event.HierarchyChanged;
 import ru.mephi.arch.tasktracker.domain.event.WorkItemHardDeleted;
+import ru.mephi.arch.tasktracker.domain.event.WorkItemFieldsChanged;
 import ru.mephi.arch.tasktracker.domain.workitem.WorkItem;
 
 import java.util.Map;
@@ -27,9 +28,16 @@ public class DeleteWorkItem {
         permissions.require("item.delete");
         if (!id.toString().equals(confirmation)) throw ApiException.invalid("confirmationId", "confirmation_required");
         WorkItem item = workItems.getById(id);
+        workItems.lockForUpdate(id);
         if (workItems.hasChildren(id)) throw ApiException.conflict("children", "move_or_delete_children_first");
+        var affectedLinks = workItems.findLinks(id);
         workItems.delete(id);
         String actor = permissions.currentSubject();
+        for (var link : affectedLinks) {
+            workItems.touch(link.otherItemId());
+            events.publish(new WorkItemFieldsChanged(link.otherItemId(), actor, null,
+                Map.of("linkRemoved", false), Map.of("linkRemoved", link.linkId().toString(), "linkType", link.type())));
+        }
         if (item.parentId != null) {
             workItems.touch(item.parentId);
             events.publish(new HierarchyChanged(item.parentId, actor, null,

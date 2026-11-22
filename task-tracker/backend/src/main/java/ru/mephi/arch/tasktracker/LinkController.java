@@ -41,7 +41,7 @@ public class LinkController {
         UUID link=UUID.randomUUID();
         int inserted=db.update("INSERT INTO work_item_link(id,source_id,target_id,type) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",link,source,target,type);
         if(inserted==0) throw ApiException.conflict("targetId","duplicate_link");
-        items.touch(id); events.publish(new WorkItemFieldsChanged(id,permissions.currentSubject(),null,Map.of("linkAdded",false),Map.of("linkAdded",link.toString())));
+        recordLinkChange(source, target, "linkAdded", link, type);
         return Map.of("id",link);
     }
     @DeleteMapping("/{linkId}") @Transactional public void delete(@PathVariable UUID id,@PathVariable UUID linkId) {
@@ -50,7 +50,17 @@ public class LinkController {
         if(rows.isEmpty()) throw ApiException.missing("linkId");
         var row=rows.getFirst(); writable((UUID)row.get("source_id"));
         read((UUID)row.get("target_id"));
-        db.update("DELETE FROM work_item_link WHERE id=?",linkId); items.touch(id);
-        events.publish(new WorkItemFieldsChanged(id,permissions.currentSubject(),null,Map.of("linkRemoved",false),Map.of("linkRemoved",linkId.toString())));
+        if (db.update("DELETE FROM work_item_link WHERE id=?", linkId) == 0) throw ApiException.missing("linkId");
+        recordLinkChange((UUID) row.get("source_id"), (UUID) row.get("target_id"), "linkRemoved", linkId, (String) row.get("type"));
+    }
+
+    private void recordLinkChange(UUID source, UUID target, String field, UUID linkId, String type) {
+        String actor = permissions.currentSubject();
+        List<UUID> endpoints = List.of(source, target).stream().sorted().toList();
+        for (UUID itemId : endpoints) items.touch(itemId);
+        for (UUID itemId : endpoints) {
+            events.publish(new WorkItemFieldsChanged(itemId, actor, null, Map.of(field, false),
+                Map.of(field, linkId.toString(), "linkType", type)));
+        }
     }
 }

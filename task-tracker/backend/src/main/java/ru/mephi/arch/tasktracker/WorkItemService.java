@@ -105,6 +105,11 @@ public class WorkItemService {
         Map<String,Object> auditNew=new LinkedHashMap<>();
         auditNew.put("type",type);auditNew.put("title",title);auditNew.put("statusId",status.toString());
         auditNew.put("priorityId",priority.toString());auditNew.put("assigneeId",assignee);
+        auditNew.put("description",Objects.toString(input.get("description"),""));
+        auditNew.put("startDate",start==null?null:start.toString());
+        auditNew.put("dueDate",due==null?null:due.toString());
+        auditNew.put("plannedHours",planned);
+        auditNew.put("parentId",parentId==null?null:parentId.toString());
         if(source!=null){auditNew.put("externalSource",source);auditNew.put("externalDefectId",input.get("externalDefectId"));}
         changes.record(id,actor,source,Map.of(),auditNew,"Создан рабочий элемент");
         return view(id);
@@ -117,15 +122,19 @@ public class WorkItemService {
     @Transactional
     public Map<String,Object> updateAs(UUID id,Map<String,Object> input,String actor,String source) {
         var before=raw(id);
-        if(input.containsKey("version") && Long.parseLong(input.get("version").toString())!=((Number)before.get("version")).longValue())
+        if(input.containsKey("version") && Values.version(input.get("version"))!=((Number)before.get("version")).longValue())
             throw ApiException.conflict("version","stale_work_item");
         String title=nullableString(field(input,"title",before.get("title")));
         if(title==null) throw ApiException.invalid("title","required");
         String type=(String)before.get("type");
         if(input.containsKey("type") && !type.equals(input.get("type"))) throw ApiException.invalid("type","immutable");
         UUID status=(UUID)before.get("status_id");
-        if(input.containsKey("statusId")) {UUID requested=Values.uuid(input.get("statusId"),"statusId");if(!status.equals(requested))access.require("item.status");status=activeReference("status",requested,"statusId");}
-        UUID priority=input.containsKey("priorityId")?activeReference("priority",Values.uuid(input.get("priorityId"),"priorityId"),"priorityId"):(UUID)before.get("priority_id");
+        if(input.containsKey("statusId")) {UUID requested=Values.uuid(input.get("statusId"),"statusId");if(!status.equals(requested)){access.require("item.status");status=activeReference("status",requested,"statusId");}}
+        UUID priority=(UUID)before.get("priority_id");
+        if(input.containsKey("priorityId")) {
+            UUID requested=Values.uuid(input.get("priorityId"),"priorityId");
+            if(!priority.equals(requested))priority=activeReference("priority",requested,"priorityId");
+        }
         UUID parentId=input.containsKey("parentId")?Values.uuid(input.get("parentId"),"parentId"):(UUID)before.get("parent_id");
         parent(id,type,parentId);
         String assignee=nullableString(field(input,"assigneeId",before.get("assignee_external_id")));
@@ -134,6 +143,9 @@ public class WorkItemService {
         LocalDate due=Values.date(field(input,"dueDate",before.get("due_date")),"dueDate");
         dates(start,due);
         BigDecimal planned=Values.hours(field(input,"plannedHours",before.get("planned_hours")),"plannedHours",false);
+        if (planned != null && before.get("planned_hours") instanceof BigDecimal previous && planned.compareTo(previous) == 0) {
+            planned = previous;
+        }
         estimate(type,id,planned);
         String description=Objects.toString(field(input,"description",before.get("description")),"");
         Map<String,Object> oldVals=fields(before);
@@ -143,8 +155,9 @@ public class WorkItemService {
         newVals.put("startDate",start==null?null:start.toString());newVals.put("dueDate",due==null?null:due.toString());
         newVals.put("plannedHours",planned);newVals.put("parentId",parentId==null?null:parentId.toString());
         if(oldVals.equals(newVals)) return view(id);
-        db.update("UPDATE work_item SET title=?,description=?,status_id=?,priority_id=?,assignee_external_id=?,start_date=?,due_date=?,planned_hours=?,parent_id=?,version=version+1,updated_at=? WHERE id=?",
-            title,description,status,priority,assignee,sqlDate(start),sqlDate(due),planned,parentId,OffsetDateTime.now(ZoneOffset.UTC),id);
+        int updated=db.update("UPDATE work_item SET title=?,description=?,status_id=?,priority_id=?,assignee_external_id=?,start_date=?,due_date=?,planned_hours=?,parent_id=?,version=version+1,updated_at=? WHERE id=? AND version=?",
+            title,description,status,priority,assignee,sqlDate(start),sqlDate(due),planned,parentId,OffsetDateTime.now(ZoneOffset.UTC),id,before.get("version"));
+        if(updated!=1)throw ApiException.conflict("version","stale_work_item");
         if(!Objects.equals(before.get("parent_id"),parentId)) {
             if(before.get("parent_id")!=null) {touch((UUID)before.get("parent_id"));changes.record((UUID)before.get("parent_id"),actor,source,Map.of("childRemoved",false),Map.of("childRemoved",id.toString()),"Изменена иерархия");}
             if(parentId!=null) {db.update("UPDATE work_item SET planned_hours=NULL,version=version+1,updated_at=? WHERE id=?",OffsetDateTime.now(ZoneOffset.UTC),parentId);changes.record(parentId,actor,source,Map.of("childAdded",false),Map.of("childAdded",id.toString()),"Изменена иерархия");}
@@ -165,7 +178,7 @@ public class WorkItemService {
     }
     public Map<String,Object> view(UUID id) {
         var w=raw(id);
-        var totals=db.queryForMap("WITH RECURSIVE d AS (SELECT id,planned_hours FROM work_item WHERE id=? UNION ALL SELECT w.id,w.planned_hours FROM work_item w JOIN d ON w.parent_id=d.id), leaves AS (SELECT d.id,d.planned_hours FROM d WHERE NOT EXISTS(SELECT 1 FROM work_item c WHERE c.parent_id=d.id)) SELECT COALESCE(SUM(planned_hours),0) AS planned, (SELECT COALESCE(SUM(t.hours),0) FROM time_log_entry t JOIN leaves l ON l.id=t.work_item_id) AS actual, COUNT(*) FILTER (WHERE planned_hours IS NULL) AS unestimated FROM leaves",id);
+        var totals=db.queryForMap("WITH RECURSIVE d AS (SELECT id,planned_hours FROM work_item WHERE id=? UNION ALL SELECT w.id,w.planned_hours FROM work_item w JOIN d ON w.parent_id=d.id), leaves AS (SELECT d.id,d.planned_hours FROM d WHERE NOT EXISTS(SELECT 1 FROM work_item c WHERE c.parent_id=d.id)) SELECT COALESCE(SUM(planned_hours),0) AS planned, (SELECT COALESCE(SUM(t.hours),0) FROM time_log_entry t JOIN d ON d.id=t.work_item_id) AS actual, COUNT(*) FILTER (WHERE planned_hours IS NULL) AS unestimated FROM leaves",id);
         BigDecimal planned=(BigDecimal)totals.get("planned"),actual=(BigDecimal)totals.get("actual");
         Map<String,Object> out=new LinkedHashMap<>();
         out.put("id",id);out.put("type",w.get("type"));out.put("title",w.get("title"));out.put("description",w.get("description"));

@@ -45,7 +45,7 @@ public class UploadAttachment {
         attachments.insert(new Attachment(id, workItemId, name, file.getSize(), type, file.getBytes(), actor, now));
         workItems.touch(workItemId);
         events.publish(new AttachmentChanged(workItemId, actor, null, Map.of("attachmentAdded", false),
-            Map.of("attachmentAdded", id.toString()), "Добавлен файл"));
+            Map.of("attachmentAdded", id.toString(), "attachmentName", name), "Добавлен файл"));
         return Map.of("id", id, "fileName", name, "sizeBytes", file.getSize(), "contentType", type, "uploadedById", actor, "uploadedAt", now);
     }
 }

@@ -27,7 +27,7 @@ public class JdbcIterationRepository implements IterationRepository {
         IterationState.valueOf(rs.getString("state")), rs.getObject("created_at", OffsetDateTime.class));
 
     private final JdbcTemplate db;
-    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     public JdbcIterationRepository(JdbcTemplate db) { this.db = db; }
 
     @Override public Iteration getById(UUID id) {

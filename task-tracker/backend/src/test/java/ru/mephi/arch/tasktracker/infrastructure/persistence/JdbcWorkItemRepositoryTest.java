@@ -43,6 +43,7 @@ class JdbcWorkItemRepositoryTest {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/changelog/001-initial.sql"));
             try(var statement=connection.createStatement()) {
                 statement.execute(new ClassPathResource("db/changelog/002-review.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+                statement.execute(new ClassPathResource("db/changelog/003-planning.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
             }
         }
     }
@@ -86,8 +87,80 @@ class JdbcWorkItemRepositoryTest {
         assertEquals(0L, fetched.version);
     }
 
+    @Test void linksAreAuditedOnBothCardsAndRemovalSurvivesDeletingAnEndpoint() {
+        var permissions = org.mockito.Mockito.mock(ru.mephi.arch.tasktracker.application.port.PermissionPort.class);
+        org.mockito.Mockito.when(permissions.currentSubject()).thenReturn("lead");
+        var audit = new JdbcAuditRepository(db);
+        var listener = new ru.mephi.arch.tasktracker.infrastructure.event.AuditEventListener(audit);
+        ru.mephi.arch.tasktracker.application.port.EventPublisherPort publisher = event -> {
+            if (event instanceof ru.mephi.arch.tasktracker.domain.event.RecordableChange change) listener.on(change);
+        };
+        var links = new ru.mephi.arch.tasktracker.LinkController(db, repo, permissions, publisher);
+        var delete = new ru.mephi.arch.tasktracker.application.workitem.DeleteWorkItem(repo, permissions, publisher);
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        repo.insert(newTask(first, null));
+        repo.insert(newTask(second, null));
+        UUID link = (UUID) ((java.util.Map<?, ?>) links.create(first, java.util.Map.of("targetId", second, "type", "RELATED"))).get("id");
+        links.delete(first, link);
+        for (UUID id : java.util.List.of(first, second)) {
+            var history = audit.findByWorkItem(id);
+            assertEquals(2, history.size());
+            assertEquals(link.toString(), ((java.util.Map<?, ?>) history.getFirst().get("newValues")).get("linkAdded"));
+            assertEquals(link.toString(), ((java.util.Map<?, ?>) history.getLast().get("newValues")).get("linkRemoved"));
+        }
+        UUID remainingLink = (UUID) ((java.util.Map<?, ?>) links.create(first, java.util.Map.of("targetId", second, "type", "BLOCKS"))).get("id");
+        delete.execute(second, second.toString());
+        var last = (java.util.Map<?, ?>) audit.findByWorkItem(first).getLast().get("newValues");
+        assertEquals(remainingLink.toString(), last.get("linkRemoved"));
+        assertEquals("BLOCKS", last.get("linkType"));
+        assertTrue(repo.findLinks(first).isEmpty());
+    }
+
     @Test void getByIdThrowsOnMissingRow() {
         assertThrows(ApiException.class, () -> repo.getById(UUID.randomUUID()));
+    }
+
+    @Test void concurrentUpdatesDoNotSilentlyOverwriteEachOther() {
+        UUID id = UUID.randomUUID();
+        repo.insert(newTask(id, null));
+        var first = repo.getById(id);
+        var stale = repo.getById(id);
+        first.applyFieldUpdate("First", "", first.statusId, first.priorityId, null, null, null, null, null, OffsetDateTime.now());
+        stale.applyFieldUpdate("Second", "", stale.statusId, stale.priorityId, null, null, null, null, null, OffsetDateTime.now());
+        repo.update(first);
+        assertThrows(ApiException.class, () -> repo.update(stale));
+        assertEquals("First", repo.getById(id).title);
+    }
+
+    @Test void decompositionPreservesTimeAlreadyRecordedOnTheParent() {
+        UUID parent = UUID.randomUUID(), child = UUID.randomUUID();
+        repo.insert(newTask(parent, null));
+        db.update("INSERT INTO time_log_entry(id,work_item_id,external_user_id,logged_date,hours,created_at) VALUES(?,?,'original-author',current_date,3,now())", UUID.randomUUID(), parent);
+        var subtask = newTask(child, parent);
+        subtask.plannedHours = new BigDecimal("5");
+        repo.insert(subtask);
+        db.update("INSERT INTO time_log_entry(id,work_item_id,external_user_id,logged_date,hours,created_at) VALUES(?,?,'other-author',current_date,2,now())", UUID.randomUUID(), child);
+        var summary = repo.computeHoursSummary(parent);
+        assertEquals(0, new BigDecimal("5").compareTo(summary.actual()));
+        assertEquals(0, new BigDecimal("5").compareTo(summary.planned()));
+        assertEquals(2, repo.findDescendantIds(parent).size());
+    }
+
+    @Test void requiredSortsAndLargeOffsetsAreSupported() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        repo.insert(newTask(a, null));
+        repo.insert(newTask(b, null));
+        db.update("UPDATE work_item SET type='BUG' WHERE id=?", b);
+        for (String sort : java.util.List.of("type", "assignee", "iteration", "priority", "status")) {
+            var filter = new ru.mephi.arch.tasktracker.application.port.WorkItemRepository.WorkItemFilter(
+                null, null, null, null, null, null, sort, null, 1, 50);
+            var page = repo.search(filter);
+            assertEquals(2, page.items().size());
+            if (sort.equals("type")) assertEquals(b, page.items().getFirst().id);
+        }
+        var distant = new ru.mephi.arch.tasktracker.application.port.WorkItemRepository.WorkItemFilter(
+            null, null, null, null, null, null, "type", null, Integer.MAX_VALUE, 500);
+        assertTrue(repo.search(distant).items().isEmpty());
     }
 
     @Test void updateBumpsWhateverVersionIsSet() {

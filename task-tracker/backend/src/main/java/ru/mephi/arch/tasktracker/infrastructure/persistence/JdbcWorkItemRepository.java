@@ -57,11 +57,12 @@ public class JdbcWorkItemRepository implements WorkItemRepository {
     }
 
     @Override public void update(WorkItem item) {
-        db.update("UPDATE work_item SET title=?,description=?,status_id=?,priority_id=?,assignee_external_id=?," +
-                "start_date=?,due_date=?,planned_hours=?,parent_id=?,version=?,updated_at=? WHERE id=?",
+        int changed = db.update("UPDATE work_item SET title=?,description=?,status_id=?,priority_id=?,assignee_external_id=?," +
+                "start_date=?,due_date=?,planned_hours=?,parent_id=?,version=?,updated_at=? WHERE id=? AND version=?",
             item.title, item.description, item.statusId, item.priorityId, item.assigneeId,
             sqlDate(item.startDate), sqlDate(item.dueDate), item.plannedHours, item.parentId,
-            item.version, item.updatedAt, item.id);
+            item.version, item.updatedAt, item.id, item.version - 1);
+        if (changed != 1) throw ApiException.conflict("version", "stale_work_item");
     }
 
     @Override public void delete(UUID id) { db.update("DELETE FROM work_item WHERE id=?", id); }
@@ -81,7 +82,7 @@ public class JdbcWorkItemRepository implements WorkItemRepository {
             "UNION ALL SELECT w.id,w.planned_hours FROM work_item w JOIN d ON w.parent_id=d.id), " +
             "leaves AS (SELECT d.id,d.planned_hours FROM d WHERE NOT EXISTS(SELECT 1 FROM work_item c WHERE c.parent_id=d.id)) " +
             "SELECT COALESCE(SUM(planned_hours),0) AS planned, " +
-            "(SELECT COALESCE(SUM(t.hours),0) FROM time_log_entry t JOIN leaves l ON l.id=t.work_item_id) AS actual, " +
+            "(SELECT COALESCE(SUM(t.hours),0) FROM time_log_entry t JOIN d ON d.id=t.work_item_id) AS actual, " +
             "COUNT(*) FILTER (WHERE planned_hours IS NULL) AS unestimated FROM leaves", id);
         return new HoursSummary((BigDecimal) totals.get("planned"), (BigDecimal) totals.get("actual"),
             ((Number) totals.get("unestimated")).longValue());
@@ -134,13 +135,17 @@ public class JdbcWorkItemRepository implements WorkItemRepository {
         String sort = switch (Objects.toString(filter.sort(), "dueDate")) {
             case "priority" -> "p.sort_order,w.created_at";
             case "status" -> "s.board_order,w.created_at";
+            case "type" -> "w.type,w.created_at";
+            case "assignee" -> "u.display_name NULLS LAST,w.assignee_external_id NULLS LAST,w.created_at";
+            case "iteration" -> "(SELECT min(i.name) FROM work_item_iteration wi JOIN iteration i ON i.id=wi.iteration_id WHERE wi.work_item_id=w.id AND wi.removed_at IS NULL AND i.state<>'COMPLETED') NULLS LAST,w.created_at";
             case "createdAt" -> "w.created_at DESC";
             default -> "w.due_date NULLS LAST,w.created_at";
         };
         var queryArgs = new ArrayList<>(args);
         queryArgs.add(filter.size());
-        queryArgs.add((filter.page() - 1) * filter.size());
-        var ids = db.queryForList("SELECT w.id" + base + " ORDER BY " + sort + " LIMIT ? OFFSET ?", UUID.class, queryArgs.toArray());
+        queryArgs.add(((long) filter.page() - 1) * filter.size());
+        String searchBase = base.replace(" WHERE 1=1", " LEFT JOIN user_cache u ON u.external_user_id=w.assignee_external_id WHERE 1=1");
+        var ids = db.queryForList("SELECT w.id" + searchBase + " ORDER BY " + sort + ",w.id LIMIT ? OFFSET ?", UUID.class, queryArgs.toArray());
         List<WorkItem> items = ids.stream().map(this::getById).toList();
         return new WorkItemPage(items, filter.page(), filter.size(), total);
     }
@@ -159,6 +164,17 @@ public class JdbcWorkItemRepository implements WorkItemRepository {
     }
 
     @Override public void lockForUpdate(UUID id) { db.queryForMap("SELECT id FROM work_item WHERE id=? FOR UPDATE", id); }
+
+    @Override public boolean isPlanningManaged(UUID id) {
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM planning_binding WHERE work_item_id=?)", Boolean.class, id));
+    }
+
+    @Override public List<LinkReference> findLinks(UUID id) {
+        return db.query("SELECT id, CASE WHEN source_id=? THEN target_id ELSE source_id END AS other_id, type " +
+                "FROM work_item_link WHERE source_id=? OR target_id=? ORDER BY other_id, id",
+            (row, index) -> new LinkReference(row.getObject("id", UUID.class), row.getObject("other_id", UUID.class), row.getString("type")),
+            id, id, id);
+    }
 
     private static Date sqlDate(java.time.LocalDate date) { return date == null ? null : Date.valueOf(date); }
 }

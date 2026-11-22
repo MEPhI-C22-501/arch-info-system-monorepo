@@ -39,7 +39,7 @@ export function Board({ context, revision, open, refresh }:
   const columns = context.statuses.filter(status => status.active && status.boardVisible).sort((a, b) => a.boardOrder - b.boardOrder);
 
   return <section className="screen-content">
-    <div className="section-heading"><div><h2>Поток работы</h2><p>Перемещайте карточки между колонками</p></div></div>
+    <div className="section-heading"><h1>Канбан-доска</h1></div>
     <ErrorBanner message={error || moveError} clear={() => setMoveError('')} />
     <div className="filters compact">
       <select value={filters.assigneeId} onChange={e => setFilters(v => ({ ...v, assigneeId: e.target.value }))}>

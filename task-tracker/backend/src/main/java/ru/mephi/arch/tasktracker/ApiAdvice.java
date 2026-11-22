@@ -70,7 +70,7 @@ class IntegrationRequestLogFilter extends OncePerRequestFilter {
     IntegrationRequestLogFilter(JdbcTemplate db) { this.db = db; }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !path.equals("/api/v1/bugs") && !path.startsWith("/api/v1/reports/");
+        return !path.equals("/api/v1/bugs") && !path.startsWith("/api/v1/reports/") && !path.startsWith("/api/v1/planning/projects/");
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         long started = System.nanoTime();
