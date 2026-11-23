@@ -28,9 +28,9 @@
 | `js/views.js` | Модели экранов без DOM: состояния пустого списка, пустого отбора и ошибки (с повтором или без), модель формы по роли и состоянию записи, текст ячейки таблицы, описание отбора |
 | `js/theme.js` | Тема страницы до первой отрисовки: системная, светлая или тёмная, выбор хранится в браузере |
 | `js/app.js` | Экраны S-01..S-05, маршруты в пути `/admin/{коллекция}/{идентификатор}`, черновики форм, подтверждения, карточка сотрудника, срез на момент, групповые операции подразделения |
-| `tests/` | Тесты клиента API, входа, схем, JSON Patch, моделей экранов и форматов |
+| `tests/` | Тесты клиента API, входа, схем, JSON Patch, моделей экранов и форматов. `spec.test.js` сверяет поля форм, их обязательность и поля только для чтения со спецификациями справочников в `backend/api/openapi/v1/` (ADR-026) |
 
-Образ собирается из `deployments/docker/reference-manager-ui.dockerfile`, конфигурация nginx `deployments/configs/reference-manager-ui/local/reference-manager-ui.conf` в образ не входит и монтируется при запуске (см. `deployments/docker-compose.yaml`). Папка `tests/` и этот файл в образ не попадают.
+Образ собирается из `deployments/docker/reference-manager-ui.dockerfile` с аргументом `VERSION` (версия сборки, без него `dev`), версия видна по адресу `/admin/version.json`. Конфигурация nginx `deployments/configs/reference-manager-ui/local/reference-manager-ui.conf` в образ не входит и монтируется при запуске (см. `deployments/docker-compose.yaml`). Папка `tests/` и этот файл в образ не попадают.
 
 ## Как это работает
 
