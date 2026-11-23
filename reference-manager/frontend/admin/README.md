@@ -20,7 +20,7 @@
 | `index.html`, `app.css` | Разметка и стили на переменных темы. Скрипты и стили лежат в отдельных файлах, встроенных нет: страница работает под `Content-Security-Policy` без `unsafe-inline` (замечание З-2 отчёта проверки безопасности) |
 | `js/config.js` | Настройки среды: путь API (`/v1`), адрес Keycloak, realm, клиент. Другой стенд монтирует свою копию файла по пути `/admin/js/config.js` |
 | `js/dom.js` | Построение DOM из текстовых узлов. Разметка из строк не собирается, значения записей не могут стать кодом (замечание З-1) |
-| `js/auth.js` | Вход через Keycloak: PKCE S256, обмен кода на токен, обновление токена до истечения, выход. Роли читаются из `realm_access.roles` и `resource_access.reference-manager.roles` |
+| `js/auth.js` | Вход через Keycloak: PKCE S256, обмен кода на токен, обновление токена до истечения, выход. Роли читаются из `resource_access.reference-manager.roles`, роли realm не читаются |
 | `js/api.js` | Клиент API поверх `fetch`: `List` с `filter`, `order_by`, `pageSize`, `pageToken`, `allowDeleted`; `Get`, `Create`, `Update` с `updateMask`, `Delete` и `force`, `export`, ревизии, `dismiss`, `syncAccount`. Ошибки `{message, details}` с `X-Trace-Id` ответа, повтор при 429 |
 | `js/catalogs.js` | Схемы справочников первой версии по [130](../../documents/130.api-contracts.md) и [120](../../documents/120.data-model.md), группы G-1..G-3 и роли из [070](../../documents/070.role-matrix.md), маска обновления, типизация тела запроса |
 | `js/jsonpatch.js` | Применение операций JSON Patch ревизий: состояние записи на ревизию собирается из ревизий сервиса |

@@ -70,7 +70,11 @@ JSON-тела сравниваются семантически: порядок 
 Сервис принимает только токены Keycloak. Шаг `the HTTP request is authorized as "<user>"` получает токен
 пользователя realm по password grant через клиент `reference-manager-ui` и добавляет заголовок `Authorization`.
 Шаг `the HTTP request is authorized as "<user>" through the client "<client>"` получает токен через другой клиент,
-например `foreign-app`, чьи токены выданы не для аудитории сервиса. Токены кэшируются до истечения срока.
+например `foreign-app`, чьи токены выданы не для аудитории сервиса. Шаг
+`the HTTP request is authorized as the service client "<client>"` получает токен служебной учётной записи потребителя
+по client credentials: `planning-service`, `reports-client`, `tracker-directory`, `qa-executor` с ролями, как в realm Infra.
+Их общий секрет `test-consumer-secret` задан в `docker-compose.test.yaml` (`KEYCLOAK_CONSUMER_SECRET`), сценарии чтения
+потребителями - `features/catalogs/consumers.feature`. Токены кэшируются до истечения срока.
 
 Пароль тестового пользователя совпадает с логином. Идентификаторы пользователей заданы в realm, поэтому
 в ожидаемых данных (`changed_by`, `last_changer`) они постоянны.
@@ -98,7 +102,7 @@ JSON-тела сравниваются семантически: порядок 
 | --- | --- |
 | `the Keycloak account "<login>" is enabled`, `is disabled`, `is missing` | Проверяет состояние учётной записи |
 | `the Keycloak account "<login>" has email "<email>"` | Проверяет адрес почты |
-| `the Keycloak account "<login>" has the realm role "<role>"` | Проверяет роль realm |
+| `the Keycloak account "<login>" has no roles of the client "<client>"` | Проверяет, что у учётной записи нет ролей клиента, в том числе через группы и роли realm по умолчанию (ADR-024) |
 | `the Keycloak account "<login>" is removed` | Удаляет учётную запись, если она есть; ставится в `Background`, потому что Keycloak между сценариями не очищается |
 | `a Keycloak account "<login>" exists with email "<email>"` | Создаёт отключённую учётную запись для сценариев повтора и конфликта |
 

@@ -32,11 +32,20 @@ Lists and exports take `readTime` (RFC 3339): the records are returned as they w
 
 Two operations change a whole org unit from one date in one transaction: `POST /v1/salaries/revise` (new salaries by `percent` or `amount`) and `POST /v1/assignments/transfer` (a move to `target_org_unit_id`). The record in effect of every employee of the unit (with `include_subunits`, of the units below it too) ends the day before, the new one starts on the date. `validate_only` returns the plan and rolls everything back. The decisions are a pure plan in `internal/services/groupops/plan.go`, the writes go through the standard methods of the catalog, so every record passes its rules and gets a revision.
 
-The shared `api/` folder of the monorepo keeps copies of these specs and the clients generated from them for every team. `task api:sync` copies the specs, `task api:check` (part of `task lint`) fails on a stale copy, the clients are regenerated in `api/` with its own `task generate`.
+### API contract: source and publication
+
+The source of the contract is `backend/api/openapi/v1/<resource>/openapi.yaml` of this module, 12 specs: the nine generated catalogs, `currency`, `health` and the hand-written `profile` (ADR-025). The shared `api/openapi/reference-manager/` folder of the monorepo is the publication for the other teams: it keeps copies of these specs and the clients generated from them. Never edit a copy there, change the spec here and publish it:
+
+```bash
+task api:sync     # copies every spec of the module into api/openapi/reference-manager/
+task api:check    # part of task lint and CI: fails when a copy differs from its source
+```
+
+`api/sync-specs.py` of the shared folder copies from the same source. The clients are regenerated in `api/` with its own `task generate`.
 
 Employees carry `employment_state` and `dismissal_date`, both set by the service. `POST /v1/employees/{employeeID}/dismiss` closes the assignment and the salary in effect with the dismissal date. The unit and the position of an employee are computed from the assignment in effect today (migration `000011`).
 
-Every employee has a Keycloak account managed by the service through the Admin REST API under the client `reference-manager-provisioner` (FR-RM-53..58). `account_state` and `account_user_id` are read-only fields of the record: the creation stores the record with `PENDING`, creates a disabled account with a random temporary password (the employee changes it at the first login), gives it the realm roles from the configuration, enables it and stores its ID with `ENABLED`. The dismissal disables the account (`DISABLED`, the ID stays), a changed name or email is passed to the account, a working employee with an account cannot be deleted. When Keycloak is unavailable the record stays `PENDING` and the method answers `503`; `POST /v1/employees/{employeeID}/syncAccount` repeats the operation and never creates a second account (the account is found by its ID, or by username when the email matches). The `pkg/keycloak` package holds the client, `internal/services/employee` the coordination.
+Every employee has a Keycloak account managed by the service through the Admin REST API under the client `reference-manager-provisioner` (FR-RM-53..58). `account_state` and `account_user_id` are read-only fields of the record: the creation stores the record with `PENDING`, creates a disabled account with a random temporary password (the employee changes it at the first login), enables it and stores its ID with `ENABLED`. The new account gets no roles of the service: it signs in and reads its own profile (`GET /v1/profiles/me`), a Keycloak administrator assigns the catalog roles (ADR-024). The dismissal disables the account (`DISABLED`, the ID stays), a changed name or email is passed to the account, a working employee with an account cannot be deleted. When Keycloak is unavailable the record stays `PENDING` and the method answers `503`. `POST /v1/employees/{employeeID}/syncAccount` repeats the operation and never creates a second account (the account is found by its ID, or by username when the email matches). The `pkg/keycloak` package holds the client, `internal/services/employee` the coordination.
 
 ## Requirements
 
@@ -166,7 +175,7 @@ PostgreSQL connection pool settings are configured under `databases.postgres.poo
 
 ### Authentication and authorization
 
-Every API request except `/v1/health/*` needs a Keycloak access token in the `Authorization: Bearer <token>` header. The service verifies the token signature with the realm keys (JWKS), its issuer, audience, lifetime and type, and takes the actor from it: the user ID from `sub` and the roles from `realm_access.roles` together with `resource_access.<client_id>.roles`. A request without a valid token gets `401`, an operation the roles do not grant gets `403`. Roles are checked by the matrix "role - reference group - access level" from [documents/070.role-matrix.md](documents/070.role-matrix.md): classifiers are read and exported by every role of the service and changed by `reference-admin` only, HR catalogs are changed by `reference-hr-admin`, salaries and absences are hidden from `reference-reader` and `reference-admin` (see [Catalogs](#catalogs)).
+Every API request except `/v1/health/*` needs a Keycloak access token in the `Authorization: Bearer <token>` header. The service verifies the token signature with the realm keys (JWKS), its issuer, audience, lifetime and type, and takes the actor from it: the user ID from `sub` and the roles from `resource_access.<client_id>.roles` (realm roles are not read). A request without a valid token gets `401`, an operation the roles do not grant gets `403`. Roles are checked by the matrix "role - reference group - access level" from [documents/070.role-matrix.md](documents/070.role-matrix.md): classifiers are read and exported by every role of the service and changed by `reference-admin` only, HR catalogs are changed by `reference-hr-admin`, salaries and absences are hidden from `reference-reader` and `reference-admin` (see [Catalogs](#catalogs)).
 
 The keys are cached and refreshed in the background and when a token is signed by an unknown key, so key rotation needs no restart and requests keep working while Keycloak is unavailable. The service starts without Keycloak as well.
 
@@ -176,9 +185,9 @@ Token verification is configured under `auth.keycloak`.
 | ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- |
 | `issuer_url`                        | `string`   | Realm URL, the `iss` claim must match it exactly. Required                                        |
 | `jwks_url`                          | `string`   | Realm keys URL when the service reaches Keycloak by another address, derived from the issuer otherwise |
-| `audience`                          | `string`   | Required value of the `aud` claim, not checked when empty                                         |
-| `client_id`                         | `string`   | Client whose roles are taken from `resource_access` in addition to the realm roles                |
-| `algorithms`                        | `[]string` | Accepted signing algorithms, `RS256` by default                                                   |
+| `audience`                          | `string`   | Required value of the `aud` claim, `reference-manager` by default, always checked                 |
+| `client_id`                         | `string`   | Client whose roles are taken from `resource_access`, `reference-manager` by default               |
+| `algorithms`                        | `[]string` | Signing algorithms, only `[RS256]` is accepted (the default)                                      |
 | `leeway`                            | `duration` | Allowed clock skew when checking the token lifetime, `30s` by default                             |
 | `jwks.refresh_interval`             | `duration` | Period of the background refresh of the keys, `1h` by default                                     |
 | `jwks.unknown_key_refresh_interval` | `duration` | Minimal period between refreshes caused by unknown keys, `1m` by default                          |
@@ -195,7 +204,8 @@ The accounts of employees are managed under `auth.keycloak.provisioner` (see [Ca
 | `client_id`           | `string`   | Service client, `reference-manager-provisioner` by default                                        |
 | `client_secret`       | `string`   | Secret of the client, read from `KEYCLOAK_PROVISIONER_SECRET` of the environment only. Required   |
 | `request_timeout`     | `duration` | Timeout of one call to Keycloak, `5s` by default                                                  |
-| `default_realm_roles` | `[]string` | Realm roles given to every created account, `reference-reader` in the local environment           |
+
+The service assigns no roles, so the client needs no rights on the roles of other clients (ADR-024).
 
 ### Telemetry
 
@@ -240,7 +250,7 @@ The host ports leave room for the stands of the other modules and the shared env
 
 The panel logs in through Keycloak (users of the local realm, the password equals the username: `admin`, `hr-admin`, `reader`, `hr-reader`) and talks to the service through the `/v1/` proxy of its own nginx, so the browser uses one origin. `task swagger` starts Swagger UI of every spec on the same network: the Authorize button logs in with PKCE through the local Keycloak and "Try it out" goes through the `/v1/` proxy of its nginx.
 
-The local Keycloak imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). For the consumers it has service clients with the client ids of the realm of Infra where they exist: `reports-client` (`reference-reader`), `planning-service` (`reference-hr-reader`), `task-tracker-service` and `qa-service` (`reference-reader`). `deployments/configs/keycloak/import-realm.sh` substitutes `KEYCLOAK_PROVISIONER_SECRET` and `KEYCLOAK_CONSUMER_SECRET` into the realm on the start of Keycloak. The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
+The local Keycloak imports the realm `arch-info-system` from `deployments/configs/keycloak/arch-info-system-realm.json` with the roles of the service, the client `reference-manager` (token audience), the public client `reference-manager-ui`, the service client `reference-manager-provisioner` and test users whose password equals the username: `admin`, `second-admin`, `reader`, `hr-admin`, `hr-reader` and `outsider` (no roles). For the consumers it has service clients with the client ids and roles of the realm of Infra: `reports-client` and `tracker-directory` (`reference-reader`), `planning-service` (`reference-hr-reader`), `qa-executor` (`reference-profile-reader` only). The scenarios of `backend/tests/features/catalogs/consumers.feature` read through each of them. `deployments/configs/keycloak/import-realm.sh` substitutes `KEYCLOAK_PROVISIONER_SECRET` and `KEYCLOAK_CONSUMER_SECRET` into the realm on the start of Keycloak. The realm is for local development and integration tests only, on the shared stand Keycloak and its realm are provided by Infra.
 
 The collector prints a summary of every received batch to its log (`docker logs reference_manager_otel_collector`) and stores nothing. The storage and the browsing of telemetry are provided by Infra on the shared stand, where only `telemetry.exporter.endpoint` changes. A trace of a request is found there by the `X-Trace-Id` of the response.
 
@@ -266,6 +276,10 @@ task demo:accounts  # calls POST /v1/employees/{id}/syncAccount for every employ
 ```
 
 The data set is loaded once: a second run finds the employees and changes nothing. Every record has its first revision. The accounts appear in the Keycloak admin console under the realm `arch-info-system`, each with a temporary password and a forced password change, and the accounts job is safe to repeat. A typical demonstration: hire an employee (`POST /v1/employees/`), show the enabled account in Keycloak, export `POST /v1/employees/export`, plan new salaries of a unit (`POST /v1/salaries/revise` with `validate_only`), dismiss the employee (`POST /v1/employees/{id}/dismiss`) and show the disabled account and the revisions of the record.
+
+### Integration tests
+
+`task tests:integration` starts PostgreSQL with all migrations on an empty database, Keycloak with the realm and the collector through testcontainers, then runs the godog scenarios of `backend/tests/` (see [backend/tests/README.md](backend/tests/README.md)). CI runs the same target in the job `Integration tests` of every pull request that changes `reference-manager/`, so every run starts from a clean environment. Last local run, 2026-11-24: 248 scenarios and 2300 steps, all passed, about one minute after the images are built.
 
 ### Browser tests
 
