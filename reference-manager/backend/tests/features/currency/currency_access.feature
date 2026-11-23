@@ -45,7 +45,8 @@ Feature: Access to currencies
     And the HTTP response contains a body
       """
       {
-        "message": "permission denied"
+        "message": "permission denied",
+        "details": [{"field": "role", "message": "create access to classifiers references needs one of the roles: reference-admin"}]
       }
       """
     When the SQL query is executed
@@ -106,7 +107,8 @@ Feature: Access to currencies
     And the HTTP response contains a body
       """
       {
-        "message": "permission denied"
+        "message": "permission denied",
+        "details": [{"field": "role", "message": "read access to classifiers references needs one of the roles: reference-admin, reference-hr-admin, reference-hr-reader, reference-reader"}]
       }
       """
 

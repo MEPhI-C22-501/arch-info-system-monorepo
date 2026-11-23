@@ -107,8 +107,9 @@ type roles struct {
 type claims struct {
 	jwt.RegisteredClaims
 
-	Type           string          `json:"typ"`
-	ResourceAccess json.RawMessage `json:"resource_access"`
+	Type            string          `json:"typ"`
+	AuthorizedParty string          `json:"azp"`
+	ResourceAccess  json.RawMessage `json:"resource_access"`
 }
 
 // Authenticate verifies the access token and returns its actor: the user ID from the "sub" claim
@@ -146,8 +147,9 @@ func (v *Verifier) Authenticate(ctx context.Context, token string) (*actor.Actor
 	slices.Sort(tokenRoles)
 
 	return &actor.Actor{
-		UserID: userID,
-		Roles:  slices.Compact(tokenRoles),
+		UserID:   userID,
+		Roles:    slices.Compact(tokenRoles),
+		ClientID: c.AuthorizedParty,
 	}, nil
 }
 

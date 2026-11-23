@@ -13,7 +13,9 @@ import (
 	"github.com/go-chi/render"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	currencydmn "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/currency"
+	recordhndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/record"
 	currencyv1 "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/api/v1/currency"
 )
 
@@ -59,6 +61,7 @@ func (h *Handler) CreateCurrency(w http.ResponseWriter, r *http.Request) {
 	created, err := h.service.CreateCurrency(r.Context(), currencyToModel(&currency))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -79,6 +82,7 @@ func (h *Handler) GetCurrency(
 	currency, err := h.service.GetCurrency(r.Context(), currencyID, valueOrZero(params.AllowDeleted))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -94,6 +98,7 @@ func (h *Handler) ListCurrencies(w http.ResponseWriter, r *http.Request, params 
 	page, err := h.service.ListCurrencies(r.Context(), listParamsToModel(&params))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -114,6 +119,7 @@ func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request, param
 	})
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -125,6 +131,7 @@ func (h *Handler) ExportCurrencies(w http.ResponseWriter, r *http.Request, param
 	var file bytes.Buffer
 	if err := writeCurrenciesExcel(&file, currencies); err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -160,6 +167,7 @@ func (h *Handler) UpdateCurrency(
 	})
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -181,6 +189,7 @@ func (h *Handler) DeleteCurrency(
 	if valueOrZero(params.Force) {
 		if err := h.service.PurgeCurrency(r.Context(), currencyID); err != nil {
 			apiErr, status := errorToAPI(err)
+			recordhndl.LogDenied(r, err)
 
 			render.Status(r, status)
 			render.JSON(w, r, apiErr)
@@ -196,6 +205,7 @@ func (h *Handler) DeleteCurrency(
 	deleted, err := h.service.DeleteCurrency(r.Context(), currencyID)
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -217,6 +227,7 @@ func (h *Handler) GetCurrencyRevision(
 	revision, err := h.service.GetCurrencyRevision(r.Context(), currencyID, revisionNumber, valueOrZero(params.AllowDeleted))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -227,6 +238,7 @@ func (h *Handler) GetCurrencyRevision(
 	resp, err := currencyRevisionToAPI(revision)
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -247,6 +259,7 @@ func (h *Handler) ListCurrencyRevisions(
 	page, err := h.service.ListCurrencyRevisions(r.Context(), revisionListParamsToModel(currencyID, &params))
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -257,6 +270,7 @@ func (h *Handler) ListCurrencyRevisions(
 	resp, err := revisionListPageToAPI(page)
 	if err != nil {
 		apiErr, status := errorToAPI(err)
+		recordhndl.LogDenied(r, err)
 
 		render.Status(r, status)
 		render.JSON(w, r, apiErr)
@@ -375,7 +389,10 @@ func currencyRevisionToAPI(r *currencydmn.CurrencyRevision) (*currencyv1.Currenc
 }
 
 func errorToAPI(err error) (currencyv1.Error, int) {
-	var invalidArgErr *domains.InvalidArgumentError
+	var (
+		invalidArgErr *domains.InvalidArgumentError
+		deniedErr     *access.PermissionDeniedError
+	)
 
 	switch {
 	case errors.As(err, &invalidArgErr):
@@ -386,6 +403,11 @@ func errorToAPI(err error) (currencyv1.Error, int) {
 		return currencyv1.Error{Message: "currency was modified concurrently, retry the request"}, http.StatusConflict
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return currencyv1.Error{Message: "unauthenticated"}, http.StatusUnauthorized
+	case errors.As(err, &deniedErr):
+		field, reason := "role", deniedErr.Reason()
+		details := []currencyv1.ErrorDetail{{Field: &field, Message: &reason}}
+
+		return currencyv1.Error{Message: "permission denied", Details: &details}, http.StatusForbidden
 	case errors.Is(err, domains.ErrPermissionDenied):
 		return currencyv1.Error{Message: "permission denied"}, http.StatusForbidden
 	case errors.Is(err, domains.ErrRevisionNotFound):

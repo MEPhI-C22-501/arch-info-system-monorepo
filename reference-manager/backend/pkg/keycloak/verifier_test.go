@@ -192,6 +192,14 @@ func TestVerifierAuthenticate(t *testing.T) {
 				Roles:  []string{"reference-admin", "reference-reader"},
 			},
 		},
+		"token of a service account names its client": {
+			token: key.sign(t, with(map[string]any{"azp": "planning-service"})),
+			want: &actor.Actor{
+				UserID:   userID,
+				Roles:    []string{"reference-admin", "reference-reader"},
+				ClientID: "planning-service",
+			},
+		},
 		"expired": {
 			token: key.sign(t, with(map[string]any{"exp": time.Now().Add(-time.Minute).Unix()})),
 		},

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"mime"
 	"net/http"
 	"strconv"
@@ -15,7 +16,9 @@ import (
 	"github.com/go-chi/render"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/record"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/actor"
 )
 
 // Error is the error response of every catalog, the same shape the currency API uses.
@@ -34,6 +37,7 @@ func ErrorToAPI(err error, singular string) (Error, int) {
 	var (
 		validationErr *record.ValidationError
 		invalidArgErr *domains.InvalidArgumentError
+		deniedErr     *access.PermissionDeniedError
 	)
 
 	switch {
@@ -54,6 +58,8 @@ func ErrorToAPI(err error, singular string) (Error, int) {
 		return Error{Message: err.Error()}, http.StatusBadRequest
 	case errors.Is(err, domains.ErrUnauthenticated):
 		return Error{Message: "unauthenticated"}, http.StatusUnauthorized
+	case errors.As(err, &deniedErr):
+		return Error{Message: "permission denied", Details: []ErrorDetail{{Field: "role", Message: deniedErr.Reason()}}}, http.StatusForbidden
 	case errors.Is(err, domains.ErrPermissionDenied):
 		return Error{Message: "permission denied"}, http.StatusForbidden
 	case errors.Is(err, domains.ErrRevisionNotFound):
@@ -70,9 +76,44 @@ func ErrorToAPI(err error, singular string) (Error, int) {
 // RenderError writes the error response of a failed service call.
 func RenderError(w http.ResponseWriter, r *http.Request, err error, singular string) {
 	apiErr, status := ErrorToAPI(err, singular)
+	LogDenied(r, err)
 
 	render.Status(r, status)
 	render.JSON(w, r, apiErr)
+}
+
+// LogDenied writes a refusal to the log, so a consumer that came without a role is found by its client and path.
+// Other errors are not logged here.
+func LogDenied(r *http.Request, err error) {
+	if !errors.Is(err, domains.ErrPermissionDenied) {
+		return
+	}
+
+	var deniedErr *access.PermissionDeniedError
+	if errors.As(err, &deniedErr) {
+		LogAccessDenied(r, string(deniedErr.Group), string(deniedErr.Level))
+
+		return
+	}
+
+	LogAccessDenied(r, "", "")
+}
+
+// LogAccessDenied writes the refused access with the caller of the request: subject, client and roles of its token.
+func LogAccessDenied(r *http.Request, group, level string) {
+	attrs := []any{slog.String("method", r.Method), slog.String("path", r.URL.Path)}
+	if group != "" {
+		attrs = append(attrs, slog.String("group", group), slog.String("level", level))
+	}
+
+	if a, ok := actor.FromContext(r.Context()); ok {
+		attrs = append(attrs, slog.String("sub", a.UserID.String()), slog.Any("roles", a.Roles))
+		if a.ClientID != "" {
+			attrs = append(attrs, slog.String("azp", a.ClientID))
+		}
+	}
+
+	slog.WarnContext(r.Context(), "access denied", attrs...)
 }
 
 // RenderParamError responds to requests whose path or query parameters could not be parsed.

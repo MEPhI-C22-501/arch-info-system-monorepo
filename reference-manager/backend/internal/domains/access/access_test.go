@@ -47,7 +47,9 @@ func TestAllowed(t *testing.T) {
 			access.GroupHR:           {c, r, u, x, d},
 			access.GroupRestrictedHR: {c, r, u, x, d},
 		},
-		"unknown-role": {},
+		// the profile role opens only /v1/profiles, never a reference group
+		access.RoleProfileReader: {},
+		"unknown-role":           {},
 	}
 
 	for role, byGroup := range granted {
@@ -74,6 +76,31 @@ func TestAllowedCombinesRoles(t *testing.T) {
 	assert.True(t, access.Allowed(roles, access.GroupClassifiers, access.LevelDelete))
 	assert.True(t, access.Allowed(roles, access.GroupRestrictedHR, access.LevelCreate))
 	assert.False(t, access.Allowed(nil, access.GroupClassifiers, access.LevelRead))
+}
+
+func TestGrantingRoles(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, []string{access.RoleAdmin, access.RoleHRAdmin, access.RoleHRReader, access.RoleReader},
+		access.GrantingRoles(access.GroupHR, access.LevelRead))
+	assert.Equal(t, []string{access.RoleHRAdmin, access.RoleHRReader}, access.GrantingRoles(access.GroupRestrictedHR, access.LevelRead))
+	assert.Equal(t, []string{access.RoleAdmin}, access.GrantingRoles(access.GroupClassifiers, access.LevelCreate))
+}
+
+func TestAuthorizeNamesTheMissingAccess(t *testing.T) {
+	t.Parallel()
+
+	reader := &actor.Actor{UserID: uuid.MustParse("3fa85f64-5717-4562-b3fc-2c963f66afa6"), Roles: []string{access.RoleReader}}
+
+	_, err := access.Authorize(actor.WithActor(context.Background(), reader), access.GroupRestrictedHR, access.LevelRead)
+	require.ErrorIs(t, err, domains.ErrPermissionDenied)
+
+	var denied *access.PermissionDeniedError
+	require.ErrorAs(t, err, &denied)
+	assert.Equal(t, access.GroupRestrictedHR, denied.Group)
+	assert.Equal(t, access.LevelRead, denied.Level)
+	assert.Equal(t, "read access to restricted-hr references: permission denied", err.Error())
+	assert.Equal(t, "read access to restricted-hr references needs one of the roles: reference-hr-admin, reference-hr-reader", denied.Reason())
 }
 
 func TestAuthorize(t *testing.T) {

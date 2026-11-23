@@ -86,3 +86,36 @@ jobs:
 
       - name: Run tests
         run: task tests
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    defaults:
+      run:
+        working-directory: reference-manager
+
+    env:
+      # the service image is built from a Dockerfile outside the build context, Docker 29 bake refuses that
+      BUILDX_BAKE_ENTITLEMENTS_FS: '0'
+      COMPOSE_BAKE: 'false'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: reference-manager/backend/go.mod
+          cache-dependency-path: reference-manager/backend/go.sum
+
+      - name: Install Task
+        run: |
+          go install github.com/go-task/task/v3/cmd/task@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # a clean environment on every run: PostgreSQL with all migrations, Keycloak with the realm, the collector
+      - name: Run integration tests
+        run: task tests:integration

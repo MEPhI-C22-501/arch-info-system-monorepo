@@ -9,7 +9,7 @@ Feature: Employee accounts in Keycloak
     And the Keycloak account "m.petrova" is removed
     And the Keycloak account "i.ivanov" is removed
 
-  Scenario: A hired employee gets an enabled account with the reader role
+  Scenario: A hired employee gets an enabled account without roles of the service
     Given a POST HTTP request
     And the HTTP request is authorized as "hr-admin"
     And the HTTP request contains a body
@@ -32,7 +32,7 @@ Feature: Employee accounts in Keycloak
       """
     And the Keycloak account "m.petrova" is enabled
     And the Keycloak account "m.petrova" has email "m.petrova@example.org"
-    And the Keycloak account "m.petrova" has the realm role "reference-reader"
+    And the Keycloak account "m.petrova" has no roles of the client "reference-manager"
     Given a GET HTTP request
     And the HTTP request is authorized as "reader"
     When the HTTP request is sent to "/v1/employees/2/revisions/2"
@@ -174,6 +174,34 @@ Feature: Employee accounts in Keycloak
     And the HTTP response contains a value at "/revision"
       """
       2
+      """
+
+  Scenario: An account removed in Keycloak whose username a foreign account took is a conflict, the record becomes PENDING
+    Given a POST HTTP request
+    And the HTTP request is authorized as "hr-admin"
+    When the HTTP request is sent to "/v1/employees/1/syncAccount"
+    Then an HTTP response is received with status 200
+    And the Keycloak account "i.ivanov" is removed
+    And a Keycloak account "i.ivanov" exists with email "someone.else@example.org"
+    Given a POST HTTP request
+    And the HTTP request is authorized as "hr-admin"
+    When the HTTP request is sent to "/v1/employees/1/syncAccount"
+    Then an HTTP response is received with status 400
+    And the HTTP response contains a body
+      """
+      {"message": "employee 1: account conflict: username \"i.ivanov\" belongs to another account: failed precondition"}
+      """
+    Given a GET HTTP request
+    And the HTTP request is authorized as "hr-admin"
+    When the HTTP request is sent to "/v1/employees/1"
+    Then an HTTP response is received with status 200
+    And the HTTP response contains a value at "/account_state"
+      """
+      "PENDING"
+      """
+    And the HTTP response contains a value at "/account_user_id"
+      """
+      "{{any}}"
       """
 
   Scenario: Only HR administrators repeat the operation with the account
