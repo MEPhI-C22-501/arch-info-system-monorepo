@@ -93,41 +93,26 @@ Request limits of the router are defined under `transport.limits`.
 | `burst`               | `int`      | Size of the token bucket, `100` by default                    |
 | `request_timeout`     | `duration` | Timeout of one request, the context is cancelled after it, `1s` by default |
 
+### Service endpoints
+
+The service endpoints need no token and are not published outside the cluster on the shared stand ([documents/070.role-matrix.md](documents/070.role-matrix.md), section 4).
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /v1/health/livez` | `200` without a body while the process runs (FR-RM-30) |
+| `GET /v1/health/readyz` | `200` `{"ready": true}` when the database answers, otherwise `503` `{"ready": false, "failedDependencies": [{"name": "postgres", "error": "..."}]}` (FR-RM-31). The schema version is not checked yet (K-02, issue #46) |
+
 ### Logging
 
-Logging configuration is defined under `log`.
+The service logs through `log/slog` to stdout. The level and the format are set under `telemetry.log` (see [Telemetry](#telemetry)): `level` is `debug`, `info`, `warn` or `error`, `format` is `text` or `json`, an unknown format stops the start. With `telemetry.exporter.enabled` the same records also go to the collector over OTLP. There are no log files and no rotation, the container runtime collects stdout.
 
-#### Metadata
+Records worth knowing:
 
-The `log.meta` section defines metadata associated with application logs.
-
-| Parameter     | Type     | Description                                  |
-| ------------- | -------- | -------------------------------------------- |
-| `service`     | `string` | Service name included in log metadata        |
-| `environment` | `string` | Runtime environment included in log metadata |
-
-#### Handlers
-
-The `log.handlers` section defines one or more log outputs.
-
-| Parameter | Type     | Description                                  |
-| --------- | -------- | -------------------------------------------- |
-| `name`    | `string` | Unique handler name                          |
-| `type`    | `string` | Log output type, such as `file` or `console` |
-| `level`   | `string` | Minimum log level processed by the handler   |
-| `format`  | `string` | Log output format, such as `json` or `text`  |
-
-For file handlers, additional settings are available under `file`.
-
-| Parameter                   | Type       | Description                              |
-| --------------------------- | ---------- | ---------------------------------------- |
-| `location`                  | `string`   | Directory where log files are stored     |
-| `rotation.enabled`          | `bool`     | Enables automatic log rotation           |
-| `rotation.filename_pattern` | `string`   | Naming pattern for rotated log files     |
-| `rotation.max_size`         | `int`      | Maximum log file size before rotation    |
-| `rotation.max_age`          | `duration` | Maximum lifetime of rotated log files    |
-| `rotation.max_backups`      | `int`      | Maximum number of old log files to keep  |
-| `rotation.compress`         | `bool`     | Enables compression of rotated log files |
+| Message | Level | When |
+| --- | --- | --- |
+| `access denied` | `WARN` | A request lacks the roles for the operation (FR-RM-65), with `method`, `path`, `group`, `level`, `sub`, `roles` and `azp` of the token |
+| `account operation is pending` | `WARN` | Keycloak did not confirm an operation with an employee account, the record stays `PENDING` |
+| `readiness check failed` | `ERROR` | `/v1/health/readyz` found the database down |
 
 ### Work with databases
 
@@ -207,6 +192,8 @@ The accounts of employees are managed under `auth.keycloak.provisioner` (see [Ca
 
 The service assigns no roles, so the client needs no rights on the roles of other clients (ADR-024).
 
+On the shared stand Infra provides Keycloak, the realm, the clients and their secrets: the issuer and the clients of the service are set in `infra/config/reference-manager/auth.yaml`, the provisioner secret comes from the environment of the stand. Secrets never come from this repository, the realm JSON of this module and `deployments/.env.example` serve the local environment and the integration tests only.
+
 ### Telemetry
 
 Logs are written to stdout and, together with traces and metrics, sent over OTLP gRPC to the OpenTelemetry Collector. Every HTTP request except `/v1/health/*` gets a span named after its route with child spans of the database queries (query parameters are not recorded); an incoming `traceparent` is continued and the trace ID is returned in the `X-Trace-Id` header. Metrics cover HTTP requests, database queries, the connection pool and the Go runtime. The exporters connect lazily, so an unavailable collector neither blocks the startup nor affects requests: export errors are logged to stdout and the data is dropped.
@@ -236,6 +223,8 @@ task up
 ```
 
 When `deployments/.env` is missing, the command creates it from `deployments/.env.example`, which holds every secret of the environment (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PROVISIONER_SECRET`, `KEYCLOAK_CONSUMER_SECRET`), the configuration files hold none. Then it builds the images and starts `deployments/docker-compose.yaml`: the database, the one-shot jobs of the migrations, the demonstration data set and the Keycloak accounts of its employees, Keycloak, the collector, the service and the admin panel. The service account of the database is created on the first start of the database, so run `task down` before `task up` on an environment created before this version.
+
+`task up` keeps the order the schema needs. The one-shot job of the migrations (`migrate up` over `deployments/migrations`) starts when the database is healthy. After it finishes successfully, the demonstration data set and the service start, the service also waits for a healthy Keycloak. The admin panel waits for a healthy service, the accounts job for a healthy service and a loaded data set. There is therefore no separate `task migrate`. `task migration -- <name>` only creates the files of a new migration. On the shared stand the schema changes run as a separate job before the service (issue #35).
 
 The host ports leave room for the stands of the other modules and the shared environment of Infra, which take 8080, 8081, 8180, 4317 and 4318:
 

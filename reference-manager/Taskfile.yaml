@@ -10,6 +10,9 @@ vars:
   DOCKERFILES_DIR: deployments/docker
   IMAGE_REGISTRY: erp
   IMAGE_TAG: latest
+  # the version written into the UI image (NFR-RM-24), the short commit, "dev" outside a git checkout
+  VERSION:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo dev
   IMAGES:
     map:
       reference-manager: '{{.BACKEND_DIR}}'
@@ -137,6 +140,7 @@ tasks:
     cmds:
       - >-
         docker build {{.CLI_ARGS}}
+        {{if eq .NAME "reference-manager-ui"}}--build-arg VERSION={{.VERSION}}{{end}}
         -f {{.DOCKERFILES_DIR}}/{{.NAME}}.dockerfile
         -t {{.IMAGE_REGISTRY}}/{{.NAME}}:{{.IMAGE_TAG}}
         {{index .IMAGES .NAME}}

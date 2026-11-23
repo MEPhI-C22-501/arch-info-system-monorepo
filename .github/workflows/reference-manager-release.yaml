@@ -74,6 +74,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # the version of the build (NFR-RM-24): the commit SHA, or X.Y.Z for a version tag; the UI image writes it to
+          # /admin/version.json, the service image does not read it yet
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
           provenance: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
