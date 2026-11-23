@@ -67,6 +67,7 @@ func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the HTTP request contains headers$`, s.requestContainsHeaders)
 	sc.Step(`^the HTTP request is authorized as "([^"]*)"$`, s.requestIsAuthorizedAs)
 	sc.Step(`^the HTTP request is authorized as "([^"]*)" through the client "([^"]*)"$`, s.requestIsAuthorizedThroughClient)
+	sc.Step(`^the HTTP request is authorized as the service client "([^"]*)"$`, s.requestIsAuthorizedAsServiceClient)
 	sc.Step(`^the HTTP request contains a body$`, s.requestContainsBody)
 	sc.Step(`^the HTTP request contains a body from file "([^"]*)"$`, s.requestContainsBodyFromFile)
 	sc.Step(`^the HTTP request is sent to "([^"]*)"$`, s.requestIsSentTo)
@@ -157,6 +158,22 @@ func (s *Steps) requestIsAuthorizedThroughClient(ctx context.Context, username, 
 	}
 
 	token, err := s.tokens.Token(ctx, username, clientID)
+	if err != nil {
+		return err
+	}
+
+	s.headers.Set("Authorization", "Bearer "+token)
+
+	return nil
+}
+
+// requestIsAuthorizedAsServiceClient adds an access token of the service account of a consumer client.
+func (s *Steps) requestIsAuthorizedAsServiceClient(ctx context.Context, clientID string) error {
+	if s.tokens == nil {
+		return errors.New("tokens of keycloak users are not configured")
+	}
+
+	token, err := s.tokens.ServiceToken(ctx, clientID)
 	if err != nil {
 		return err
 	}

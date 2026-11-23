@@ -757,6 +757,14 @@
           await openPendingEmployee(values.username, rec ? rec.id : null);
           return;
         }
+        // the record is stored PENDING, the login belongs to a foreign Keycloak account: show the stored record
+        // and the way out instead of the form, a second save would only fail on the taken login
+        if (error instanceof ApiError && error.status === 400 && collection === 'employees' && /account conflict/.test(error.message)) {
+          storageSet(draftKey, null);
+          flash('warn', `Конфликт учётной записи: запись сотрудника сохранена в состоянии PENDING, учётная запись не создана, потому что логин "${values.username}" занят учётной записью Keycloak с другой почтой. Логин после создания не меняется. Администратор Keycloak освобождает логин, затем здесь повторяется операция с учётной записью. Другой путь - окончательно удалить запись и принять сотрудника с другим логином. Ответ сервиса: ${error.message}`);
+          await openPendingEmployee(values.username, rec ? rec.id : null);
+          return;
+        }
         if (error instanceof ApiError && error.status === 409 && !isNew) {
           replace(formBanner, errorBanner(error, el('button', { type: 'button', on: { click: () => { storageSet(draftKey, null); render(); } } }, 'Перечитать запись')));
           return;

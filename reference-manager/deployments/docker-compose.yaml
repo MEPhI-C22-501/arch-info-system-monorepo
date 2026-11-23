@@ -64,6 +64,7 @@ services:
 
     volumes:
       - ./seed/demo.sql:/seed/demo.sql:ro
+      - ./seed/profiles.sql:/seed/profiles.sql:ro
 
     depends_on:
       reference-manager-migrations:
@@ -113,7 +114,7 @@ services:
       KC_HOSTNAME: http://localhost:8183
       KC_HEALTH_ENABLED: "true"
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET}
-      # secret of the local service clients of the consumers (reports-client, planning-service, task-tracker-service, qa-service)
+      # secret of the local service clients of the consumers (reports-client, planning-service, tracker-directory, qa-executor)
       KEYCLOAK_CONSUMER_SECRET: ${KEYCLOAK_CONSUMER_SECRET}
 
     ports:

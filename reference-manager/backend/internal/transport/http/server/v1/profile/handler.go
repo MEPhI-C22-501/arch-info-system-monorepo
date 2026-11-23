@@ -17,10 +17,10 @@ import (
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	postgresrepo "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/repositories/postgres"
+	recordhndl "github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/transport/http/server/v1/record"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/actor"
 )
 
-const reader = "reference-profile-reader"
 const limit = 100
 
 type profile struct {
@@ -108,22 +108,39 @@ func problem(w http.ResponseWriter, r *http.Request, status int, message string)
 	render.JSON(w, r, map[string]string{"message": message})
 }
 
-func (h handler) authorize(w http.ResponseWriter, r *http.Request) *actor.Actor {
+// authenticate returns the actor of a valid token. A new account has no roles of the service (ADR-024),
+// so it may still read its own profile.
+func (h handler) authenticate(w http.ResponseWriter, r *http.Request) *actor.Actor {
 	w.Header().Set("Cache-Control", "no-store")
 	a, ok := actor.FromContext(r.Context())
 	if !ok {
 		problem(w, r, http.StatusUnauthorized, "unauthenticated")
 		return nil
 	}
-	if !a.HasRole(reader) && !access.Allowed(a.Roles, access.GroupHR, access.LevelRead) {
-		problem(w, r, http.StatusForbidden, "forbidden")
+	return a
+}
+
+// authorize lets profiles of other people be read by the profile role or by read access to HR references.
+func (h handler) authorize(w http.ResponseWriter, r *http.Request) *actor.Actor {
+	a := h.authenticate(w, r)
+	if a == nil {
+		return nil
+	}
+	if !a.HasRole(access.RoleProfileReader) && !access.Allowed(a.Roles, access.GroupHR, access.LevelRead) {
+		recordhndl.LogAccessDenied(r, "profiles", string(access.LevelRead))
+		roles := append([]string{access.RoleProfileReader}, access.GrantingRoles(access.GroupHR, access.LevelRead)...)
+		render.Status(r, http.StatusForbidden)
+		render.JSON(w, r, recordhndl.Error{Message: "permission denied", Details: []recordhndl.ErrorDetail{{
+			Field:   "role",
+			Message: "read access to the profiles of other accounts needs one of the roles: " + strings.Join(roles, ", "),
+		}}})
 		return nil
 	}
 	return a
 }
 
 func (h handler) me(w http.ResponseWriter, r *http.Request) {
-	a := h.authorize(w, r)
+	a := h.authenticate(w, r)
 	if a == nil {
 		return
 	}

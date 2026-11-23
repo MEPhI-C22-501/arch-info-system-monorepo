@@ -34,6 +34,8 @@ func NewApp(cfg *Config) (*App, error) {
 	}
 
 	log := telemetry.Logger()
+	// handlers without an injected logger (refusals of the shared error mapping) write through the same handler
+	slog.SetDefault(log)
 
 	postgresClient, err := postgres.NewClient(&cfg.Databases.Postgres, log)
 	if err != nil {

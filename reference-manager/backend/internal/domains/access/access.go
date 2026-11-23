@@ -5,6 +5,8 @@ package access
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/actor"
@@ -39,6 +41,8 @@ const (
 	RoleHRReader = "reference-hr-reader"
 	RoleAdmin    = "reference-admin"
 	RoleHRAdmin  = "reference-hr-admin"
+	// RoleProfileReader reads the profiles of other accounts (R-06), it grants nothing on the reference groups.
+	RoleProfileReader = "reference-profile-reader"
 )
 
 var (
@@ -81,8 +85,43 @@ func Allowed(roles []string, group Group, level Level) bool {
 	return false
 }
 
+// GrantingRoles returns the sorted roles that grant the level on the group.
+func GrantingRoles(group Group, level Level) []string {
+	var roles []string
+
+	for role, groups := range matrix {
+		if slices.Contains(groups[group], level) {
+			roles = append(roles, role)
+		}
+	}
+
+	slices.Sort(roles)
+
+	return roles
+}
+
+// PermissionDeniedError names the access the caller lacks, it matches domains.ErrPermissionDenied.
+type PermissionDeniedError struct {
+	Group Group
+	Level Level
+}
+
+func (e *PermissionDeniedError) Error() string {
+	return fmt.Sprintf("%s access to %s references: %s", e.Level, e.Group, domains.ErrPermissionDenied)
+}
+
+func (e *PermissionDeniedError) Unwrap() error {
+	return domains.ErrPermissionDenied
+}
+
+// Reason tells the caller which roles grant the access, the roles are public in the role matrix.
+func (e *PermissionDeniedError) Reason() string {
+	return fmt.Sprintf("%s access to %s references needs one of the roles: %s",
+		e.Level, e.Group, strings.Join(GrantingRoles(e.Group, e.Level), ", "))
+}
+
 // Authorize returns the actor of the context when it may perform an operation of the level on the group.
-// It fails with domains.ErrUnauthenticated without an actor and with domains.ErrPermissionDenied without the level.
+// It fails with domains.ErrUnauthenticated without an actor and with *PermissionDeniedError without the level.
 func Authorize(ctx context.Context, group Group, level Level) (*actor.Actor, error) {
 	a, ok := actor.FromContext(ctx)
 	if !ok {
@@ -90,7 +129,7 @@ func Authorize(ctx context.Context, group Group, level Level) (*actor.Actor, err
 	}
 
 	if !Allowed(a.Roles, group, level) {
-		return nil, fmt.Errorf("%s access to %s references: %w", level, group, domains.ErrPermissionDenied)
+		return nil, &PermissionDeniedError{Group: group, Level: level}
 	}
 
 	return a, nil

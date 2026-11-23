@@ -1,16 +1,20 @@
 package recordhndl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
+	"uuid"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/access"
 	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/internal/domains/record"
+	"github.com/MEPhI-C22-501/arch-info-system-monorepo/reference-manager/pkg/actor"
 )
 
 func TestErrorToAPI(t *testing.T) {
@@ -39,6 +43,24 @@ func TestErrorToAPI(t *testing.T) {
 		if status != tc.status || apiErr.Message != tc.message || len(apiErr.Details) != tc.details {
 			t.Errorf("%v: expected %d %q with %d details, got %d %q with %d", tc.err, tc.status, tc.message, tc.details, status, apiErr.Message, len(apiErr.Details))
 		}
+	}
+}
+
+// TestErrorToAPINamesTheMissingRoles keeps a consumer without a role from getting a bare 403 (review of 2026-11-23).
+func TestErrorToAPINamesTheMissingRoles(t *testing.T) {
+	t.Parallel()
+
+	reader := &actor.Actor{UserID: uuid.MustParse("c5a7e2d0-3b4f-4a19-8e6d-2f1b0c9d8e7a"), Roles: []string{access.RoleReader}}
+	_, err := access.Authorize(actor.WithActor(context.Background(), reader), access.GroupRestrictedHR, access.LevelRead)
+
+	apiErr, status := ErrorToAPI(err, "salary")
+	if status != http.StatusForbidden || apiErr.Message != "permission denied" {
+		t.Fatalf("expected 403 permission denied, got %d %q", status, apiErr.Message)
+	}
+
+	want := []ErrorDetail{{Field: "role", Message: "read access to restricted-hr references needs one of the roles: reference-hr-admin, reference-hr-reader"}}
+	if len(apiErr.Details) != 1 || apiErr.Details[0] != want[0] {
+		t.Fatalf("expected details %v, got %v", want, apiErr.Details)
 	}
 }
 

@@ -168,9 +168,9 @@
       "fullScopeAllowed": false
     },
     {
-      "clientId": "task-tracker-service",
-      "name": "Task Tracker directory cache",
-      "description": "Local service client of a consumer with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "clientId": "tracker-directory",
+      "name": "Task Tracker directory reader",
+      "description": "Local service client of Task Tracker with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
       "enabled": true,
       "publicClient": false,
       "standardFlowEnabled": false,
@@ -196,9 +196,9 @@
       "fullScopeAllowed": false
     },
     {
-      "clientId": "qa-service",
-      "name": "QA System directory cache",
-      "description": "Local service client of a consumer with the role reference-reader, the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
+      "clientId": "qa-executor",
+      "name": "QA System profile reader",
+      "description": "Local service client of QA System with the role reference-profile-reader only (it reads /v1/profiles), the same client id as in the realm of Infra. The secret is substituted from KEYCLOAK_CONSUMER_SECRET by import-realm.sh.",
       "enabled": true,
       "publicClient": false,
       "standardFlowEnabled": false,
@@ -261,9 +261,9 @@
       }
     },
     {
-      "username": "service-account-task-tracker-service",
+      "username": "service-account-tracker-directory",
       "enabled": true,
-      "serviceAccountClientId": "task-tracker-service",
+      "serviceAccountClientId": "tracker-directory",
       "realmRoles": [],
       "clientRoles": {
         "reference-manager": [
@@ -272,13 +272,13 @@
       }
     },
     {
-      "username": "service-account-qa-service",
+      "username": "service-account-qa-executor",
       "enabled": true,
-      "serviceAccountClientId": "qa-service",
+      "serviceAccountClientId": "qa-executor",
       "realmRoles": [],
       "clientRoles": {
         "reference-manager": [
-          "reference-reader"
+          "reference-profile-reader"
         ]
       }
     },
@@ -425,15 +425,15 @@
         ]
       },
       {
-        "client": "task-tracker-service",
+        "client": "tracker-directory",
         "roles": [
           "reference-reader"
         ]
       },
       {
-        "client": "qa-service",
+        "client": "qa-executor",
         "roles": [
-          "reference-reader"
+          "reference-profile-reader"
         ]
       },
       {

@@ -10,6 +10,8 @@ import (
 type Actor struct {
 	UserID uuid.UUID
 	Roles  []string
+	// ClientID is the client the token was issued to (the "azp" claim), empty when the token has none.
+	ClientID string
 }
 
 // HasRole reports whether the actor has the role.

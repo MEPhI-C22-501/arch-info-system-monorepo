@@ -47,10 +47,30 @@ func NewTokens(keycloakURL, realm string, client *http.Client) *Tokens {
 	}
 }
 
+// ConsumerSecret is the secret of the consumer service clients in docker-compose.test.yaml (KEYCLOAK_CONSUMER_SECRET).
+const ConsumerSecret = "test-consumer-secret"
+
 // Token returns an access token of the user issued to the client.
 func (t *Tokens) Token(ctx context.Context, username, clientID string) (string, error) {
-	key := tokenKey{username: username, clientID: clientID}
+	return t.cached(ctx, tokenKey{username: username, clientID: clientID}, url.Values{
+		"grant_type": {"password"},
+		"client_id":  {clientID},
+		"username":   {username},
+		"password":   {username},
+		"scope":      {"openid"},
+	})
+}
 
+// ServiceToken returns an access token of the service account of a consumer client, issued by client credentials.
+func (t *Tokens) ServiceToken(ctx context.Context, clientID string) (string, error) {
+	return t.cached(ctx, tokenKey{clientID: clientID}, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {clientID},
+		"client_secret": {ConsumerSecret},
+	})
+}
+
+func (t *Tokens) cached(ctx context.Context, key tokenKey, form url.Values) (string, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -58,7 +78,12 @@ func (t *Tokens) Token(ctx context.Context, username, clientID string) (string, 
 		return cached.value, nil
 	}
 
-	token, err := t.request(ctx, username, clientID)
+	label := key.username
+	if label == "" {
+		label = "service client " + key.clientID
+	}
+
+	token, err := t.request(ctx, label, form)
 	if err != nil {
 		return "", err
 	}
@@ -68,14 +93,7 @@ func (t *Tokens) Token(ctx context.Context, username, clientID string) (string, 
 	return token.value, nil
 }
 
-func (t *Tokens) request(ctx context.Context, username, clientID string) (cachedToken, error) {
-	form := url.Values{
-		"grant_type": {"password"},
-		"client_id":  {clientID},
-		"username":   {username},
-		"password":   {username},
-		"scope":      {"openid"},
-	}
+func (t *Tokens) request(ctx context.Context, username string, form url.Values) (cachedToken, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {

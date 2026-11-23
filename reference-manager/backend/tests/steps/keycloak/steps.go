@@ -48,7 +48,7 @@ func New(keycloakURL, realm, admin, password string, client *http.Client) *Steps
 func (s *Steps) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the Keycloak account "([^"]*)" is (enabled|disabled|missing)$`, s.accountIs)
 	sc.Step(`^the Keycloak account "([^"]*)" has email "([^"]*)"$`, s.accountHasEmail)
-	sc.Step(`^the Keycloak account "([^"]*)" has the realm role "([^"]*)"$`, s.accountHasRealmRole)
+	sc.Step(`^the Keycloak account "([^"]*)" has no roles of the client "([^"]*)"$`, s.accountHasNoClientRoles)
 	sc.Step(`^the Keycloak account "([^"]*)" is removed$`, s.accountIsRemoved)
 	sc.Step(`^a Keycloak account "([^"]*)" exists with email "([^"]*)"$`, s.accountExistsWithEmail)
 }
@@ -101,7 +101,9 @@ func (s *Steps) accountHasEmail(ctx context.Context, username, email string) err
 	return nil
 }
 
-func (s *Steps) accountHasRealmRole(ctx context.Context, username, role string) error {
+// accountHasNoClientRoles checks the effective roles of the client, so a role that comes through a group
+// or the default roles of the realm fails the check as well as a direct mapping (ADR-024).
+func (s *Steps) accountHasNoClientRoles(ctx context.Context, username, clientID string) error {
 	u, err := s.find(ctx, username)
 	if err != nil {
 		return err
@@ -111,30 +113,56 @@ func (s *Steps) accountHasRealmRole(ctx context.Context, username, role string) 
 		return fmt.Errorf("account %q does not exist", username)
 	}
 
-	var roles []struct {
-		Name string `json:"name"`
-	}
-
-	status, body, err := s.call(ctx, http.MethodGet, "/users/"+url.PathEscape(u.ID)+"/role-mappings/realm", nil)
+	status, body, err := s.call(ctx, http.MethodGet, "/clients?clientId="+url.QueryEscape(clientID), nil)
 	if err != nil {
 		return err
 	}
 
 	if status != http.StatusOK {
-		return fmt.Errorf("role mappings of %q answered %d", username, status)
+		return fmt.Errorf("client %q answered %d", clientID, status)
+	}
+
+	var clients []struct {
+		ID string `json:"id"`
+	}
+
+	if err := json.Unmarshal(body, &clients); err != nil {
+		return fmt.Errorf("decode clients: %w", err)
+	}
+
+	if len(clients) != 1 {
+		return fmt.Errorf("client %q found %d times", clientID, len(clients))
+	}
+
+	apiPath := "/users/" + url.PathEscape(u.ID) + "/role-mappings/clients/" + url.PathEscape(clients[0].ID) + "/composite"
+
+	status, body, err = s.call(ctx, http.MethodGet, apiPath, nil)
+	if err != nil {
+		return err
+	}
+
+	if status != http.StatusOK {
+		return fmt.Errorf("client role mappings of %q answered %d", username, status)
+	}
+
+	var roles []struct {
+		Name string `json:"name"`
 	}
 
 	if err := json.Unmarshal(body, &roles); err != nil {
 		return fmt.Errorf("decode role mappings: %w", err)
 	}
 
-	for _, r := range roles {
-		if r.Name == role {
-			return nil
+	if len(roles) > 0 {
+		names := make([]string, 0, len(roles))
+		for _, r := range roles {
+			names = append(names, r.Name)
 		}
+
+		return fmt.Errorf("account %q has roles of the client %q: %v", username, clientID, names)
 	}
 
-	return fmt.Errorf("account %q has no realm role %q", username, role)
+	return nil
 }
 
 func (s *Steps) accountIsRemoved(ctx context.Context, username string) error {

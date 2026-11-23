@@ -2,13 +2,16 @@
 // roles, the slice at a moment, group operations, the narrow screen and the keyboard (document 115, P-01..P-14)
 const { test, expect } = require('@playwright/test');
 
+// display names of the local realm users in deployments/seed/profiles.sql, the header shows them from /v1/profiles/me
+const DISPLAY_NAMES = { admin: 'Reference Admin', reader: 'Reference Reader', 'hr-admin': 'HR Admin', outsider: 'No Roles User' };
+
 // users of the local realm, the password equals the login
 async function login(page, user, path) {
   await page.goto(path || '/admin/');
   await page.getByLabel('Username or email').fill(user);
   await page.getByLabel('Password', { exact: true }).fill(user);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page.locator('#who')).toContainText(user);
+  await expect(page.locator('#who')).toContainText(DISPLAY_NAMES[user] ? new RegExp(`${user}|${DISPLAY_NAMES[user]}`) : user);
 }
 
 test('the root of the panel redirects to /admin/ on the same port', async ({ page, baseURL }) => {
@@ -100,6 +103,40 @@ test('a reader sees records read only, a user without roles gets the refusal scr
   await login(page, 'outsider');
   await expect(page.getByRole('heading', { name: 'Нет доступа' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Выйти и войти/ })).toBeVisible();
+});
+
+test('an account without roles of the service sees its own name and the refusal screen (ADR-024)', async ({ page }) => {
+  await login(page, 'outsider');
+  await expect(page.locator('#profile-display-name')).toHaveText('No Roles User');
+  await expect(page.getByRole('heading', { name: 'Нет доступа' })).toBeVisible();
+});
+
+test('a hire with the login of a foreign Keycloak account opens the stored PENDING record and tells the way out', async ({ page }) => {
+  const stamp = String(Date.now() % 1e9);
+  await login(page, 'hr-admin', '/admin/employees/new');
+  await page.getByLabel(/^Табельный номер/).fill(stamp);
+  await page.getByLabel(/^Фамилия/).fill('Конфликтова');
+  await page.getByLabel(/^Имя/).fill('Ольга');
+  await page.getByLabel(/^Адрес почты/).fill(`conflict.${stamp}@example.org`);
+  // the realm user outsider has the email outsider@reference-manager.local, so the login is taken
+  await page.getByLabel(/^Логин/).fill('outsider');
+  await page.getByLabel(/^Дата приёма/).fill('2026-11-24');
+  await page.getByRole('button', { name: 'Сохранить' }).click();
+
+  try {
+    await expect(page).toHaveURL(/\/admin\/employees\/\d+$/);
+    await expect(page.getByText(/Конфликт учётной записи: запись сотрудника сохранена в состоянии PENDING/)).toBeVisible();
+    await expect(page.locator('#syncAccount')).toBeVisible();
+  } finally {
+    // the stored record keeps the login taken, so it is purged for the next run
+    if (/\/admin\/employees\/\d+$/.test(page.url())) {
+      await page.getByRole('button', { name: 'Удалить', exact: true }).click();
+      await page.locator('#confirmYes').click();
+      await page.getByRole('button', { name: 'Удалить окончательно' }).click();
+      await page.locator('#confirmYes').click();
+      await expect(page).toHaveURL(/\/admin\/employees$/);
+    }
+  }
 });
 
 test('a slice at a moment before the demonstration data is empty and narrows the export', async ({ page }) => {
