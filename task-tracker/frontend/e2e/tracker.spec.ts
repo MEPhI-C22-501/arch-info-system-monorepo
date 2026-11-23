@@ -1,5 +1,32 @@
 import { test, expect } from '@playwright/test';
 
+test('attachment storage failure leaves the card usable and allows retry', async ({ page }, testInfo) => {
+  const id = 'dddddddd-0000-0000-0000-000000000003';
+  await page.route(`**/api/v1/work-items/${id}/attachments`, route => route.fulfill({
+    json: [{ id: 'test-file', fileName: 'evidence.txt', contentType: 'text/plain', sizeBytes: 8 }],
+  }));
+  let available = false;
+  await page.route(`**/api/v1/work-items/${id}/attachments/test-file`, route => available
+    ? route.fulfill({ contentType: 'text/plain', body: 'Evidence' })
+    : route.fulfill({ status: 503, json: { errors: [{ field: 'file', reason: 'storage_unavailable' }] } }));
+  await page.goto(`/work-items/${id}`);
+  await page.locator('#username').fill(process.env.TRACKER_E2E_USER || 'lead');
+  await page.locator('#password').fill(process.env.TRACKER_E2E_PASSWORD || 'demo12345');
+  await page.locator('#kc-login').click();
+  const card = page.getByRole('dialog', { name: 'Карточка рабочего элемента' });
+  await card.getByRole('tab', { name: 'Вложения' }).click();
+  await card.getByRole('button', { name: 'Просмотр' }).click();
+  await expect(card.getByRole('alert')).toHaveText(/Хранилище вложений временно недоступно/);
+  await expect(card.getByRole('heading', { name: 'Демо задача в работе' })).toBeVisible();
+  await expect(card.locator('iframe')).toHaveCount(0);
+  await card.screenshot({ path: testInfo.outputPath('attachment-unavailable.png') });
+
+  available = true;
+  await card.getByRole('button', { name: 'Просмотр' }).click();
+  await expect(card.getByRole('alert')).toHaveCount(0);
+  await expect(card.locator('iframe[title="evidence.txt"]')).toBeVisible();
+});
+
 test('iteration status distribution separates labels, counts and shares without overflow', async ({ page }, testInfo) => {
   let empty = false;
   await page.route(/\/api\/v1\/iterations\/[^/?]+$/, async route => {

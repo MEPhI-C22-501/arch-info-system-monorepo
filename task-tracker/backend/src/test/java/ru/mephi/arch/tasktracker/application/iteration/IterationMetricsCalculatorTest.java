@@ -35,7 +35,9 @@ class IterationMetricsCalculatorTest {
             null, null, new BigDecimal("8"), parent, null, null, null, null, null, null, 0, OffsetDateTime.now(), OffsetDateTime.now()));
         when(logs.findByWorkItem(parent)).thenReturn(List.of(new TimeLogEntry(UUID.randomUUID(), parent, "original-author", day, new BigDecimal("3"), "", OffsetDateTime.now())));
         when(logs.findByWorkItem(child)).thenReturn(List.of(new TimeLogEntry(UUID.randomUUID(), child, "other-author", day, new BigDecimal("2"), "", OffsetDateTime.now())));
-        var result = new IterationMetricsCalculator(iterations, items, logs, statuses, views).compute(iteration);
+        var calculator = new IterationMetricsCalculator(iterations, items, logs, statuses, views);
+        var result = calculator.compute(iteration);
+        assertEquals(result, calculator.compute(iteration));
         assertEquals(new BigDecimal("8"), result.get("plannedHours"));
         assertEquals(new BigDecimal("5"), result.get("actualHours"));
         var capacity = (List<?>) result.get("capacity");
