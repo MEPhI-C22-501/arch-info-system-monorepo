@@ -4902,8 +4902,8 @@ paths:
               example:
                 correlationId: example-request
                 errors:
-                - field: storage
-                  reason: unavailable
+                - field: file
+                  reason: storage_unavailable
         '413':
           description: Размер multipart превышен
           content:
@@ -4997,6 +4997,17 @@ paths:
                 errors:
                 - field: request
                   reason: constraint_violation
+        '410':
+          description: Метаданные существуют, но хранилище сообщает, что объект удалён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                correlationId: example-request
+                errors:
+                - field: file
+                  reason: attachment_content_missing
         '422':
           description: invalid
           content:
@@ -5020,7 +5031,7 @@ paths:
                 - field: request
                   reason: internal_error
         '503':
-          description: Внешний сервис недоступен
+          description: Хранилище недоступно или проверка целостности файла завершилась ошибкой (attachment_integrity_failed)
           content:
             application/json:
               schema:
@@ -5028,8 +5039,8 @@ paths:
               example:
                 correlationId: example-request
                 errors:
-                - field: storage
-                  reason: unavailable
+                - field: file
+                  reason: storage_unavailable
       operationId: get_work_items_id_attachments_attachmentId
       tags:
       - UI

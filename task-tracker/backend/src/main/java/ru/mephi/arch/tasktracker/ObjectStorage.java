@@ -1,6 +1,8 @@
 package ru.mephi.arch.tasktracker;
 
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,11 +14,13 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.auth.credentials.*;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.exception.SdkException;
 import java.net.URI;
 import java.util.*;
 
 @Component
 public class ObjectStorage {
+    private static final Logger log = LoggerFactory.getLogger(ObjectStorage.class);
     private final S3Client client;
     private final String bucket;
     private final JdbcTemplate db;
@@ -37,12 +41,29 @@ public class ObjectStorage {
     }
     public void put(String key,byte[] bytes,String contentType) {
         independent.executeWithoutResult(s->db.update("INSERT INTO object_cleanup(object_key) VALUES(?) ON CONFLICT DO NOTHING",key));
-        client.putObject(PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),RequestBody.fromBytes(bytes));
+        try {
+            client.putObject(PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),RequestBody.fromBytes(bytes));
+        } catch (SdkException ex) {
+            throw unavailable(ex);
+        }
     }
     public byte[] get(String key,String expected) {
-        byte[] bytes=client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build()).asByteArray();
-        if(!hash(bytes).equals(expected)) throw new IllegalStateException("attachment_checksum_mismatch");
-        return bytes;
+        try {
+            byte[] bytes=client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build()).asByteArray();
+            if (!hash(bytes).equals(expected)) {
+                log.warn("Attachment checksum mismatch correlationId={}", ApiAdvice.correlationId());
+                throw new ApiException(503, "file", "attachment_integrity_failed");
+            }
+            return bytes;
+        } catch (NoSuchKeyException ex) {
+            throw new ApiException(410, "file", "attachment_content_missing");
+        } catch (SdkException ex) {
+            throw unavailable(ex);
+        }
+    }
+    private ApiException unavailable(SdkException ex) {
+        log.warn("Attachment storage failed correlationId={} type={}", ApiAdvice.correlationId(), ex.getClass().getSimpleName());
+        return new ApiException(503, "file", "storage_unavailable");
     }
     @Scheduled(fixedDelay=60000) public void cleanup() {
         if(client==null) return;

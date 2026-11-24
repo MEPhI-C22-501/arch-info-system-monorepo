@@ -18,7 +18,11 @@ import java.util.concurrent.TimeUnit;
 public class Outbox {
     private final JdbcTemplate db;
     private final ObjectMapper json=new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    private final KafkaProducer<String,String> producer;
+    private final Producer<String,String> producer;
+    Outbox(JdbcTemplate db, Producer<String,String> producer) {
+        this.db = db;
+        this.producer = producer;
+    }
     public Outbox(JdbcTemplate db, String bootstrap, String protocol, String jaas, String truststore, String password) {
         this(db, bootstrap, protocol, jaas, truststore, password, "PLAIN");
     }

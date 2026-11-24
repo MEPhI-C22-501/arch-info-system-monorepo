@@ -7,6 +7,12 @@ databaseChangeLog:
             path: db/changelog/001-initial.sql
             splitStatements: true
   - changeSet:
+      id: baseline-001
+      author: task-tracker
+      changes:
+        - tagDatabase:
+            tag: task-tracker-001
+  - changeSet:
       id: 002-review
       author: task-tracker
       changes:
@@ -19,4 +25,11 @@ databaseChangeLog:
       changes:
         - sqlFile:
             path: db/changelog/003-planning.sql
+            splitStatements: false
+  - changeSet:
+      id: 004-review
+      author: task-tracker
+      changes:
+        - sqlFile:
+            path: db/changelog/004-review.sql
             splitStatements: false

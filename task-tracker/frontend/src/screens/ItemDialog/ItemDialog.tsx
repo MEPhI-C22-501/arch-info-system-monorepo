@@ -2,7 +2,7 @@ import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { validateItem } from '../../validation';
 import { Links } from '../../components/Links';
 import { useEffect, useState } from 'react';
-import { auth, date, dateTime, hours, json, request, typeName } from '../../api';
+import { date, dateTime, hours, json, request, typeName } from '../../api';
 import type { Item, Json } from '../../api';
 import { AttachmentFrame } from '../../AttachmentFrame';
 import { Empty } from '../../components/Empty';
@@ -105,24 +105,23 @@ export function ItemDialog({ id, context, close, open, refresh }:
     catch (e) { setError(getError(e)); }
   };
   const upload = async (file: File) => {
+    setError('');
     try { const data = new FormData(); data.append('file', file); await request(`/work-items/${id}/attachments`, { method: 'POST', body: data }); bump(); refresh(); }
     catch (e) { setError(getError(e)); }
   };
   const download = async (a: Json) => {
+    setError('');
     try {
-      const user = await auth.getUser();
-      const response = await fetch(`/api/v1/work-items/${id}/attachments/${a.id}`, { headers: { Authorization: `Bearer ${user?.access_token}` } });
-      if (!response.ok) throw new Error('Не удалось скачать вложение');
-      const blob = await response.blob(); const url = URL.createObjectURL(blob);
+      const blob = await request<Blob>(`/work-items/${id}/attachments/${a.id}`, {}, 'blob');
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url; link.download = String(a.fileName); link.click(); URL.revokeObjectURL(url);
     } catch (e) { setError(getError(e)); }
   };
   const showPreview = async (a: Json) => {
+    setError('');
+    setPreview(null);
     try {
-      const user = await auth.getUser();
-      const response = await fetch(`/api/v1/work-items/${id}/attachments/${a.id}`, { headers: { Authorization: `Bearer ${user?.access_token}` } });
-      if (!response.ok) throw new Error('Не удалось открыть вложение');
-      const blob = await response.blob();
+      const blob = await request<Blob>(`/work-items/${id}/attachments/${a.id}`, {}, 'blob');
       setPreview({ name: String(a.fileName), type: String(a.contentType), url: URL.createObjectURL(blob) });
     } catch (e) { setError(getError(e)); }
   };

@@ -2,6 +2,9 @@ type ErrorDetail = { row?: number; field: string; reason: string };
 
 const reasons: Record<string, string> = {
   internal_error: 'На сервере произошла ошибка. Попробуйте ещё раз.',
+  storage_unavailable: 'Хранилище вложений временно недоступно. Повторите попытку позже.',
+  attachment_content_missing: 'Файл больше недоступен в хранилище.',
+  attachment_integrity_failed: 'Не удалось проверить целостность файла. Сообщите администратору.',
   not_planned: 'Запустить можно только запланированную итерацию. Обновите страницу.',
   not_active: 'Завершить можно только активную итерацию. Обновите страницу.',
   completed: 'Завершённую итерацию нельзя изменять.',
@@ -24,6 +27,9 @@ const fields: Record<string, string> = {
 };
 
 export function errorMessage(status: number, errors: ErrorDetail[] = []): string {
+  const storageError = errors.find(error => error.field === 'file' &&
+    ['storage_unavailable', 'attachment_content_missing', 'attachment_integrity_failed'].includes(error.reason));
+  if (storageError) return reasons[storageError.reason];
   if (status >= 500) return reasons.internal_error;
   if (!errors.length) return status === 403 ? reasons.forbidden : 'Не удалось выполнить действие. Проверьте данные и повторите попытку.';
   return errors.map(error => {

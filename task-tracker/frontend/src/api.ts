@@ -36,7 +36,7 @@ export const auth = new UserManager({
 export class ApiError extends Error {
   constructor(message:string,public status:number,public errors:Array<{field:string;reason:string}>,public correlationId?:string) {super(message);}
 }
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}, responseType?: 'blob'): Promise<T> {
   const user = await auth.getUser();
   const headers = new Headers(init.headers);
   if (user?.access_token) headers.set('Authorization', `Bearer ${user.access_token}`);
@@ -49,7 +49,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     throw new ApiError(errorMessage(response.status, errors), response.status, errors, body?.correlationId);
   }
   if (response.status === 204) return undefined as T;
-  if (response.headers.get('content-type')?.includes('application/vnd.openxmlformats')) return (await response.blob()) as T;
+  if (responseType === 'blob' || response.headers.get('content-type')?.includes('application/vnd.openxmlformats')) return (await response.blob()) as T;
   return response.json() as Promise<T>;
 }
 export const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
