@@ -30,7 +30,13 @@ func validate(ctx context.Context, q postgres.Querier, next, prev *record.Record
 		}
 	}
 
-	err := record.CheckReferences(ctx, q, record.Reference{Field: "currency_id", Table: "currencies", ID: &f.CurrencyID})
+	// an unchanged currency is not checked again, so a salary in a since deleted currency can still be closed
+	var currencyBefore *int64
+	if prev != nil {
+		currencyBefore = &prev.Fields.CurrencyID
+	}
+
+	err := record.CheckReferences(ctx, q, record.Reference{Field: "currency_id", Table: "currencies", ID: &f.CurrencyID, Before: currencyBefore})
 	if err != nil {
 		var refErrs *record.ValidationError
 		if !errors.As(err, &refErrs) {

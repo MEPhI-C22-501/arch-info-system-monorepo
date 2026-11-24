@@ -5,7 +5,7 @@
  *
  * Qualification grades of employees used by the planning of work.
  *
- * API version: 1.1.0
+ * API version: 1.2.0
  */
 
 package reference_manager_grade
@@ -19,7 +19,7 @@ import (
 // Grade - The fields of a grade a client sets on creation and update.
 type Grade struct {
 
-	// Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code" validate:"regexp=^[a-z][a-z0-9-]{1\\,63}$"`
 
 	// Name of the grade.

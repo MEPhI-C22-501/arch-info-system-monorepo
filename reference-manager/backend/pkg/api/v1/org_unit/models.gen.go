@@ -47,7 +47,7 @@ type ErrorDetail struct {
 
 // ExpandedOrgUnit A org_unit with its identifier and the lifecycle derived from its revisions.
 type ExpandedOrgUnit struct {
-	// Code Stable code of the unit: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the unit: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// CreatedAt The date and time when the record was created.
@@ -83,7 +83,7 @@ type ExpandedOrgUnit struct {
 
 // OrgUnit The fields of a org_unit a client sets on creation and update.
 type OrgUnit struct {
-	// Code Stable code of the unit: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the unit: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// Kind Department or team.

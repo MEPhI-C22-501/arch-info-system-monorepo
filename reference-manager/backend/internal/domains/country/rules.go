@@ -8,6 +8,12 @@ import (
 )
 
 // validate checks that the main currency of the country exists and is not deleted.
-func validate(ctx context.Context, q postgres.Querier, next, _ *record.Record[Fields]) error {
-	return record.CheckReferences(ctx, q, record.Reference{Field: "currency_id", Table: "currencies", ID: next.Fields.CurrencyID})
+// An unchanged currency is not checked again, so a country of a since deleted currency can still be renamed.
+func validate(ctx context.Context, q postgres.Querier, next, prev *record.Record[Fields]) error {
+	var before *int64
+	if prev != nil {
+		before = prev.Fields.CurrencyID
+	}
+
+	return record.CheckReferences(ctx, q, record.Reference{Field: "currency_id", Table: "currencies", ID: next.Fields.CurrencyID, Before: before})
 }

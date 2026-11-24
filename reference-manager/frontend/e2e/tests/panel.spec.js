@@ -89,6 +89,29 @@ test('the form shows the error of the service at its field and takes the focus t
   await expect(page.getByRole('heading', { name: new RegExp(code) })).toBeVisible();
 });
 
+test('the code of a grade is read only after creation, the employee card shows the grade of the assignment in effect', async ({ page }) => {
+  // BR-RM-18: the code is set on creation and kept, so a consumer may keep it as a reference
+  await login(page, 'admin', '/admin/grades/1');
+  const code = page.getByLabel(/^Код/);
+  await expect(code).toHaveJSProperty('readOnly', true);
+  await expect(page.getByText('не меняется').first()).toBeVisible();
+
+  // FR-RM-69: the grade is a dated value of the assignment, the card shows it next to the unit and the position
+  const current = page.locator('.card', { has: page.getByRole('heading', { name: 'Действующие значения' }) });
+  await page.goto('/admin/employees/1');
+  await expect(current).toContainText('Грейд');
+  await expect(current).toContainText('Lead');
+  await page.goto('/admin/employees/6');
+  await expect(current).toContainText('не указан');
+});
+
+test('a new assignment takes an optional grade', async ({ page }) => {
+  await login(page, 'hr-admin', '/admin/assignments/new');
+  const grade = page.getByLabel(/^Грейд/);
+  await expect(grade).toBeVisible();
+  await expect(grade).not.toHaveAttribute('required', '');
+});
+
 test('a reader sees records read only, a user without roles gets the refusal screen', async ({ page, context }) => {
   await login(page, 'reader', '/admin/positions/1');
   await expect(page.getByRole('note')).toContainText('Только чтение');

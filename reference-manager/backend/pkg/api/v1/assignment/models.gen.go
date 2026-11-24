@@ -19,6 +19,9 @@ type Assignment struct {
 	// EndDate Last day the record is in effect, empty while it is in effect.
 	EndDate *openapi_types.Date `json:"end_date,omitempty"`
 
+	// GradeId Identifier of the grade of the employee in this assignment, empty when no grade is set.
+	GradeId *int64 `json:"grade_id,omitempty"`
+
 	// OrgUnitId Identifier of the unit.
 	OrgUnitId int64 `json:"org_unit_id"`
 
@@ -138,6 +141,9 @@ type ExpandedAssignment struct {
 
 	// EndDate Last day the record is in effect, empty while it is in effect.
 	EndDate *openapi_types.Date `json:"end_date,omitempty"`
+
+	// GradeId Identifier of the grade of the employee in this assignment, empty when no grade is set.
+	GradeId *int64 `json:"grade_id,omitempty"`
 
 	// Id Identifier of the assignment, assigned by the service.
 	Id int64 `json:"id"`

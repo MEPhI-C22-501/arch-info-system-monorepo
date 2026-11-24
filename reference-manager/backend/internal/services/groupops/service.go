@@ -194,6 +194,7 @@ func (s *Service) TransferAssignments(ctx context.Context, request *assignmentdm
 				EmployeeID: step.item.EmployeeID,
 				OrgUnitID:  step.item.TargetOrgUnitID,
 				PositionID: step.item.PositionID,
+				GradeID:    step.gradeID,
 				StartDate:  step.item.StartDate,
 				EndDate:    step.item.EndDate,
 			})

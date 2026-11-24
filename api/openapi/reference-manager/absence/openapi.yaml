@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Absence API
   description: "Absences of employees: vacations, sick leaves and other periods. Readable by the HR roles only."
-  version: 1.1.0
+  version: 1.2.0
 
 security:
   - KeycloakOAuth2: []

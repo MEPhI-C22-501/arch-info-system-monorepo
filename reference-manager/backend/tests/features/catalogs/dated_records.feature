@@ -76,7 +76,7 @@ Feature: Dated records of employees
     Then an HTTP response is received with status 400
     And the HTTP response contains a value at "/message"
       """
-      "invalid updateMask: field \"employee_id\" cannot be updated, updatable fields: org_unit_id, position_id, start_date, end_date"
+      "invalid updateMask: field \"employee_id\" cannot be updated, updatable fields: org_unit_id, position_id, grade_id, start_date, end_date"
       """
     Given a POST HTTP request
     And the HTTP request is authorized as "hr-admin"

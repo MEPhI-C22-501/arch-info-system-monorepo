@@ -58,3 +58,20 @@ test('table cells name a referenced record shortly: the name without the code, a
   assert.equal(shortLabel('assignments', { id: 7 }), '#7');
   assert.equal(shortLabel('currencies', { id: 1, code: 'RUB', name: 'Российский рубль' }), 'Российский рубль');
 });
+
+test('the stable code of a classifier, a unit and a position is set on creation only and never goes into the update mask', () => {
+  for (const collection of ['project_roles', 'grades', 'org_units', 'positions']) {
+    const field = CATALOGS[collection].fields.find((f) => f.name === 'code');
+    assert.equal(field.immutable, true, `${collection}.code`);
+    assert.match(field.hint, /после создания не меняется/);
+  }
+  const mask = updateMask('grades', { code: 'senior', name: 'Senior', rank: 3 }, { code: 'expert', name: 'Expert', rank: 3 });
+  assert.deepEqual(mask, ['name']);
+});
+
+test('an assignment takes an optional grade and the employee shows the grade of the assignment in effect', () => {
+  const grade = CATALOGS.assignments.fields.find((f) => f.name === 'grade_id');
+  assert.equal(grade.ref, 'grades');
+  assert.ok(!grade.required);
+  assert.ok(CATALOGS.employees.readOnly.some((f) => f.name === 'grade_id' && f.ref === 'grades'));
+});

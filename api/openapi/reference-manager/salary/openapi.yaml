@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Salary API
   description: "Monthly salaries of employees with the period they are in effect. Periods of one employee do not overlap. Readable by the HR roles only."
-  version: 1.1.0
+  version: 1.2.0
 
 security:
   - KeycloakOAuth2: []

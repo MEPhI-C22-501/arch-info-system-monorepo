@@ -29,9 +29,18 @@ func validate(ctx context.Context, q postgres.Querier, next, prev *record.Record
 		}
 	}
 
+	// an unchanged reference is not checked again, so an assignment that points at a since deleted unit, position
+	// or grade can still be closed, for example by a dismissal
+	var orgUnitBefore, positionBefore, gradeBefore *int64
+	if prev != nil {
+		orgUnitBefore, positionBefore, gradeBefore = &prev.Fields.OrgUnitID, &prev.Fields.PositionID, prev.Fields.GradeID
+	}
+
 	if err := record.CheckReferences(ctx, q,
-		record.Reference{Field: "org_unit_id", Table: "org_units", ID: &f.OrgUnitID},
-		record.Reference{Field: "position_id", Table: "positions", ID: &f.PositionID},
+		record.Reference{Field: "org_unit_id", Table: "org_units", ID: &f.OrgUnitID, Before: orgUnitBefore},
+		record.Reference{Field: "position_id", Table: "positions", ID: &f.PositionID, Before: positionBefore},
+		// the grade is optional (FR-RM-69): an empty one is not checked
+		record.Reference{Field: "grade_id", Table: "grades", ID: f.GradeID, Before: gradeBefore},
 	); err != nil {
 		var refErrs *record.ValidationError
 		if !asValidation(err, &refErrs) {

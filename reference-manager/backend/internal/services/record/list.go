@@ -40,6 +40,7 @@ var revisionFields = listFields{
 	sortable: []string{"revision_number", "changed_at"},
 	declarations: mustDeclarations(
 		filtering.DeclareStandardFunctions(),
+		aipsql.PresenceDeclarations(),
 		filtering.DeclareIdent("revision_number", filtering.TypeInt),
 		filtering.DeclareIdent("changed_by", filtering.TypeString),
 		filtering.DeclareIdent("changed_at", filtering.TypeTimestamp),
@@ -48,7 +49,7 @@ var revisionFields = listFields{
 
 // recordListFields declares the fields of a catalog accepted in filter and order_by: its columns and the lifecycle.
 func recordListFields[F any](desc *record.Descriptor[F]) listFields {
-	options := append(aipsql.BoolLiteralDeclarations(), filtering.DeclareStandardFunctions())
+	options := append(aipsql.BoolLiteralDeclarations(), filtering.DeclareStandardFunctions(), aipsql.PresenceDeclarations())
 	options = append(options, lifecycleFields...)
 
 	sortable := make([]string, 0, len(desc.Columns)+len(lifecycleSortable))

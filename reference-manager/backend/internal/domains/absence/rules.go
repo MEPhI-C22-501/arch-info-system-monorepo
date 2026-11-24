@@ -10,7 +10,7 @@ import (
 
 // validate checks that the employee exists and the period is ordered, absences of dismissed employees
 // stay editable because they describe the past.
-func validate(ctx context.Context, q postgres.Querier, next, _ *record.Record[Fields]) error {
+func validate(ctx context.Context, q postgres.Querier, next, prev *record.Record[Fields]) error {
 	f := &next.Fields
 	errs := &record.ValidationError{}
 
@@ -18,7 +18,13 @@ func validate(ctx context.Context, q postgres.Querier, next, _ *record.Record[Fi
 		errs.Add("end_date", "must not be earlier than start_date")
 	}
 
-	err := record.CheckReferences(ctx, q, record.Reference{Field: "employee_id", Table: "employees", ID: &f.EmployeeID})
+	// the employee of an absence never changes, so it is checked when the absence is created only
+	var employeeBefore *int64
+	if prev != nil {
+		employeeBefore = &prev.Fields.EmployeeID
+	}
+
+	err := record.CheckReferences(ctx, q, record.Reference{Field: "employee_id", Table: "employees", ID: &f.EmployeeID, Before: employeeBefore})
 	if err != nil {
 		var refErrs *record.ValidationError
 		if !errors.As(err, &refErrs) {

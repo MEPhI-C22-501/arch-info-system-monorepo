@@ -162,6 +162,9 @@ type Reference struct {
 	Table string
 	// ID is the referenced record, nil when the field is empty.
 	ID *int64
+	// Before is the value of the field before the change, nil for a new record. A reference that keeps its value is
+	// not checked again: a record that points at a record deleted since then can still be closed or changed otherwise.
+	Before *int64
 }
 
 // CheckReferences verifies that every referenced record exists and is not deleted, the violations are collected
@@ -169,7 +172,7 @@ type Reference struct {
 func CheckReferences(ctx context.Context, q postgres.Querier, refs ...Reference) error {
 	errs := &ValidationError{}
 	for _, ref := range refs {
-		if ref.ID == nil {
+		if ref.ID == nil || (ref.Before != nil && *ref.Before == *ref.ID) {
 			continue
 		}
 

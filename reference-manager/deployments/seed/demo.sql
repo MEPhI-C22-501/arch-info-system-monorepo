@@ -160,23 +160,25 @@ BEGIN
     FROM employees e;
 
     -- dated records: one open period per employee, Petrova has a closed one before the current (BR-RM-16)
+    -- the grade of an assignment is optional (FR-RM-69): the HR manager has none
 
-    INSERT INTO assignments (employee_id, org_unit_id, position_id, start_date, end_date) VALUES
-        ((SELECT id FROM employees WHERE personnel_number = '1001'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'team-lead'), '2022-03-01', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1002'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'developer'), '2023-06-15', '2024-12-31'),
-        ((SELECT id FROM employees WHERE personnel_number = '1002'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'senior-developer'), '2025-01-01', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1003'), (SELECT id FROM org_units WHERE code = 'dev-frontend'), (SELECT id FROM positions WHERE code = 'senior-developer'), '2021-09-01', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1004'), (SELECT id FROM org_units WHERE code = 'qa'), (SELECT id FROM positions WHERE code = 'qa-engineer'), '2024-02-12', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1005'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'developer'), '2024-11-05', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1006'), (SELECT id FROM org_units WHERE code = 'hr'), (SELECT id FROM positions WHERE code = 'hr-manager'), '2020-01-20', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1007'), (SELECT id FROM org_units WHERE code = 'pmo'), (SELECT id FROM positions WHERE code = 'analyst'), '2025-04-01', NULL),
-        ((SELECT id FROM employees WHERE personnel_number = '1008'), (SELECT id FROM org_units WHERE code = 'pmo'), (SELECT id FROM positions WHERE code = 'project-manager'), '2023-01-09', NULL);
+    INSERT INTO assignments (employee_id, org_unit_id, position_id, grade_id, start_date, end_date) VALUES
+        ((SELECT id FROM employees WHERE personnel_number = '1001'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'team-lead'), (SELECT id FROM grades WHERE code = 'lead'), '2022-03-01', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1002'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'developer'), (SELECT id FROM grades WHERE code = 'junior'), '2023-06-15', '2024-12-31'),
+        ((SELECT id FROM employees WHERE personnel_number = '1002'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'senior-developer'), (SELECT id FROM grades WHERE code = 'senior'), '2025-01-01', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1003'), (SELECT id FROM org_units WHERE code = 'dev-frontend'), (SELECT id FROM positions WHERE code = 'senior-developer'), (SELECT id FROM grades WHERE code = 'senior'), '2021-09-01', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1004'), (SELECT id FROM org_units WHERE code = 'qa'), (SELECT id FROM positions WHERE code = 'qa-engineer'), (SELECT id FROM grades WHERE code = 'middle'), '2024-02-12', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1005'), (SELECT id FROM org_units WHERE code = 'dev-backend'), (SELECT id FROM positions WHERE code = 'developer'), (SELECT id FROM grades WHERE code = 'junior'), '2024-11-05', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1006'), (SELECT id FROM org_units WHERE code = 'hr'), (SELECT id FROM positions WHERE code = 'hr-manager'), NULL, '2020-01-20', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1007'), (SELECT id FROM org_units WHERE code = 'pmo'), (SELECT id FROM positions WHERE code = 'analyst'), (SELECT id FROM grades WHERE code = 'middle'), '2025-04-01', NULL),
+        ((SELECT id FROM employees WHERE personnel_number = '1008'), (SELECT id FROM org_units WHERE code = 'pmo'), (SELECT id FROM positions WHERE code = 'project-manager'), (SELECT id FROM grades WHERE code = 'lead'), '2023-01-09', NULL);
 
     INSERT INTO assignment_revisions (assignment_id, revision_number, change, changed_by, changed_at)
     SELECT a.id, 1, jsonb_build_array(
         jsonb_build_object('op', 'add', 'path', '/employee_id', 'value', a.employee_id),
         jsonb_build_object('op', 'add', 'path', '/org_unit_id', 'value', a.org_unit_id),
         jsonb_build_object('op', 'add', 'path', '/position_id', 'value', a.position_id),
+        jsonb_build_object('op', 'add', 'path', '/grade_id', 'value', a.grade_id),
         jsonb_build_object('op', 'add', 'path', '/start_date', 'value', to_char(a.start_date, 'YYYY-MM-DD') || 'T00:00:00Z'),
         jsonb_build_object('op', 'add', 'path', '/end_date', 'value', CASE WHEN a.end_date IS NULL THEN NULL ELSE to_char(a.end_date, 'YYYY-MM-DD') || 'T00:00:00Z' END),
         jsonb_build_object('op', 'add', 'path', '/is_deleted', 'value', false)

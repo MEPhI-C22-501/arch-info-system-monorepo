@@ -32,6 +32,7 @@ var currencyFields = listFields{
 	declarations: mustDeclarations(append(
 		aipsql.BoolLiteralDeclarations(),
 		filtering.DeclareStandardFunctions(),
+		aipsql.PresenceDeclarations(),
 		filtering.DeclareIdent("code", filtering.TypeString),
 		filtering.DeclareIdent("number", filtering.TypeString),
 		filtering.DeclareIdent("name", filtering.TypeString),
@@ -50,6 +51,7 @@ var revisionFields = listFields{
 	sortable: []string{"revision_number", "changed_at"},
 	declarations: mustDeclarations(
 		filtering.DeclareStandardFunctions(),
+		aipsql.PresenceDeclarations(),
 		filtering.DeclareIdent("revision_number", filtering.TypeInt),
 		filtering.DeclareIdent("changed_by", filtering.TypeString),
 		filtering.DeclareIdent("changed_at", filtering.TypeTimestamp),

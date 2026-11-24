@@ -143,6 +143,8 @@ func planRevision(r *salarydmn.GroupChangeRequest, employees []int64, employed m
 
 type transferStep struct {
 	item assignmentdmn.TransferItem
+	// gradeID is the grade of the closed assignment, the new one keeps it (FR-RM-69)
+	gradeID *int64
 }
 
 type transferPlan struct {
@@ -187,7 +189,7 @@ func planTransfer(r *assignmentdmn.TransferRequest, assignments []*record.Expand
 			PositionID:         position,
 			StartDate:          r.StartDate,
 			EndDate:            a.Fields.EndDate,
-		}})
+		}, gradeID: a.Fields.GradeID})
 	}
 
 	return plan

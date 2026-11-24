@@ -29,7 +29,7 @@ type ErrorDetail struct {
 
 // ExpandedGrade A grade with its identifier and the lifecycle derived from its revisions.
 type ExpandedGrade struct {
-	// Code Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// CreatedAt The date and time when the record was created.
@@ -62,7 +62,7 @@ type ExpandedGrade struct {
 
 // Grade The fields of a grade a client sets on creation and update.
 type Grade struct {
-	// Code Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the grade: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// Name Name of the grade.

@@ -1125,6 +1125,7 @@
     const rows = [
       el('dt', {}, 'Подразделение'), el('dd', {}, await refCell(fieldByName('employees', 'org_unit_id'), rec.org_unit_id)),
       el('dt', {}, 'Должность'), el('dd', {}, await refCell(fieldByName('employees', 'position_id'), rec.position_id)),
+      el('dt', {}, 'Грейд'), el('dd', {}, rec.grade_id ? await refCell(fieldByName('employees', 'grade_id'), rec.grade_id) : el('span', { class: 'muted' }, 'не указан')),
     ];
     if (can(session.user, 'salaries', 'R')) {
       let text = el('span', { class: 'muted' }, 'нет действующего оклада');
@@ -1145,7 +1146,11 @@
   }
 
   async function periodDetails(collection, row) {
-    if (collection === 'assignments') return el('span', {}, await refCell(fieldByName('assignments', 'org_unit_id'), row.org_unit_id), ', ', await refCell(fieldByName('assignments', 'position_id'), row.position_id));
+    if (collection === 'assignments') {
+      const parts = [await refCell(fieldByName('assignments', 'org_unit_id'), row.org_unit_id), ', ', await refCell(fieldByName('assignments', 'position_id'), row.position_id)];
+      if (row.grade_id) parts.push(', ', await refCell(fieldByName('assignments', 'grade_id'), row.grade_id));
+      return el('span', {}, ...parts);
+    }
     if (collection === 'salaries') return el('span', {}, `${fmt.money(row.amount)} `, await refCell(fieldByName('salaries', 'currency_id'), row.currency_id));
     return badge(row.kind);
   }
