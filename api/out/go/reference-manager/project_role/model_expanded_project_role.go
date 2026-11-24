@@ -5,7 +5,7 @@
  *
  * Project roles used by the planning of work.
  *
- * API version: 1.1.0
+ * API version: 1.2.0
  */
 
 package reference_manager_project_role
@@ -22,7 +22,7 @@ type ExpandedProjectRole struct {
 	// Identifier of the project_role, assigned by the service.
 	Id int64 `json:"id"`
 
-	// Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code" validate:"regexp=^[a-z][a-z0-9-]{1\\,63}$"`
 
 	// Name of the role.

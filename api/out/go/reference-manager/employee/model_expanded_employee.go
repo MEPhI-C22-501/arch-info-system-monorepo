@@ -5,7 +5,7 @@
  *
  * HR profiles of employees. The unit and the position come from the assignment in effect today.
  *
- * API version: 1.1.0
+ * API version: 1.2.0
  */
 
 package reference_manager_employee
@@ -54,6 +54,9 @@ type ExpandedEmployee struct {
 
 	// Identifier of the position from the assignment in effect today, filled by migration 000011. Read-only, set by the service.
 	PositionId int64 `json:"position_id,omitempty"`
+
+	// Identifier of the grade from the assignment in effect today, empty when that assignment has no grade, filled by migration 000014. Read-only, set by the service.
+	GradeId int64 `json:"grade_id,omitempty"`
 
 	AccountState AccountState `json:"account_state"`
 
@@ -132,6 +135,7 @@ func (o *ExpandedEmployee) UnmarshalJSON(data []byte) (err error) {
 		"dismissal_date":   {},
 		"org_unit_id":      {},
 		"position_id":      {},
+		"grade_id":         {},
 		"account_state":    {},
 		"account_user_id":  {},
 		"is_deleted":       {},
@@ -228,6 +232,11 @@ func (o *ExpandedEmployee) UnmarshalJSON(data []byte) (err error) {
 			return err
 		}
 	}
+	if value, exists := allProperties["grade_id"]; exists {
+		if err = json.Unmarshal(value, &decoded.GradeId); err != nil {
+			return err
+		}
+	}
 	if value, exists := allProperties["account_state"]; exists {
 		if err = json.Unmarshal(value, &decoded.AccountState); err != nil {
 			return err
@@ -287,6 +296,9 @@ func AssertExpandedEmployeeConstraints(obj ExpandedEmployee) error {
 	}
 	if obj.PositionId < 1 {
 		return &ParsingError{Param: "PositionId", Err: errors.New(errMsgMinValueConstraint)}
+	}
+	if obj.GradeId < 1 {
+		return &ParsingError{Param: "GradeId", Err: errors.New(errMsgMinValueConstraint)}
 	}
 	return nil
 }

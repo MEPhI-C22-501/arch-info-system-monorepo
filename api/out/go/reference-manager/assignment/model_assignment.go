@@ -5,7 +5,7 @@
  *
  * Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap.
  *
- * API version: 1.1.0
+ * API version: 1.2.0
  */
 
 package reference_manager_assignment
@@ -27,6 +27,9 @@ type Assignment struct {
 
 	// Identifier of the position.
 	PositionId int64 `json:"position_id"`
+
+	// Identifier of the grade of the employee in this assignment, empty when no grade is set.
+	GradeId int64 `json:"grade_id,omitempty"`
 
 	// First day the record is in effect.
 	StartDate string `json:"start_date"`
@@ -57,6 +60,7 @@ func (o *Assignment) UnmarshalJSON(data []byte) (err error) {
 		"employee_id": {},
 		"org_unit_id": {},
 		"position_id": {},
+		"grade_id":    {},
 		"start_date":  {},
 		"end_date":    {},
 	}
@@ -102,6 +106,11 @@ func (o *Assignment) UnmarshalJSON(data []byte) (err error) {
 			return err
 		}
 	}
+	if value, exists := allProperties["grade_id"]; exists {
+		if err = json.Unmarshal(value, &decoded.GradeId); err != nil {
+			return err
+		}
+	}
 	if value, exists := allProperties["start_date"]; exists {
 		if err = json.Unmarshal(value, &decoded.StartDate); err != nil {
 			return err
@@ -134,6 +143,9 @@ func AssertAssignmentConstraints(obj Assignment) error {
 	}
 	if obj.PositionId < 1 {
 		return &ParsingError{Param: "PositionId", Err: errors.New(errMsgMinValueConstraint)}
+	}
+	if obj.GradeId < 1 {
+		return &ParsingError{Param: "GradeId", Err: errors.New(errMsgMinValueConstraint)}
 	}
 	return nil
 }
