@@ -179,6 +179,7 @@ func fieldsFromAPI(in *assignmentv1.Assignment) *assignmentdmn.Fields {
 		EmployeeID: in.EmployeeId,
 		OrgUnitID:  in.OrgUnitId,
 		PositionID: in.PositionId,
+		GradeID:    in.GradeId,
 		StartDate:  in.StartDate.Time,
 		EndDate:    recordhndl.DatePtr(in.EndDate),
 	}
@@ -192,6 +193,7 @@ func expandedToAPI(m *record.Expanded[assignmentdmn.Fields]) assignmentv1.Expand
 		EmployeeId:  f.EmployeeID,
 		OrgUnitId:   f.OrgUnitID,
 		PositionId:  f.PositionID,
+		GradeId:     f.GradeID,
 		StartDate:   openapi_types.Date{Time: f.StartDate},
 		EndDate:     recordhndl.DatePtrTo(f.EndDate),
 		IsDeleted:   m.IsDeleted,

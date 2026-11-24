@@ -17,6 +17,7 @@ type Fields struct {
 	EmployeeID int64      `json:"employee_id"`
 	OrgUnitID  int64      `json:"org_unit_id"`
 	PositionID int64      `json:"position_id"`
+	GradeID    *int64     `json:"grade_id"`
 	StartDate  time.Time  `json:"start_date"`
 	EndDate    *time.Time `json:"end_date"`
 }
@@ -27,6 +28,7 @@ type snapshot struct {
 	EmployeeID int64      `json:"employee_id"`
 	OrgUnitID  int64      `json:"org_unit_id"`
 	PositionID int64      `json:"position_id"`
+	GradeID    *int64     `json:"grade_id"`
 	StartDate  time.Time  `json:"start_date"`
 	EndDate    *time.Time `json:"end_date"`
 	IsDeleted  bool       `json:"is_deleted"`
@@ -37,6 +39,7 @@ func newSnapshot(r *record.Record[Fields]) any {
 		EmployeeID: r.Fields.EmployeeID,
 		OrgUnitID:  r.Fields.OrgUnitID,
 		PositionID: r.Fields.PositionID,
+		GradeID:    r.Fields.GradeID,
 		StartDate:  r.Fields.StartDate,
 		EndDate:    r.Fields.EndDate,
 		IsDeleted:  r.IsDeleted,
@@ -81,6 +84,15 @@ var Descriptor = &record.Descriptor[Fields]{
 			Rules:     record.Rules{Required: true},
 		},
 		{
+			Name:      "grade_id",
+			Type:      filtering.TypeInt,
+			Stored:    true,
+			Updatable: true,
+			Value:     func(f *Fields) any { return f.GradeID },
+			Ptr:       func(f *Fields) any { return &f.GradeID },
+			Rules:     record.Rules{},
+		},
+		{
 			Name:      "start_date",
 			Type:      filtering.TypeString,
 			SQL:       "start_date::text",
@@ -105,6 +117,7 @@ var Descriptor = &record.Descriptor[Fields]{
 		{Title: "Employee id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.EmployeeID) }},
 		{Title: "Org unit id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.OrgUnitID) }},
 		{Title: "Position id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.PositionID) }},
+		{Title: "Grade id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.GradeID) }},
 		{Title: "Start date", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.StartDate) }},
 		{Title: "End date", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.EndDate) }},
 	},

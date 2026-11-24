@@ -233,6 +233,16 @@ var boolLiterals = map[string]string{
 	"false": "FALSE",
 }
 
+// PresenceDeclarations declare `field:*` for integer and float fields: the standard declarations allow the has
+// operator on strings and timestamps only, so an optional reference such as parent_id or grade_id could not be checked
+// for presence. TranspileFilter turns it into IS NOT NULL and rejects any other value than * on such a field.
+func PresenceDeclarations() filtering.DeclarationOption {
+	return filtering.DeclareFunction(filtering.FunctionHas,
+		filtering.NewFunctionOverload("has_int_string", filtering.TypeBool, filtering.TypeInt, filtering.TypeString),
+		filtering.NewFunctionOverload("has_float_string", filtering.TypeBool, filtering.TypeFloat, filtering.TypeString),
+	)
+}
+
 // BoolLiteralDeclarations declare the idents true and false, which TranspileFilter turns into bool literals.
 func BoolLiteralDeclarations() []filtering.DeclarationOption {
 	options := make([]filtering.DeclarationOption, 0, len(boolLiterals))

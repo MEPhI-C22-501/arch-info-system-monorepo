@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Employee API
   description: "HR profiles of employees. The unit and the position come from the assignment in effect today."
-  version: 1.1.0
+  version: 1.2.0
 
 security:
   - KeycloakOAuth2: []
@@ -524,6 +524,12 @@ components:
           minimum: 1
           description: "Identifier of the position from the assignment in effect today, filled by migration 000011. Read-only, set by the service."
           example: 1
+        grade_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: "Identifier of the grade from the assignment in effect today, empty when that assignment has no grade, filled by migration 000014. Read-only, set by the service."
+          example: 2
         account_state:
           $ref: '#/components/schemas/AccountState'
         account_user_id:

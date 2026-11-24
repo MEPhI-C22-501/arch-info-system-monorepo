@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager ProjectRole API
   description: "Project roles used by the planning of work."
-  version: 1.1.0
+  version: 1.2.0
 
 security:
   - KeycloakOAuth2: []
@@ -319,7 +319,7 @@ components:
           minLength: 2
           maxLength: 64
           pattern: '^[a-z][a-z0-9-]{1,63}$'
-          description: "Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters."
+          description: "Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation."
           example: "developer"
         name:
           type: string
@@ -356,7 +356,7 @@ components:
           minLength: 2
           maxLength: 64
           pattern: '^[a-z][a-z0-9-]{1,63}$'
-          description: "Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters."
+          description: "Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation."
           example: "developer"
         name:
           type: string

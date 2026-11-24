@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: Reference Manager Assignment API
   description: "Assignments of employees to units and positions with the period they are in effect. Periods of one employee do not overlap."
-  version: 1.1.0
+  version: 1.2.0
 
 security:
   - KeycloakOAuth2: []
@@ -372,6 +372,12 @@ components:
           minimum: 1
           description: "Identifier of the position."
           example: 1
+        grade_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: "Identifier of the grade of the employee in this assignment, empty when no grade is set."
+          example: 2
         start_date:
           type: string
           format: date
@@ -422,6 +428,12 @@ components:
           minimum: 1
           description: "Identifier of the position."
           example: 1
+        grade_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: "Identifier of the grade of the employee in this assignment, empty when no grade is set."
+          example: 2
         start_date:
           type: string
           format: date

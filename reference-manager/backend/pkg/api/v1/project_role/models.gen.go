@@ -29,7 +29,7 @@ type ErrorDetail struct {
 
 // ExpandedProjectRole A project_role with its identifier and the lifecycle derived from its revisions.
 type ExpandedProjectRole struct {
-	// Code Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// CreatedAt The date and time when the record was created.
@@ -62,7 +62,7 @@ type ExpandedProjectRole struct {
 
 // ProjectRole The fields of a project_role a client sets on creation and update.
 type ProjectRole struct {
-	// Code Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the role: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// Description What the role does in a project.

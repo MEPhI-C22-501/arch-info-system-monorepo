@@ -191,6 +191,7 @@ func TestPlanTransfer(t *testing.T) {
 		assignment(24, 4, 3, 7, "2026-01-01", nil),
 		assignment(25, 6, 3, 7, "2027-01-01", nil),
 	}
+	assignments[0].Fields.GradeID = ptr(int64(2))
 	employed := map[int64]bool{1: true, 2: true, 3: true, 4: false, 6: true}
 
 	plan := planTransfer(&assignmentdmn.TransferRequest{OrgUnitID: 3, TargetOrgUnitID: 4, StartDate: day("2027-01-01"), IncludeSubunits: true}, assignments, employed)
@@ -206,6 +207,12 @@ func TestPlanTransfer(t *testing.T) {
 	}
 	if got := plan.steps[1].item; got.FromOrgUnitID != 5 || got.EndDate == nil || !got.EndDate.Equal(end) {
 		t.Errorf("employee 2 of a subunit moves and keeps the end of the closed assignment: %+v", got)
+	}
+	if g := plan.steps[0].gradeID; g == nil || *g != 2 {
+		t.Errorf("the new assignment keeps the grade of the closed one, got %v", g)
+	}
+	if g := plan.steps[1].gradeID; g != nil {
+		t.Errorf("an assignment without a grade moves without one, got %v", *g)
 	}
 	want := []assignmentdmn.Skipped{{EmployeeID: 3, Reason: reasonInTarget}, {EmployeeID: 4, Reason: reasonDismissed}}
 	if len(plan.skipped) != 2 || plan.skipped[0] != want[0] || plan.skipped[1] != want[1] {

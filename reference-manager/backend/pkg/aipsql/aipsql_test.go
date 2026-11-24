@@ -27,6 +27,7 @@ func testDeclarations(t *testing.T) *filtering.Declarations {
 	declarations, err := filtering.NewDeclarations(append(
 		aipsql.BoolLiteralDeclarations(),
 		filtering.DeclareStandardFunctions(),
+		aipsql.PresenceDeclarations(),
 		filtering.DeclareIdent("code", filtering.TypeString),
 		filtering.DeclareIdent("name", filtering.TypeString),
 		filtering.DeclareIdent("decimals", filtering.TypeInt),
@@ -112,6 +113,24 @@ func TestTranspileFilter(t *testing.T) {
 			filter: `deleted_at:*`,
 			want: want{
 				sql: "(deleted_at IS NOT NULL)",
+			},
+		},
+		"has with wildcard on a number is a presence check": {
+			filter: `NOT decimals:*`,
+			want: want{
+				sql: "(NOT (decimals IS NOT NULL))",
+			},
+		},
+		"has with text on a number is rejected": {
+			filter: `decimals:"2"`,
+			want: want{
+				err: true,
+			},
+		},
+		"has with a field on the right of a number is rejected": {
+			filter: `decimals:name`,
+			want: want{
+				err: true,
 			},
 		},
 		"bool literal alone": {

@@ -100,10 +100,11 @@ func newCatalogView(c Catalog) catalogView {
 		if f.Pattern != "" {
 			v.NeedsRegexp = true
 		}
-		if f.Unique {
+		// the indexes of a column added by a later hand-written migration belong to that migration
+		if f.Unique && f.Migration == 0 {
 			v.UniqueNames = append(v.UniqueNames, f.Name)
 		}
-		if f.Kind == KindRef && f.Computed == "" {
+		if f.Kind == KindRef && f.Computed == "" && f.Migration == 0 {
 			v.RefNames = append(v.RefNames, f.Name)
 		}
 		if f.Kind == KindEnum {

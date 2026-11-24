@@ -205,6 +205,7 @@ func expandedToAPI(m *record.Expanded[employeedmn.Fields]) employeev1.ExpandedEm
 		DismissalDate:   recordhndl.DatePtrTo(f.DismissalDate),
 		OrgUnitId:       f.OrgUnitID,
 		PositionId:      f.PositionID,
+		GradeId:         f.GradeID,
 		AccountState:    employeev1.AccountState(f.AccountState),
 		AccountUserId:   f.AccountUserID,
 		IsDeleted:       m.IsDeleted,

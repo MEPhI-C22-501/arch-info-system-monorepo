@@ -51,7 +51,7 @@ var Descriptor = &record.Descriptor[Fields]{
 			Name:      "code",
 			Type:      filtering.TypeString,
 			Stored:    true,
-			Updatable: true,
+			Updatable: false,
 			Value:     func(f *Fields) any { return f.Code },
 			Ptr:       func(f *Fields) any { return &f.Code },
 			Rules:     record.Rules{Required: true, Pattern: regexp.MustCompile(`^[a-z][a-z0-9-]{1,63}$`), PatternText: "^[a-z][a-z0-9-]{1,63}$", MinLen: 2, MaxLen: 64},

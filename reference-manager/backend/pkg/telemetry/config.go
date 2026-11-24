@@ -23,8 +23,10 @@ type ResourceConfig struct {
 // ExporterConfig describes the OTLP gRPC connection to the OpenTelemetry Collector.
 // When the exporter is disabled, traces and metrics are not collected and logs are written to stdout only.
 type ExporterConfig struct {
-	Enabled  bool          `yaml:"enabled" env-default:"false"`
-	Endpoint string        `yaml:"endpoint" env-default:"localhost:4317"`
+	Enabled bool `yaml:"enabled" env-default:"false"`
+	// Endpoint is host:port; TELEMETRY_EXPORTER_ENDPOINT overrides the file, so a stand points the service at its
+	// collector without its own copy of telemetry.yaml
+	Endpoint string        `yaml:"endpoint" env:"TELEMETRY_EXPORTER_ENDPOINT" env-default:"localhost:4317"`
 	Insecure bool          `yaml:"insecure" env-default:"false"`
 	Timeout  time.Duration `yaml:"timeout" env-default:"10s"`
 }

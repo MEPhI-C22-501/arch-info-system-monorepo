@@ -154,6 +154,9 @@ type ExpandedEmployee struct {
 	// GivenName Given name.
 	GivenName string `json:"given_name"`
 
+	// GradeId Identifier of the grade from the assignment in effect today, empty when that assignment has no grade, filled by migration 000014. Read-only, set by the service.
+	GradeId *int64 `json:"grade_id,omitempty"`
+
 	// HireDate Date of hire.
 	HireDate openapi_types.Date `json:"hire_date"`
 

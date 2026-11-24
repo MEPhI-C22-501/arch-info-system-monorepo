@@ -97,8 +97,8 @@ const (
 
 func codeField(description string) Field {
 	return Field{
-		Name: "code", Kind: KindString, Required: true, Unique: true, Pattern: slugPattern, MinLen: 2, MaxLen: 64,
-		Description: description + " " + slugHint + ".", Example: "developer",
+		Name: "code", Kind: KindString, Required: true, Unique: true, Immutable: true, Pattern: slugPattern, MinLen: 2, MaxLen: 64,
+		Description: description + " " + slugHint + ", cannot be changed after creation.", Example: "developer",
 	}
 }
 
@@ -185,6 +185,7 @@ var Catalogs = []Catalog{
 			{Name: "dismissal_date", Kind: KindDate, ServerManaged: true, Description: "Date of dismissal, set by the dismissal.", Example: "2026-10-31"},
 			{Name: "org_unit_id", Kind: KindRef, Ref: "org_units", Computed: "NULL::bigint", Description: "Identifier of the unit from the assignment in effect today, filled by migration 000011.", Example: "1"},
 			{Name: "position_id", Kind: KindRef, Ref: "positions", Computed: "NULL::bigint", Description: "Identifier of the position from the assignment in effect today, filled by migration 000011.", Example: "1"},
+			{Name: "grade_id", Kind: KindRef, Ref: "grades", Computed: "NULL::bigint", Migration: 14, Description: "Identifier of the grade from the assignment in effect today, empty when that assignment has no grade, filled by migration 000014.", Example: "2"},
 			{Name: "account_state", Kind: KindEnum, Required: true, ServerManaged: true, Default: "'PENDING'", GoDefault: `"PENDING"`, Enum: []string{"PENDING", "ENABLED", "DISABLED"}, EnumName: "AccountState", Migration: 12,
 				Description: "State of the Keycloak account: PENDING until the last operation with the account is confirmed, ENABLED while the employee works, DISABLED after the dismissal (FR-RM-55).", Example: "ENABLED"},
 			{Name: "account_user_id", Kind: KindString, ServerManaged: true, MaxLen: 36, Migration: 12,
@@ -213,6 +214,7 @@ var Catalogs = []Catalog{
 			employeeRef,
 			{Name: "org_unit_id", Kind: KindRef, Ref: "org_units", Required: true, Description: "Identifier of the unit.", Example: "1"},
 			{Name: "position_id", Kind: KindRef, Ref: "positions", Required: true, Description: "Identifier of the position.", Example: "1"},
+			{Name: "grade_id", Kind: KindRef, Ref: "grades", Migration: 14, Description: "Identifier of the grade of the employee in this assignment, empty when no grade is set.", Example: "2"},
 			startDate,
 			{Name: "end_date", Kind: KindDate, Description: "Last day the record is in effect, empty while it is in effect.", Example: "2026-12-31"},
 		},

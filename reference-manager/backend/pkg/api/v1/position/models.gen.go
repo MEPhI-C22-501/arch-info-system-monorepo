@@ -29,7 +29,7 @@ type ErrorDetail struct {
 
 // ExpandedPosition A position with its identifier and the lifecycle derived from its revisions.
 type ExpandedPosition struct {
-	// Code Stable code of the position: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the position: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// CreatedAt The date and time when the record was created.
@@ -59,7 +59,7 @@ type ExpandedPosition struct {
 
 // Position The fields of a position a client sets on creation and update.
 type Position struct {
-	// Code Stable code of the position: lowercase latin letters, digits and hyphens, 2 to 64 characters.
+	// Code Stable code of the position: lowercase latin letters, digits and hyphens, 2 to 64 characters, cannot be changed after creation.
 	Code string `json:"code"`
 
 	// Name Name of the position.

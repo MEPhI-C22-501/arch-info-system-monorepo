@@ -18,7 +18,7 @@ WITH RECURSIVE ancestors AS (
 SELECT EXISTS (SELECT 1 FROM ancestors WHERE id = $2)`
 
 // validate checks the parent of the unit: it exists, is not deleted and does not make the hierarchy a cycle (FR-RM-50).
-func validate(ctx context.Context, q postgres.Querier, next, _ *record.Record[Fields]) error {
+func validate(ctx context.Context, q postgres.Querier, next, prev *record.Record[Fields]) error {
 	parent := next.Fields.ParentID
 	if parent == nil {
 		return nil
@@ -28,7 +28,13 @@ func validate(ctx context.Context, q postgres.Querier, next, _ *record.Record[Fi
 		return record.Violation("parent_id", "a unit cannot be its own parent")
 	}
 
-	if err := record.CheckReferences(ctx, q, record.Reference{Field: "parent_id", Table: "org_units", ID: parent}); err != nil {
+	// an unchanged parent is not checked again, so a unit under a since deleted parent can still be renamed
+	var before *int64
+	if prev != nil {
+		before = prev.Fields.ParentID
+	}
+
+	if err := record.CheckReferences(ctx, q, record.Reference{Field: "parent_id", Table: "org_units", ID: parent, Before: before}); err != nil {
 		return err
 	}
 

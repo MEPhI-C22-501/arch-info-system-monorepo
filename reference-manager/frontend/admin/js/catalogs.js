@@ -33,7 +33,7 @@
     { name: 'deleted_at', label: 'Удалена в' },
   ];
 
-  const code = (hint) => ({ name: 'code', label: 'Код', type: 'text', required: true, pattern: SLUG.pattern, hint: hint || SLUG.hint, maxLen: 64 });
+  const code = (hint) => ({ name: 'code', label: 'Код', type: 'text', required: true, immutable: true, pattern: SLUG.pattern, hint: `${hint || SLUG.hint}, после создания не меняется`, maxLen: 64 });
   const name = (label) => ({ name: 'name', label: label || 'Наименование', type: 'text', required: true, maxLen: 128 });
   const employeeRef = { name: 'employee_id', label: 'Сотрудник', type: 'ref', ref: 'employees', required: true, immutable: true };
   const startDate = { name: 'start_date', label: 'Действует с', type: 'date', required: true };
@@ -111,6 +111,7 @@
         { name: 'dismissal_date', label: 'Дата увольнения', type: 'date' },
         { name: 'org_unit_id', label: 'Подразделение', type: 'ref', ref: 'org_units' },
         { name: 'position_id', label: 'Должность', type: 'ref', ref: 'positions' },
+        { name: 'grade_id', label: 'Грейд', type: 'ref', ref: 'grades' },
         { name: 'account_state', label: 'Учётная запись', type: 'enum' },
         { name: 'account_user_id', label: 'Идентификатор учётной записи', type: 'text' },
       ],
@@ -124,6 +125,7 @@
         employeeRef,
         { name: 'org_unit_id', label: 'Подразделение', type: 'ref', ref: 'org_units', required: true },
         { name: 'position_id', label: 'Должность', type: 'ref', ref: 'positions', required: true },
+        { name: 'grade_id', label: 'Грейд', type: 'ref', ref: 'grades', hint: 'необязательно' },
         startDate,
         endDate,
       ],

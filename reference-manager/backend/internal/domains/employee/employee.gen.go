@@ -26,6 +26,7 @@ type Fields struct {
 	DismissalDate   *time.Time `json:"dismissal_date"`
 	OrgUnitID       *int64     `json:"org_unit_id"`
 	PositionID      *int64     `json:"position_id"`
+	GradeID         *int64     `json:"grade_id"`
 	AccountState    string     `json:"account_state"`
 	AccountUserID   *string    `json:"account_user_id"`
 }
@@ -174,6 +175,14 @@ var Descriptor = &record.Descriptor[Fields]{
 			Ptr:       func(f *Fields) any { return &f.PositionID },
 		},
 		{
+			Name:      "grade_id",
+			Type:      filtering.TypeInt,
+			Stored:    false,
+			Updatable: false,
+			Value:     func(f *Fields) any { return f.GradeID },
+			Ptr:       func(f *Fields) any { return &f.GradeID },
+		},
+		{
 			Name:      "account_state",
 			Type:      filtering.TypeString,
 			Stored:    true,
@@ -204,6 +213,7 @@ var Descriptor = &record.Descriptor[Fields]{
 		{Title: "Dismissal date", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.DismissalDate) }},
 		{Title: "Org unit id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.OrgUnitID) }},
 		{Title: "Position id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.PositionID) }},
+		{Title: "Grade id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.GradeID) }},
 		{Title: "Account state", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.AccountState) }},
 		{Title: "Account user id", Value: func(x *record.Expanded[Fields]) any { return record.Cell(x.Fields.AccountUserID) }},
 	},
