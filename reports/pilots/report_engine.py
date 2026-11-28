@@ -209,11 +209,15 @@ class Engine:
         elif slice=='iteration': result=named(self.records('tracker','iterations'))
         elif slice=='status': result=named(self.records('tracker','statuses'))
         elif slice=='employee':
-            result={employee_subject(e,self.links):e.get('display_name') or ' '.join(str(e.get(f) or '') for f in ['family_name','given_name','middle_name']).strip() or e.get('name')
+            result={employee_subject(e,self.links):e.get('profile_display_name') or ' '.join(str(e.get(f) or '') for f in ['family_name','given_name','middle_name']).strip() or e.get('name')
                     for e in self.records('reference','employees')}
             result.update({p['userId']:p['displayName'] for p in self.records('reference','profiles') if p.get('userId')})
-        elif slice in {'unit','role','grade'}:
-            result=named(self.records('reference',{'unit':'org_units','role':'project_roles','grade':'grades'}[slice]))
+        elif slice=='unit': result=named(self.records('reference','org_units'))
+        elif slice in {'role','grade'}:
+            # Roles and grades arrive as codes (Planning roleCode/gradeCode, employee-role links).
+            from star import reference_key
+            entity={'role':'project_roles','grade':'grades'}[slice]
+            result={reference_key(entity,r):r.get('name') for r in self.records('reference',entity)}
         elif slice=='type': result=dict(TYPE_NAMES)
         else: result={}
         self.name_cache[slice]={str(k):str(v) for k,v in result.items() if k is not None and v}

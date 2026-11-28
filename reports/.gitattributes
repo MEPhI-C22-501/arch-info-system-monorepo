@@ -1,0 +1,4 @@
+# Text is stored and checked out with LF, on Windows too: containers run the Reports scripts as they are,
+# and git diff --check does not take the CR of a Windows checkout for trailing whitespace.
+* text=auto eol=lf
+*.png binary

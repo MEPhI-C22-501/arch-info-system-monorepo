@@ -201,6 +201,12 @@ def upsert(db,table,key,values,payload,at):
     db.execute(f'INSERT INTO dwh.{table}({",".join(cols)}) VALUES ({",".join("?" for _ in cols)}) ON CONFLICT(id) DO UPDATE SET '+','.join(k+'=excluded.'+k for k in cols if k!='id'),tuple(data.values()))
 
 
+def reference_key(entity,row):
+    """Natural key of a Reference Manager record: the code for project roles and grades, the id otherwise."""
+    if entity in {'project_roles','grades'} and row.get('code'): return str(row['code'])
+    return str(row['id'])
+
+
 def records(db,source,entity):
     return [json.loads(r[0]) for r in db.execute('SELECT payload FROM dwh.source_record WHERE source=? AND entity=? ORDER BY entity_id',(source,entity))]
 
@@ -220,14 +226,21 @@ def refresh(db,at,batch_id=None,*,observed_at=None):
     def k(name,source,value,when=at):return key_at(db,name,source,value,when)
     project_inverse={target:source for (kind,source),target in links.items() if kind=='planning-project'}
     employees=records(db,'reference','employees')
+    grade_code={str(g['id']):reference_key('grades',g) for g in records(db,'reference','grades')}
     employee_inverse={target:source for (kind,source),target in links.items() if kind=='hr-employee'}
     employee_inverse.update({subject:str(r['id']) for r in employees for subject in [employee_subject(r,links)] if subject})
     def emp(subject,when=at):return k('employee','reference',employee_inverse.get(subject),when)
     def project(tracker,when=at):return k('project','planning',project_inverse.get(tracker),when)
     for r in employees:
-        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=employee_subject(r,links),full_name=r.get('display_name') or ' '.join(str(r[f]) for f in ('family_name','given_name','middle_name') if r.get(f)).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=r.get('grade'),is_active=int(not r.get('is_deleted',False))),r,at)
+        dimension(db,'employee','reference',r['id'],dict(employee_id=str(r['id']),account_user_id=employee_subject(r,links),full_name=r.get('profile_display_name') or ' '.join(str(r[f]) for f in ('family_name','given_name','middle_name') if r.get(f)).strip() or r.get('name'),org_unit_id=str(r['org_unit_id']) if r.get('org_unit_id') is not None else None,position_id=str(r['position_id']) if r.get('position_id') is not None else None,grade=grade_code.get(str(r.get('grade_id'))),
+                  # A dismissed employee is kept by Reference Manager, not deleted (#201).
+                  is_active=int(r.get('employment_state')=='EMPLOYED' and not r.get('is_deleted',False))),r,at)
+    # Org units and positions are referenced by id; project roles and grades by their code, which
+    # Reference Manager never changes after creation (#201, BR-RM-18) and Planning facts carry.
     for entity,name,idcol in [('org_units','org_unit','org_unit_id'),('positions','position','position_id'),('project_roles','project_role','role_code'),('grades','grade','grade_id')]:
-        for r in records(db,'reference',entity):dimension(db,name,'reference',r['id'],{idcol:str(r['id']),'name':r.get('name'),'parent_id':str(r['parent_id']) if r.get('parent_id') is not None else None},r,at)
+        for r in records(db,'reference',entity):
+            key=reference_key(entity,r)
+            dimension(db,name,'reference',key,{idcol:key if entity=='project_roles' else str(r['id']),'name':r.get('name'),'parent_id':str(r['parent_id']) if r.get('parent_id') is not None else None},r,at)
     plans=records(db,'planning','plan')
     for r in plans:
         p=r.get('data',{});pid=p.get('projectId')

@@ -131,8 +131,9 @@ class Service:
                 if params['status'] not in {'EXTRACTING','LOADED','REJECTED'}: raise Problem(422,'INVALID_PARAMETER')
                 where.append('status=?');args.append(params['status'])
             rows,count=self.db_page('etl.batch',' AND '.join(where),args,'id,source,status,started_at,completed_at,row_count,error_code','started_at DESC,id',params)
-            return 200,{'items':[{'batchId':r[0],'source':SOURCE_NAMES[r[1]],'status':r[2],'startedAt':r[3],'finishedAt':r[4],'rows':r[5],'error':r[6]}
-                                  for r in rows],'total':count},{}
+            from reasons import explain
+            return 200,{'items':[{'batchId':r[0],'source':SOURCE_NAMES[r[1]],'status':r[2],'startedAt':r[3],'finishedAt':r[4],'rows':r[5],'error':r[6],
+                                  'reason':explain(r[6],r[1])} for r in rows],'total':count},{}
         if 'status' in params: raise Problem(422,'INVALID_PARAMETER')
         if resource=='reconciliations' and method=='GET':
             rows,count=self.db_page('etl.reconciliation',' AND '.join(where),args,

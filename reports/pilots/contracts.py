@@ -17,7 +17,7 @@ def tracker_validator(name):
         parents = Path(__file__).resolve().parents
         if len(parents) < 3:
             raise Rejected("TRACKER_CONTRACT_PATH_REQUIRED")
-        path = parents[2] / "task-tracker/docs/block-g-api-and-events/openapi.yaml"
+        path = parents[2] / "api/openapi/task-tracker/v1/openapi.yaml"
     document = yaml.safe_load(path.read_text())
     schema = {"$ref": "#/components/schemas/" + name, "components": document["components"]}
     return Draft202012Validator(schema, format_checker=FormatChecker())

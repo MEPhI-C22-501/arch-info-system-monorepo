@@ -1370,6 +1370,10 @@ components:
         error:
           type: string
           nullable: true
+        reason:
+          type: string
+          nullable: true
+          description: Причина отказа словами, например какой роли не хватает служебному входу Reports
     Reconciliation:
       type: object
       required: [reconciliationId, source, entity, mode, result, checkedAt]

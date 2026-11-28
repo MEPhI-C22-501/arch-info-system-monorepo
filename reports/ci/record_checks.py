@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,7 @@ def main():
     npm = os.getenv('NPM') or shutil.which('npm') or 'npm'
     commands = [
         ('contracts-and-links', [sys.executable, 'reports/ci/validate.py']),
+        ('neighbour-contracts', [sys.executable, 'reports/ci/check_contracts.py']),
         ('python-tests', [sys.executable, *test]),
         ('cube-scope-tests', [node, '--test', 'reports/pilots/tests/cube-auth.test.cjs']),
         ('ui-tests', [npm, '--prefix', 'reports/pilots/ui', 'test']),
@@ -45,7 +47,7 @@ def main():
     commands.append(('reports-secret-scan', [sys.executable, 'reports/ci/check_secrets.py', '--record']))
     if args.native_postgres:
         commands.insert(2,('cube-all-measures',[sys.executable,'reports/pilots/check_semantics.py']))
-    checks, logs = [], []
+    checks, logs, skipped = [], [], []
     for name, command in commands:
         if name == 'reports-secret-scan':
             # Include this run's logs in the scan, not just a previous run.
@@ -53,17 +55,21 @@ def main():
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         checks.append({'name': name, 'exit_code': result.returncode})
         logs.append(name+'\n'+result.stdout+result.stderr)
+        if name == 'python-tests':
+            # A skip without a reason is indistinguishable from an error: every one is listed with its reason.
+            skipped = [{'test': m.group(1), 'reason': m.group(2)} for m in
+                       re.finditer(r"^(\S+) \([^)]*\) \.\.\. skipped '(.*)'$", result.stdout+result.stderr, re.M)]
         print(name, 'passed' if result.returncode == 0 else 'failed')
     hashes = {}
     for source in REPORTS.rglob('*'):
         relative = source.relative_to(ROOT)
         if source.is_file() and not {'artifacts', '.venv', 'node_modules', 'dist', '__pycache__'}.intersection(relative.parts):
             hashes[str(relative)] = hashlib.sha256(source.read_bytes()).hexdigest()
-    contracts = ['task-tracker/docs/block-g-api-and-events/openapi.yaml',
-                 'qa/api/openapi/v1/openapi.yaml', 'planning-system/docs/contracts/openapi.json',
-                 'reference-manager/backend/api/openapi/v1/employee/openapi.yaml']
-    for name in contracts: hashes[name] = hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
+    # Every neighbour contract Reports reads, from the shared catalog (check_contracts.py).
+    from check_contracts import NEIGHBOURS
+    for name in sorted({file for file, _ in NEIGHBOURS.values()}): hashes[name] = hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
     output = {'captured_at_utc': datetime.now(timezone.utc).isoformat(), 'python': platform.python_version(),
+              'skipped_tests': skipped,
               'base_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'native_postgres_test': args.native_postgres, 'checks': checks, 'source_sha256': hashes,
               'container_stack_verified': args.bi and all(c['exit_code'] == 0 for c in checks if c['name'] in

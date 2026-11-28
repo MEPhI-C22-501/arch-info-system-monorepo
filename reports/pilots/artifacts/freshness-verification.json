@@ -1,0 +1,57 @@
+{
+  "checked_at_utc": "2026-11-28T09:46:00.418689+00:00",
+  "measurements": [
+    {
+      "source": "planning",
+      "promised": "24 ч; 1 ч после сигнала Planning",
+      "tick_seconds": 3600,
+      "what_changed": "available hours of the plan",
+      "samples_seconds": [
+        0.8
+      ],
+      "scheduled_tick_included": false,
+      "measured_at_utc": "2026-11-28T09:30:33.435739+00:00",
+      "within_promise": true
+    },
+    {
+      "source": "qa",
+      "promised": "1 ч",
+      "tick_seconds": 3600,
+      "what_changed": "R-07 failed results",
+      "samples_seconds": [
+        1.1
+      ],
+      "scheduled_tick_included": false,
+      "measured_at_utc": "2026-11-28T09:30:39.527557+00:00",
+      "within_promise": true
+    },
+    {
+      "source": "reference",
+      "promised": "1 ч (ежечасный List)",
+      "tick_seconds": 3600,
+      "what_changed": "employee name in report labels",
+      "samples_seconds": [
+        1.3
+      ],
+      "scheduled_tick_included": false,
+      "measured_at_utc": "2026-11-28T09:30:36.882080+00:00",
+      "within_promise": true
+    },
+    {
+      "source": "tracker",
+      "promised": "до 2 мин",
+      "tick_seconds": 60,
+      "what_changed": "R-01 total hours",
+      "samples_seconds": [
+        40.2,
+        54.2,
+        33.1
+      ],
+      "scheduled_tick_included": true,
+      "measured_at_utc": "2026-11-28T09:46:00.418689+00:00",
+      "within_promise": true
+    }
+  ],
+  "passed": true,
+  "method": "neighbour demo database changed at t0; Reports ETL at the stand cadence; reports engine polled every second"
+}

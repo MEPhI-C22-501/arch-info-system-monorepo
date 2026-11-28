@@ -1,0 +1,62 @@
+{
+  "task-tracker": {
+    "file": "api/openapi/task-tracker/v1/openapi.yaml",
+    "operations": {
+      "GET /reports/work-items": "fbefa30fac9c007bc25ba99037bdd1bae10389eeddc4dd575f73d3b91903972b",
+      "GET /reports/time-logs": "5e91975c5ce461cb78dbaab43bfe621d76a2fdd909b4fe3b1dd99542ec9e7a30",
+      "GET /reports/iterations": "25a997203dc8de948ec4b241aa046782d7b73dbce6a72e32dddb5792aaf30447",
+      "GET /reports/statuses": "db0cbd10fc5cb61caa9270544c17f4354269e6e08cf62d723319e8137bf1a0c4",
+      "GET /reports/history": "153a2cbe31dc90fb5783a8cbe0128a13f7cb97c5657dccdf032723da5e7271d3"
+    }
+  },
+  "planning-system": {
+    "file": "api/openapi/planning-system/v1/openapi.json",
+    "operations": {
+      "POST /api/v1/exports": "c837dd9a0ad80917d0cdf71ca9be290b74f83d800dff13abd9f14b53aab4fadb",
+      "GET /api/v1/exports/{batchId}": "8e48886d5bfa65db12e749b88845fe85c091b700aee24fa1929459d6fff0c159",
+      "GET /api/v1/exports/{batchId}/rows": "7c97b31a813483f5b200c3aeb11736afa871cdf15d70c1a5383105827299e3ce"
+    }
+  },
+  "qa": {
+    "file": "api/openapi/qa/v1/openapi.yaml",
+    "operations": {
+      "GET /reports/{resource}": "23b89c41d773801dfa119057eaedb4f396afa712a6a4b19f917dd270cf597ebb"
+    }
+  },
+  "reference-manager/employee": {
+    "file": "api/openapi/reference-manager/employee/openapi.yaml",
+    "operations": {
+      "GET /v1/employees/": "4b7aa3508c7b544a121716c6cfb694a1e53b7ab74afb2132eea983ec53ba4d7c"
+    }
+  },
+  "reference-manager/org_unit": {
+    "file": "api/openapi/reference-manager/org_unit/openapi.yaml",
+    "operations": {
+      "GET /v1/org_units/": "e8057cf404f9b603bb3eccb534bb8b524f08850af3a2a6798bf3d86236c983f2"
+    }
+  },
+  "reference-manager/position": {
+    "file": "api/openapi/reference-manager/position/openapi.yaml",
+    "operations": {
+      "GET /v1/positions/": "d75af58597f842105f15e466b20ed1fb5fc420455968d01669a7867864c42533"
+    }
+  },
+  "reference-manager/project_role": {
+    "file": "api/openapi/reference-manager/project_role/openapi.yaml",
+    "operations": {
+      "GET /v1/project_roles/": "3eb7499f8bb1c2cf9b2f4231b705180325dcd8d5b67a14adc16153b6ecd54060"
+    }
+  },
+  "reference-manager/grade": {
+    "file": "api/openapi/reference-manager/grade/openapi.yaml",
+    "operations": {
+      "GET /v1/grades/": "62f9daf93bf7e1367c92c17b7ff6db7e41b62bd9f610baaab3a178f8dd424a9f"
+    }
+  },
+  "reference-manager/profile": {
+    "file": "api/openapi/reference-manager/profile/openapi.yaml",
+    "operations": {
+      "GET /v1/profiles": "7fa831ee930d0353f8755ba7fe4a14af6a5f88a65221dc1d24456854083e1f61"
+    }
+  }
+}

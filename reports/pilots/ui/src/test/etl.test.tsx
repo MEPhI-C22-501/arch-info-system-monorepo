@@ -10,7 +10,8 @@ const streams = { items: [
 ] };
 const batches = { total: 2, items: [
   { batchId: 'b-2', source: 'task-tracker', status: 'LOADED', startedAt: '2026-11-04T09:00:00Z', finishedAt: '2026-11-04T09:00:05Z', rows: 13, error: null },
-  { batchId: 'b-1', source: 'qa-system', status: 'REJECTED', startedAt: '2026-11-04T08:30:00Z', finishedAt: '2026-11-04T08:30:02Z', rows: null, error: 'SOURCE_LOAD_IN_PROGRESS' },
+  { batchId: 'b-1', source: 'qa-system', status: 'REJECTED', startedAt: '2026-11-04T08:30:00Z', finishedAt: '2026-11-04T08:30:02Z', rows: null, error: 'SOURCE_HTTP_403',
+    reason: 'QA System отказал в доступе (403): служебному входу Reports не выдана роль qa-reports-reader. Роль выдаёт Infra по заявке.' },
 ] };
 const checks = { total: 1, items: [
   { reconciliationId: 'r-1', source: 'task-tracker', entity: 'work-items', sourceCount: 2, dwhCount: 2, missing: 0, extra: 0, mode: 'SOURCE', result: 'MATCH', checkedAt: '2026-11-04T09:00:05Z' },
@@ -37,7 +38,9 @@ describe('SCR-10 freshness and ETL journal', () => {
     expect(within(table).getByText(/Совпадает, 04\.11\.2026/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Обновить из источника/ })).not.toBeInTheDocument();
     const journalTable = await screen.findByRole('table', { name: /Пакеты загрузки/ });
-    expect(within(journalTable).getByText('SOURCE_LOAD_IN_PROGRESS')).toBeInTheDocument();
+    expect(within(journalTable).getByText(/не выдана роль qa-reports-reader/)).toBeInTheDocument();
+    expect(within(journalTable).getByText('SOURCE_HTTP_403')).toBeInTheDocument();
+    expect(within(table).getByText(/не выдана роль qa-reports-reader/)).toBeInTheDocument();
     expect(within(journalTable).getByText('13')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: /Сверки/ })).toBeInTheDocument();
   });

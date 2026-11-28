@@ -77,7 +77,7 @@ class Pipeline(unittest.TestCase):
         return self.db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
 
     def test_actual_tracker_contracts_validate_fixture_and_page(self):
-        document = yaml.safe_load((ROOT/'task-tracker/docs/block-g-api-and-events/openapi.yaml').read_text())
+        document = yaml.safe_load((ROOT/'api/openapi/task-tracker/v1/openapi.yaml').read_text())
         for resource, name in [('time-logs', 'TimeLogPage'), ('work-items', 'ReportWorkItemPage')]:
             schema = {'$ref': '#/components/schemas/'+name, 'components': document['components']}
             Draft202012Validator(schema, format_checker=FormatChecker()).validate(
@@ -91,7 +91,7 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(self.count('dwh.fact_time_log'), 0)
 
     def test_container_contract_override_does_not_resolve_repository_parents(self):
-        contract = ROOT/'task-tracker/docs/block-g-api-and-events/openapi.yaml'
+        contract = ROOT/'api/openapi/task-tracker/v1/openapi.yaml'
         tracker_validator.cache_clear()
         try:
             with patch('contracts.__file__', '/app/contracts.py'), patch.dict(os.environ, {'REPORTS_TRACKER_CONTRACT': str(contract)}):

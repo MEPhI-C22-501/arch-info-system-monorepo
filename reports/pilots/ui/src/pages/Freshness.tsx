@@ -86,7 +86,10 @@ export function Freshness() {
                     <td className={'status ' + STATE[s.state][1]}>{STATE[s.state][0]}</td>
                     {can.etlJournal && (
                       <>
-                        <td>{batch ? <span className={'status ' + BATCH[batch.status][1]}>{BATCH[batch.status][0]}, {dateTime(batch.finishedAt ?? batch.startedAt)}</span> : '—'}</td>
+                        <td>
+                          {batch ? <span className={'status ' + BATCH[batch.status][1]}>{BATCH[batch.status][0]}, {dateTime(batch.finishedAt ?? batch.startedAt)}</span> : '—'}
+                          {batch?.status === 'REJECTED' && batch.reason && <p className="muted batch-reason">{batch.reason}</p>}
+                        </td>
                         <td>{check ? <span className={check.result === 'MATCH' ? 'status status-completed' : 'status status-failed'}>{check.result === 'MATCH' ? 'Совпадает' : 'Расхождение'}, {dateTime(check.checkedAt)}</span> : '—'}</td>
                       </>
                     )}
@@ -167,7 +170,7 @@ function BatchJournal() {
             <div className="table-scroll" tabIndex={0}>
               <table>
                 <caption>Пакеты загрузки, страница {page} из {Math.max(1, Math.ceil(total / SIZE))}</caption>
-                <thead><tr><th scope="col">Источник</th><th scope="col">Статус</th><th scope="col">Начало</th><th scope="col">Окончание</th><th scope="col" className="num">Записей</th><th scope="col">Ошибка</th></tr></thead>
+                <thead><tr><th scope="col">Источник</th><th scope="col">Статус</th><th scope="col">Начало</th><th scope="col">Окончание</th><th scope="col" className="num">Записей</th><th scope="col">Причина отказа</th></tr></thead>
                 <tbody>
                   {batches.data.items.map((b) => (
                     <tr key={b.batchId}>
@@ -176,7 +179,7 @@ function BatchJournal() {
                       <td>{dateTime(b.startedAt)}</td>
                       <td>{b.finishedAt ? dateTime(b.finishedAt) : '—'}</td>
                       <td className="num">{b.rows === null ? '—' : formatCell(b.rows)}</td>
-                      <td className="mono">{b.error ?? '—'}</td>
+                      <td>{b.error ? <>{b.reason ?? b.error} <span className="mono muted">{b.error}</span></> : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
