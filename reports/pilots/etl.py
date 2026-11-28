@@ -274,9 +274,11 @@ def catalog_extract(client, source):
         entities = {resource: reference(client, resource) for resource in sorted(HR_RESOURCES)}
         profiles = reference_profiles(client)
         names = {p["employeeId"]:p["displayName"] for p in profiles if p.get("employeeId")}
+        # /v1/profiles gives the display name of an employee or an external account (RM ADR-022:
+        # employees has no display_name). Kept under our own key, never mistaken for an employees field.
         for employee in entities["employees"]:
             if employee["id"] in names:
-                employee["display_name"] = names[employee["id"]]
+                employee["profile_display_name"] = names[employee["id"]]
         entities["profiles"] = profiles
     else:
         entities = {resource: numbered(client, resource, tracker=False) for resource in sorted(QA_RESOURCES)}
@@ -331,7 +333,8 @@ def run_once(args):
         complete_reload_requests(db, args.source, begun)
         return result
     except Rejected as error:
-        return {"status": "REJECTED", "error": str(error)}
+        from reasons import explain
+        return {"status": "REJECTED", "error": str(error), "reason": explain(str(error), args.source)}
     finally:
         db.close()
 

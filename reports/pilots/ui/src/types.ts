@@ -50,7 +50,7 @@ export interface DimensionOption { id: string; label: string }
 
 export interface Batch {
   batchId: string; source: string; status: 'EXTRACTING' | 'LOADED' | 'REJECTED';
-  startedAt: string; finishedAt: string | null; rows: number | null; error: string | null;
+  startedAt: string; finishedAt: string | null; rows: number | null; error: string | null; reason?: string | null;
 }
 
 export interface Reconciliation {

@@ -1,12 +1,13 @@
 name: Reports Checks
 
-# Reports reads the owners' contracts directly, so their changes rerun the checks.
+# Reports reads neighbours' contracts from the shared catalog api/openapi (check_contracts.py), so their changes rerun the checks.
 on:
   pull_request:
     paths:
       - 'reports/**'
       - '.github/workflows/reports-checks.yaml'
       - 'task-tracker/docs/block-g-api-and-events/**'
+      - 'api/openapi/**'
       - 'qa/api/**'
       - 'qa/docs/140.event-schema.md'
       - 'planning-system/docs/contracts/**'
@@ -17,6 +18,7 @@ on:
       - 'reports/**'
       - '.github/workflows/reports-checks.yaml'
       - 'task-tracker/docs/block-g-api-and-events/**'
+      - 'api/openapi/**'
       - 'qa/api/**'
       - 'qa/docs/140.event-schema.md'
       - 'planning-system/docs/contracts/**'

@@ -22,6 +22,23 @@ def freshness(db):
     return state[0], 'FRESH' if fresh else 'STALE'
 
 
+def readiness(db):
+    """Ready only after a first successful load of every source and with fresh tracker data:
+    an empty store is a non-working Reports, not an idle one (review 5). The body names what is missing and why."""
+    from reasons import explain
+    sources = {}
+    for source in ['tracker', 'planning', 'reference', 'qa']:
+        loaded = db.execute('SELECT data_as_of FROM etl.source_state WHERE source=?', (source,)).fetchone()
+        failure = db.execute("SELECT error_code FROM etl.batch WHERE source=? AND status='REJECTED' ORDER BY completed_at DESC LIMIT 1",
+                             (source,)).fetchone()
+        sources[source] = {'loaded': loaded is not None, 'dataAsOf': loaded[0] if loaded else None,
+                           'lastRejection': explain(failure[0], source) if failure else None}
+    facts = db.execute('SELECT COUNT(*) FROM dwh.fact_time_log').fetchone()[0]
+    _, state = freshness(db)
+    ready = all(s['loaded'] for s in sources.values()) and facts > 0 and state == 'FRESH'
+    return ready, {'status': 'ready' if ready else 'not ready', 'trackerFreshness': state, 'timeLogFacts': facts, 'sources': sources}
+
+
 def authorize(claims):
     subject = claims.get("sub")
     access = claims.get('resource_access')
@@ -108,8 +125,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 db = Database(os.environ['REPORTS_DATABASE_URL'])
                 try:
-                    _, state = freshness(db)
-                    status, data = (200, {'status': 'ready'}) if state == 'FRESH' else (503, {'status': 'not ready'})
+                    ready, data = readiness(db)
+                    status = 200 if ready else 503
                 finally:
                     db.close()
             except Exception:

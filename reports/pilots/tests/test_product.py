@@ -134,6 +134,23 @@ class Product(unittest.TestCase):
         linked=self.db.execute('SELECT COUNT(*) FROM dwh.dim_defect WHERE defect_id=? AND tt_work_item_id=?',(defect,bug['id'])).fetchone()[0]
         self.assertGreaterEqual(linked,1)
 
+    def test_reference_codes_grade_and_dismissed_employee(self):
+        # Reference Manager, #201: a dismissed employee stays (employment_state), grade comes from the
+        # current assignment, project roles and grades are matched to Planning facts by their code.
+        employees=[dict(self.data['reference']['employees'][0]),
+                   {'id':9,'family_name':'Уволенная','given_name':'Ольга','org_unit_id':1,'grade_id':1,
+                    'employment_state':'DISMISSED','dismissal_date':'2026-10-15','account_state':'DISABLED','is_deleted':False}]
+        value=now();load(self.db,'reference',lambda:(dict(self.data['reference'],employees=employees),value,value,None))
+        rows=dict(self.db.execute("SELECT employee_id,is_active FROM dwh.dim_employee WHERE is_current=1 AND employee_key<>-1").fetchall())
+        self.assertEqual((rows['1'],rows['9']),(1,0))
+        grade=self.db.execute("SELECT grade FROM dwh.dim_employee WHERE is_current=1 AND employee_id='1'").fetchone()[0]
+        self.assertEqual(grade,'middle')
+        linked=self.db.execute('SELECT COUNT(*) FROM dwh.fact_demand f JOIN dwh.dim_project_role r ON r.project_role_key=f.project_role_key '
+                               "WHERE r.role_code='developer'").fetchone()[0]
+        self.assertGreaterEqual(linked,1)
+        roles={r['role']['label'] for r in self.query('R-02',dict(QUERY,slice=['role']))['rows']}
+        self.assertIn('Разработчик',roles)
+
     def test_project_scope_mapping_and_drilldown_never_expand_access(self):
         project=self.data['tracker']['work-items'][0]['projectId']
         c=claims(ADMIN,[PM])
@@ -265,6 +282,51 @@ class Product(unittest.TestCase):
         allowed=dict(self.admin,scope='cost.read')
         self.assertEqual(self.query('R-06',c=allowed)['totals']['M-09'],-12.5)
         self.assertEqual(self.query('R-06',c=allowed)['totals']['estimatedTotalCost'],100)
+
+    def test_cost_permission_in_background_and_after_revocation(self):
+        # Review 5, item 7: money follows the current cost.read in the background delivery and in the download.
+        forecast=self.data['planning']['forecast'][0]
+        forecast['data'].update(estimatedTotalCost=100,budgetAdjustment=-12.5,currencyCode='RUB')
+        with self.db.transaction():
+            self.db.execute("UPDATE dwh.source_record SET payload=? WHERE source='planning' AND entity='forecast'",(json.dumps(forecast),))
+        from star import refresh
+        with self.db.transaction(): refresh(self.db,now())
+        rights={'cost':True}
+        def current(subject):  # the current roles in Keycloak, as product_jobs.KeycloakDirectory reads them
+            return {'sub':subject,'scope':'cost.read' if rights['cost'] else '','resource_access':{'reports':{'roles':[AN,AD]}}}
+        owner=Service(self.db,dict(self.admin,scope='cost.read'),resolver=current)
+        payload={'reportId':'R-06','query':QUERY,'schedule':'0 9 * * 1','format':'csv','recipients':[ADMIN]}
+        with self.db.transaction():
+            _,created,_=owner.route('POST','subscriptions',payload)
+            self.db.execute("UPDATE app.subscription SET next_run_at='2026-10-01T00:00:00+00:00' WHERE id=?",(created['subscriptionId'],))
+        tick(self.db,current)
+        first,data=self.db.execute("SELECT id,file_data FROM app.export_job WHERE status='COMPLETED' ORDER BY created_at DESC").fetchone()
+        self.assertIn(b'-12.5',bytes(data))
+        rights['cost']=False
+        # A token issued before the revocation still carries cost.read; the file is refused by the current roles.
+        with self.assertRaises(Problem) as denied: owner.download(first)
+        self.assertEqual(denied.exception.status,403)
+        with self.db.transaction():
+            self.db.execute("UPDATE app.subscription SET next_run_at='2026-10-01T00:00:00+00:00' WHERE id=?",(created['subscriptionId'],))
+        tick(self.db,current)
+        second,data=self.db.execute("SELECT id,file_data FROM app.export_job WHERE status='COMPLETED' ORDER BY created_at DESC").fetchone()
+        self.assertNotEqual(second,first);self.assertNotIn(b'-12.5',bytes(data))
+        # Without cost.read in the scope a request gets no money; oidc.claims_for drops the scope without the role.
+        self.assertNotIn('M-09',self.query('R-06',c=dict(self.admin,scope=''))['totals'])
+
+    def test_readiness_needs_every_source_and_explains_a_403(self):
+        # Review 5, live run: an empty store is a non-working Reports; a 403 says which role is missing.
+        from api import readiness
+        ready,body=readiness(self.db);self.assertTrue(ready,body)
+        with self.db.transaction():
+            self.db.execute("DELETE FROM etl.source_state WHERE source='reference'")
+            self.db.execute("INSERT INTO etl.batch(id,source,status,started_at,completed_at,error_code) VALUES ('b-403','reference','REJECTED',?,?,'SOURCE_HTTP_403')",(now(),now()))
+        ready,body=readiness(self.db)
+        self.assertFalse(ready);self.assertEqual(body['status'],'not ready')
+        self.assertFalse(body['sources']['reference']['loaded'])
+        self.assertIn('не выдана роль reference-reader',body['sources']['reference']['lastRejection'])
+        rejected=Service(self.db,claims(ADMIN,[AN])).route('GET','etl/batches',params={'status':'REJECTED'})[1]['items']
+        self.assertEqual(rejected[0]['error'],'SOURCE_HTTP_403');self.assertIn('Роль выдаёт Infra',rejected[0]['reason'])
 
     def test_failed_encoder_does_not_poison_the_queue(self):
         with self.db.transaction(): key=self.service.create_export('R-01',QUERY,'csv')

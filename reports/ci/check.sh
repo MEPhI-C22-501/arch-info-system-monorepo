@@ -3,6 +3,7 @@ set -eu
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$REPO_ROOT"
 "${PYTHON:-python3}" reports/ci/validate.py
+"${PYTHON:-python3}" reports/ci/check_contracts.py
 if [ "${REPORTS_NATIVE_POSTGRES:-0}" = "1" ]; then
   "${PYTHON:-python3}" reports/pilots/check_postgres.py
 else

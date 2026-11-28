@@ -25,9 +25,16 @@ from etl import load, planning_extract, tracker_extract
 from report_engine import AN, Engine
 
 SERVICES = {'tracker': 'task-tracker/compose.yaml, its own Keycloak realm arch-info-system',
-            'planning': 'planning-system/compose.yaml, AUTH_MODE=demo, DEMO_SEED=true'}
-CONTRACTS = {'tracker': 'task-tracker/docs/block-g-api-and-events/openapi.yaml',
-             'planning': 'planning-system/docs/contracts/openapi.json'}
+            'planning': 'planning-system/compose.yaml, AUTH_MODE=demo, DEMO_SEED=true',
+            'reference': 'reference-manager/deployments/docker-compose.yaml with its seed, its own Keycloak realm arch-info-system',
+            'qa': 'qa/compose.yaml, AUTH_MODE=demo with its seed'}
+CONTRACTS = {'tracker': 'api/openapi/task-tracker/v1/openapi.yaml',
+             'planning': 'api/openapi/planning-system/v1/openapi.json',
+             'reference': 'api/openapi/reference-manager/{employee,org_unit,position,project_role,grade,profile}/openapi.yaml',
+             'qa': 'api/openapi/qa/v1/openapi.yaml'}
+REFERENCE_SCHEMAS = {'employees': ('employee', 'ExpandedEmployee'), 'org_units': ('org_unit', 'ExpandedOrgUnit'),
+                     'positions': ('position', 'ExpandedPosition'), 'project_roles': ('project_role', 'ExpandedProjectRole'),
+                     'grades': ('grade', 'ExpandedGrade'), 'profiles': ('profile', 'Profile')}
 
 
 def client_token(issuer, client_id, secret):
@@ -93,6 +100,88 @@ def tracker_findings(client):
                          for item in page.get('items', []) for e in tracker_validator(schema).iter_errors(item)})
         if errors: findings.append({'resource': resource, 'schema': schema, 'item_errors': errors})
     return findings
+
+
+def reference_validator(spec, schema):
+    """An OpenAPI 3.0 schema of Reference Manager as JSON Schema: nullable becomes a null type."""
+    import yaml
+    from jsonschema import Draft202012Validator, FormatChecker
+    def convert(value):
+        if isinstance(value, list): return [convert(v) for v in value]
+        if not isinstance(value, dict): return value
+        result = {k: convert(v) for k, v in value.items() if k != 'nullable'}
+        if value.get('nullable') and 'type' in result: result['type'] = [result['type'], 'null']
+        if value.get('nullable') and '$ref' in result: result = {'anyOf': [{'$ref': result.pop('$ref')}, {'type': 'null'}], **result}
+        return result
+    root = Path(__file__).resolve().parents[2]
+    document = yaml.safe_load((root/f'api/openapi/reference-manager/{spec}/openapi.yaml').read_text(encoding='utf-8'))
+    return Draft202012Validator(convert({'$ref': '#/components/schemas/'+schema, 'components': document['components']}),
+                                format_checker=FormatChecker())
+
+
+def reference(args, values, db, checks):
+    # Reference Manager's local stand: its own realm with the consumers' service clients (#201).
+    secret = values.get('REPORTS_REFERENCE_CLIENT_SECRET')
+    if not secret: raise SystemExit('Missing REPORTS_REFERENCE_CLIENT_SECRET in ~/secrets.env')
+    denied = status_without_token(args.reference_url+'/v1/employees/?pageSize=1')
+    if denied not in {401, 403}: raise SystemExit(f'Reference Manager answered {denied} without a token')
+    checks.append({'source': 'reference', 'check': 'no_token_denied', 'http_status': denied, 'passed': True})
+    from etl import catalog_extract
+    client = Client(args.reference_url, client_token(args.reference_issuer, 'reports-client', secret), allow_http=True)
+    seen = {}
+
+    def extract():
+        entities, started, data_as_of, facts = catalog_extract(client, 'reference')
+        seen.update(entities)
+        return entities, started, data_as_of, facts
+    try:
+        results, counts = load_twice(db, 'reference', extract)
+    except SystemExit as stop:
+        checks.append({'source': 'reference', 'check': 'live_api_matches_owner_contract', 'passed': False, 'rejected': str(stop)})
+        return
+    errors = {}
+    for entity, (spec, schema) in REFERENCE_SCHEMAS.items():
+        validator = reference_validator(spec, schema)
+        found = sorted({('/'.join(map(str, e.absolute_path)) or 'item')+': '+e.message
+                        for row in seen.get(entity, []) for e in validator.iter_errors({k: v for k, v in row.items() if k not in {'profile_display_name'} and not (entity == 'profiles' and k == 'id')})})
+        if found: errors[entity] = found[:10]
+    employees = seen.get('employees', [])
+    active = dict(db.execute("SELECT employee_id,is_active FROM dwh.dim_employee WHERE is_current=1 AND employee_key<>-1").fetchall())
+    dismissed = [str(e['id']) for e in employees if e.get('employment_state') == 'DISMISSED']
+    roles = {str(r.get('code')) for r in seen.get('project_roles', [])}
+    linked = db.execute("SELECT COUNT(*) FROM dwh.dim_project_role WHERE project_role_key<>-1 AND role_code IN (%s)"
+                        % ','.join('?'*len(roles)), tuple(roles)).fetchone()[0] if roles else 0
+    checks.append({'source': 'reference', 'check': 'live_catalog_twice_without_double_count', 'records': counts,
+                   'rows_per_load': [r['rows'] for r in results], 'contract_errors': errors,
+                   'deleted_employees_included': sum(1 for e in employees if e.get('is_deleted')),
+                   'dismissed_employees': len(dismissed), 'dismissed_marked_inactive': all(active.get(d) == 0 for d in dismissed),
+                   'project_roles_keyed_by_code': linked == len(roles),
+                   'passed': not errors and all(active.get(d) == 0 for d in dismissed) and linked == len(roles)})
+
+
+def qa(args, db, checks):
+    # QA's development mode issues role tokens "demo-<role>"; qa-reports-reader is the Reports role. Not a secret.
+    denied = status_without_token(args.qa_url+'/api/v1/reports/defects?page=1&pageSize=1')
+    if denied not in {401, 403}: raise SystemExit(f'QA answered {denied} without a token')
+    checks.append({'source': 'qa', 'check': 'no_token_denied', 'http_status': denied, 'passed': True})
+    other = urllib.request.Request(args.qa_url+'/api/v1/reports/defects?page=1&pageSize=1', headers={'Authorization': 'Bearer demo-qa-tester'})
+    try:
+        with urllib.request.urlopen(other, timeout=15) as response: wrong_role = response.status
+    except urllib.error.HTTPError as error: wrong_role = error.code
+    checks.append({'source': 'qa', 'check': 'other_role_denied', 'http_status': wrong_role, 'passed': wrong_role == 403})
+    from etl import catalog_extract
+    client = Client(args.qa_url, 'demo-qa-reports-reader', allow_http=True)
+    try:
+        results, counts = load_twice(db, 'qa', lambda: catalog_extract(client, 'qa'))
+    except SystemExit as stop:
+        checks.append({'source': 'qa', 'check': 'live_api_matches_owner_contract', 'passed': False, 'rejected': str(stop)})
+        return
+    analyst = {'sub': 'live-check-analyst', 'exp': 0, 'scope': '', 'resource_access': {'reports': {'roles': [AN]}}}
+    year = {'periodFrom': date.today().replace(month=1, day=1).isoformat(), 'periodTo': date.today().isoformat()}
+    r07 = Engine(db).query('R-07', analyst, {'params': year, 'slice': ['project']})['totals']
+    checks.append({'source': 'qa', 'check': 'live_export_twice_without_double_count', 'records': counts,
+                   'rows_per_load': [r['rows'] for r in results],
+                   'r07_this_year': {k: r07.get(k) for k in ['M-14', 'M-15', 'passed', 'failed', 'blocked', 'skipped']}, 'passed': True})
 
 
 def activate_demo_plan(url):
@@ -186,10 +275,13 @@ def planning(args, db, checks):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--source', choices=['tracker', 'planning'], action='append',
+    parser.add_argument('--source', choices=['tracker', 'planning', 'reference', 'qa'], action='append',
                         help='Services to check; locally they share port 8080, so run them one at a time')
     parser.add_argument('--tracker-url', default='http://localhost:8080')
     parser.add_argument('--tracker-issuer', default='http://localhost:8081/realms/arch-info-system')
+    parser.add_argument('--qa-url', default='http://localhost:8090')
+    parser.add_argument('--reference-url', default='http://localhost:8083')
+    parser.add_argument('--reference-issuer', default='http://localhost:8183/realms/arch-info-system')
     parser.add_argument('--planning-url', default='http://localhost:8080')
     parser.add_argument('--planning-portfolio', default='10000000-0000-4000-8000-000000000001')
     parser.add_argument('--planning-activate-demo-plan', action='store_true',
@@ -203,7 +295,8 @@ def main():
         db = Database('sqlite:'+str(Path(tmp)/'live.sqlite')); db.initialize()
         try:
             for source in sources:
-                tracker(args, values, db, checks) if source == 'tracker' else planning(args, db, checks)
+                {'tracker': lambda: tracker(args, values, db, checks), 'planning': lambda: planning(args, db, checks),
+                 'reference': lambda: reference(args, values, db, checks), 'qa': lambda: qa(args, db, checks)}[source]()
         finally: db.close()
     target = Path(__file__).with_name('artifacts')/'live-sources-verification.json'
     # Each run replaces the records of its own sources, so services can be checked one after another.
@@ -214,8 +307,7 @@ def main():
     output = {'checked_at_utc': datetime.now(timezone.utc).isoformat(), 'sources': checked,
               'passed': all(c['passed'] for c in all_checks), 'checks': all_checks,
               'services': {s: SERVICES[s] for s in checked}, 'contracts': {s: CONTRACTS[s] for s in checked},
-              'not_checked': {'qa': 'QA has no reporting export yet (listReportData is planned)',
-                              'reference': 'not started locally in this run'},
+              'not_checked': {s: reason for s, reason in {'qa': 'not started locally in this run', 'reference': 'not started locally in this run'}.items() if s not in checked},
               'cross_system_consistency': False,
               'source_sha256': {f'reports/pilots/{n}': hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in names}}
     if args.record: target.write_text(json.dumps(output, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

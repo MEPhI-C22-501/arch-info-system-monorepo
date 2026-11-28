@@ -124,7 +124,7 @@ services:
       REPORTS_TRACKER_CONTRACT: /contracts/tracker.yaml
     volumes:
       - demo-data:/demo:ro
-      - ../../task-tracker/docs/block-g-api-and-events/openapi.yaml:/contracts/tracker.yaml:ro
+      - ../../api/openapi/task-tracker/v1/openapi.yaml:/contracts/tracker.yaml:ro
     depends_on:
       mock-tracker: {condition: service_healthy}
   api:
@@ -148,7 +148,7 @@ services:
       <<: *app-env
       REPORTS_TRACKER_CONTRACT: /contracts/tracker.yaml
     volumes:
-      - ../../task-tracker/docs/block-g-api-and-events/openapi.yaml:/contracts/tracker.yaml:ro
+      - ../../api/openapi/task-tracker/v1/openapi.yaml:/contracts/tracker.yaml:ro
     depends_on:
       etl: {condition: service_completed_successfully}
     stop_grace_period: 60s

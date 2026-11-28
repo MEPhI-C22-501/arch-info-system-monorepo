@@ -102,7 +102,7 @@ class Acceptance(unittest.TestCase):
             self.assertEqual({method for method, _ in calls}, {'GET', 'POST'})
             self.assertTrue(all(path == '/planning/api/v1/exports' for method, path in calls if method == 'POST'))
             # Validate the published Planning export envelope and typed rows.
-            document = json.loads((ROOT/'planning-system/docs/contracts/openapi.json').read_text())
+            document = json.loads((ROOT/'api/openapi/planning-system/v1/openapi.json').read_text())
             for endpoint, payload in [('/api/v1/exports/{batchId}', manifest),
                 ('/api/v1/exports/{batchId}/rows', {'batchId': manifest['batchId'], 'dataAsOf': manifest['dataAsOf'],
                                                  'items': data['planning'], 'nextCursor': None})]:

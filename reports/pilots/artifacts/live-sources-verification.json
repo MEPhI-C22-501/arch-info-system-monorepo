@@ -1,11 +1,100 @@
 {
-  "checked_at_utc": "2026-11-10T08:54:39.483394+00:00",
+  "checked_at_utc": "2026-11-28T09:27:12.569947+00:00",
   "sources": [
     "planning",
+    "qa",
+    "reference",
     "tracker"
   ],
   "passed": true,
   "checks": [
+    {
+      "source": "reference",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "reference",
+      "check": "live_catalog_twice_without_double_count",
+      "records": {
+        "employees": 8,
+        "grades": 4,
+        "org_units": 6,
+        "positions": 7,
+        "profiles": 14,
+        "project_roles": 5
+      },
+      "rows_per_load": [
+        44,
+        44
+      ],
+      "contract_errors": {},
+      "deleted_employees_included": 0,
+      "dismissed_employees": 0,
+      "dismissed_marked_inactive": true,
+      "project_roles_keyed_by_code": true,
+      "passed": true
+    },
+    {
+      "source": "qa",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "qa",
+      "check": "other_role_denied",
+      "http_status": 403,
+      "passed": true
+    },
+    {
+      "source": "qa",
+      "check": "live_export_twice_without_double_count",
+      "records": {
+        "defects": 1,
+        "test-cases": 25,
+        "test-plans": 1,
+        "test-results": 25,
+        "test-runs": 1
+      },
+      "rows_per_load": [
+        53,
+        53
+      ],
+      "r07_this_year": {
+        "M-14": 88.8889,
+        "M-15": null,
+        "passed": 8,
+        "failed": 1,
+        "blocked": 0,
+        "skipped": 0
+      },
+      "passed": true
+    },
+    {
+      "source": "tracker",
+      "check": "no_token_denied",
+      "http_status": 401,
+      "passed": true
+    },
+    {
+      "source": "tracker",
+      "check": "live_etl_twice_without_double_count",
+      "records": {
+        "iterations": 1,
+        "statuses": 5,
+        "time-logs": 1,
+        "work-items": 4
+      },
+      "rows_per_load": [
+        11,
+        11
+      ],
+      "time_log_hours": 2.0,
+      "r01_hours_current_month": 2.0,
+      "passed": true
+    },
     {
       "source": "planning",
       "check": "no_token_denied",
@@ -38,49 +127,27 @@
       ],
       "same_batch_replayed": true,
       "passed": true
-    },
-    {
-      "source": "tracker",
-      "check": "no_token_denied",
-      "http_status": 401,
-      "passed": true
-    },
-    {
-      "source": "tracker",
-      "check": "live_etl_twice_without_double_count",
-      "records": {
-        "iterations": 1,
-        "statuses": 5,
-        "time-logs": 1,
-        "work-items": 4
-      },
-      "rows_per_load": [
-        11,
-        11
-      ],
-      "time_log_hours": 2.0,
-      "r01_hours_current_month": 2.0,
-      "passed": true
     }
   ],
   "services": {
     "planning": "planning-system/compose.yaml, AUTH_MODE=demo, DEMO_SEED=true",
+    "qa": "qa/compose.yaml, AUTH_MODE=demo with its seed",
+    "reference": "reference-manager/deployments/docker-compose.yaml with its seed, its own Keycloak realm arch-info-system",
     "tracker": "task-tracker/compose.yaml, its own Keycloak realm arch-info-system"
   },
   "contracts": {
-    "planning": "planning-system/docs/contracts/openapi.json",
-    "tracker": "task-tracker/docs/block-g-api-and-events/openapi.yaml"
+    "planning": "api/openapi/planning-system/v1/openapi.json",
+    "qa": "api/openapi/qa/v1/openapi.yaml",
+    "reference": "api/openapi/reference-manager/{employee,org_unit,position,project_role,grade,profile}/openapi.yaml",
+    "tracker": "api/openapi/task-tracker/v1/openapi.yaml"
   },
-  "not_checked": {
-    "qa": "QA has no reporting export yet (listReportData is planned)",
-    "reference": "not started locally in this run"
-  },
+  "not_checked": {},
   "cross_system_consistency": false,
   "source_sha256": {
-    "reports/pilots/check_live_sources.py": "4ca7861a9e52c7ccadca2207c9a89e0a6b6600187f62d1190eae9b08060ecfae",
-    "reports/pilots/adapters.py": "3133b6b4ad59dd5e6e41672ab37e914f8ae48636834135ce7f365ae5bdd61cdb",
-    "reports/pilots/etl.py": "cf3b97ca15f7d56c940f2047b7f3b91245fad828b4deb48dd25f68c433902b97",
-    "reports/pilots/contracts.py": "c7471614cc2e1d43b14569ca736044a8e88f0a795928fa967c8c624fef7a34df",
-    "reports/pilots/star.py": "cb2c49da6596de0884eb7d391c9d1d14f3e25cd560286cf08150c2aa2eaefc73"
+    "reports/pilots/check_live_sources.py": "21bba4e9f5d1513fee8a4a3dfd386d9685c71eca7f2b4a3977ace6d8e803a8ce",
+    "reports/pilots/adapters.py": "27fea0dc4e453175547cc2c3971d30c60a3fae857713aefc0ba4d53810a7ae8d",
+    "reports/pilots/etl.py": "e6b9876a0d8d8cbc56fdac13931f5aaf46101c414a35d7af68287d18cbb7c0d1",
+    "reports/pilots/contracts.py": "dfbf71681af1bde1f0c3ceb96d0acfcf4c11a3cf8079bc6ae309cfd682e87c07",
+    "reports/pilots/star.py": "85e4772e03a1d3da345af5df865156dc5e0c30e5b5a202b1fc519e5883be9aa7"
   }
 }
