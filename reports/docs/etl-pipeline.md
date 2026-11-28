@@ -45,7 +45,7 @@ Manager); роль та же — `reference-reader`. Из справочнико
 а не согласованность данных между системами. На общем стенде Infra 23.11.2026
 загрузки справочников и QA получили 403: роли служебных входов там не выданы
 (разбор Reference Manager — [их 160, раздел 4.3](../../reference-manager/documents/160.integration-plan.md),
-запрос к Infra — [#158](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/158)).
+запрос к Infra — [#204](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/204), ранее [#158](https://github.com/MEPhI-C22-501/arch-info-system-monorepo/issues/158)).
 Причину отказа Reports теперь показывает словами — какой роли не хватает и кто её
 выдаёт: журнал ETL, журнал пакетов и `GET /readyz` ([сценарии качества](quality-scenarios.md), QS-02).
 
